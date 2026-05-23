@@ -40,17 +40,30 @@ It must be multi-channel-ready even though v1 serves a single owner channel. See
   Alternative considered: `@supabase/ssr` middleware session refresh — rejected
   because CLAUDE.md forbids middleware.
 
+- **Three Supabase clients, mirroring `docs/template_files/`.**
+  `supabase/browser-client.ts` exports a `supabase` singleton (used in hooks for
+  auth + realtime); `supabase/server-client.ts` exports an async `createClient()`
+  (used in actions); `supabase/admin-client.ts` exports `supabaseAdmin` using the
+  secret key (used only in the seed/verification scripts, never in app code).
+  Env is read through `@/lib/env.utils` (`ENV.SUPABASE_URL`,
+  `ENV.SUPABASE_PUBLISHABLE_KEY`); the secret key comes from
+  `process.env.SUPABASE_SECRET_KEY` (server/script only).
+
 - **Auth runs in the browser client inside React Query hooks.** A `useUserAuth`
   hook (in `app/(auth)/login/page.hooks.tsx`) exposes `signUp` / `signIn` /
-  `signOut` mutations using `@/supabase/browser-client`, mirroring
+  `signOut` mutations using the browser client, mirroring
   `docs/template_files/template.hooks.tsx`. Success/error surface via `sonner`
-  toasts (`@/components/CustomToast`); `useAuthStore` holds `{ user,
-  isAuthenticated }`. Rationale: matches the established project pattern exactly.
+  toasts through `@/components/CustomToast` (from
+  `docs/template_files/CustomToast.template.tsx`); `useAuthStore` holds
+  `{ user, isAuthenticated }`.
 
-- **Email verification is on (remote project default).** Signup uses
-  `emailRedirectTo` and routes the user to a verification page, per the template
-  (`/verify`). Rationale: remote Supabase enforces confirmation; the template
-  already models the resend-on-existing-user path.
+- **Email verification via an auth callback route.** Signup uses
+  `emailRedirectTo` pointing at `app/auth/callback/route.ts`, which calls
+  `supabase.auth.exchangeCodeForSession(code)` and redirects on success or to
+  `app/auth/error/page.tsx` on failure — mirroring
+  `docs/template_files/auth-callback-route.ts`. The signup hook handles the
+  resend-on-existing-user path. Rationale: remote Supabase enforces confirmation;
+  the templates already model this flow.
 
 - **Server actions validate with `auth.getUser()`.** Channel reads/writes that
   need the server client live in `*.actions.ts` with `"use server"`, call
@@ -67,11 +80,17 @@ It must be multi-channel-ready even though v1 serves a single owner channel. See
   `owner_user_id = (select auth.uid())`. Rationale: channel pages are public;
   writes restricted to the owner. Matches the real access model.
 
-- **Remote-only Supabase workflow.** Migrations created with
-  `npx supabase migration new`, pushed with `npx supabase db push`; types via
-  `npx supabase gen types typescript --project-id <ref> > supabase/types.ts`.
-  DB verification (RLS) is done with a custom TypeScript script (CLAUDE.md
-  forbids `psql`). Rationale: the project has no local database.
+- **Remote-only Supabase workflow with TypeScript seeding.** Migrations created
+  with `npx supabase migration new`, applied to the linked remote with
+  `npx supabase db push` (or `npx supabase db reset --linked --yes` to rebuild +
+  reseed); types via `npx supabase gen types typescript --project-id <ref> >
+  supabase/types.ts`. The owner account + channel are created by a TypeScript
+  seed (`supabase/seed.ts`, run with `tsx`, using `supabaseAdmin` and
+  `auth.admin.createUser({ email_confirm: true })`), wrapped by `reset-seed.sh` —
+  mirroring `docs/template_files/seed.template.ts` and `reset-seed.sh`. RLS is
+  verified by a similar `tsx` script using the admin + anon clients (CLAUDE.md
+  forbids `psql`). Rationale: the project has no local database; seeding/queries
+  go through TypeScript scripts against the linked remote.
 
 - **File layout per CLAUDE.md.** Co-located `page.hooks.tsx` / `page.types.ts`
   with each route; shared auth store/types in `app/layout.stores.ts` /
@@ -99,12 +118,14 @@ It must be multi-channel-ready even though v1 serves a single owner channel. See
 ## Migration Plan
 
 - Schema: `npx supabase migration new channels` → write SQL → `npx supabase db
-  push` to the remote project. Generate types with `npx supabase gen types ...
-  --project-id <ref>`.
-- Owner account + channel created via the Supabase dashboard / SQL editor (no
-  local seed).
-- Deploy: import repo to Vercel, set `NEXT_PUBLIC_SUPABASE_URL` and
-  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, add `vids.tube` custom domain.
+  push` to the linked remote project. Generate types with `npx supabase gen
+  types ... --project-id <ref>`.
+- Owner account + channel created by `supabase/seed.ts` (run via `tsx`, or
+  through `reset-seed.sh`), using `supabaseAdmin`.
+- Deploy: import repo to Vercel, set `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (and `SUPABASE_SECRET_KEY` only if a
+  server route later needs admin access — not for this change), add `vids.tube`
+  custom domain.
 - Rollback: revert the Vercel deployment; the `channels` migration is additive
   and safe to leave in place.
 

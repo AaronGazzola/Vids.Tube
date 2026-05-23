@@ -19,6 +19,24 @@ SHALL surface the outcome via a toast notification.
 - **THEN** the system resends the verification email and shows a notification
   toast, without creating a duplicate account
 
+### Requirement: Email confirmation callback
+
+The system SHALL provide an auth callback route that exchanges the confirmation
+code from the verification email for a session, redirecting to the app on
+success and to an auth error page on failure.
+
+#### Scenario: Valid confirmation code
+
+- **WHEN** a user follows the verification link and the callback receives a valid
+  code
+- **THEN** the system exchanges the code for a session and redirects to the
+  intended destination
+
+#### Scenario: Missing or invalid code
+
+- **WHEN** the callback is reached without a valid code
+- **THEN** the system redirects to the auth error page
+
 ### Requirement: Account login
 
 The system SHALL allow a registered user to log in with their email and password
