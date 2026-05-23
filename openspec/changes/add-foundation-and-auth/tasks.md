@@ -7,8 +7,8 @@
 
 ## 1. Project scaffold & tooling
 
-- [ ] 1.1 Scaffold the Next.js App Router app (TypeScript, Tailwind, ESLint, `@/*` alias); verify dev server boots; commit
-- [ ] 1.2 Add Vitest + Playwright + dotenv; create `tests/setup-env.ts` (loads `.env.local`), `vitest.config.ts`, `playwright.config.ts`; add `test` / `test:watch` / `test:e2e` scripts; verify Vitest runs; commit
+- [x] 1.1 Scaffold the Next.js App Router app (TypeScript, Tailwind, ESLint, `@/*` alias); verify dev server boots; commit
+- [x] 1.2 Add Vitest + Playwright + dotenv; create `tests/setup-env.ts` (loads `.env.local`), `vitest.config.ts`, `playwright.config.ts`; add `test` / `test:watch` / `test:e2e` scripts; verify Vitest runs; commit
 
 ## 2. Supabase setup
 
