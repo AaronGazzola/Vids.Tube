@@ -4,6 +4,7 @@ import { CustomToast } from "@/components/CustomToast";
 import { supabase } from "@/supabase/browser-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { useAuthStore } from "./layout.stores";
 import type { AuthCredentials } from "./layout.types";
@@ -25,6 +26,34 @@ export function useUser() {
 
 export function useIsOwner() {
   return useAuthStore((state) => state.isAuthenticated);
+}
+
+export function useRequireAuth() {
+  const { isPending } = useUser();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isPending && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isPending, isAuthenticated, router]);
+
+  return { isPending, isAuthenticated };
+}
+
+export function useRequireOwner() {
+  const { isPending } = useUser();
+  const isOwner = useIsOwner();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isPending && !isOwner) {
+      router.replace("/");
+    }
+  }, [isPending, isOwner, router]);
+
+  return { isPending, isOwner };
 }
 
 export function useUserAuth() {
