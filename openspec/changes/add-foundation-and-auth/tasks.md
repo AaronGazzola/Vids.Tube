@@ -1,43 +1,48 @@
 # Tasks: add-foundation-and-auth
 
-> Verbatim code, exact commands, and expected output for each step live in the
-> companion TDD plan: `docs/superpowers/plans/2026-05-23-p1-foundation-and-auth.md`.
-> This checklist mirrors that plan's tasks for OpenSpec tracking. Follow TDD:
-> failing test → minimal implementation → passing test → commit.
+> Follow the conventions in `CLAUDE.md` and the patterns in
+> `docs/template_files/template.{types.ts,actions.ts,hooks.tsx,stores.ts}`.
+> Key rules: **no middleware**; **remote-only Supabase** (no local db); React
+> Query hooks call server actions / browser-client auth; Zustand stores; Shadcn
+> UI + `sonner` toasts; throw all errors (log with `console.error`); no comments;
+> `cn` from `@/lib/utils`. Next.js 16 — consult `node_modules/next/dist/docs/`
+> before writing app code (`AGENTS.md`).
+>
+> Note: the older `docs/superpowers/plans/2026-05-23-p1-foundation-and-auth.md`
+> is **superseded** (it predates these conventions); do not follow its
+> middleware/local-Supabase/raw-form code.
 
-## 1. Project scaffold & tooling
+## 1. Dependencies & app shell
 
-- [x] 1.1 Scaffold the Next.js App Router app (TypeScript, Tailwind, ESLint, `@/*` alias); verify dev server boots; commit
-- [x] 1.2 Add Vitest + Playwright + dotenv; create `tests/setup-env.ts` (loads `.env.local`), `vitest.config.ts`, `playwright.config.ts`; add `test` / `test:watch` / `test:e2e` scripts; verify Vitest runs; commit
+- [ ] 1.1 Add deps: `@supabase/ssr`, `@supabase/supabase-js`, `@tanstack/react-query`, `zustand`, `sonner`; init Shadcn/ui; ensure `cn` exists in `@/lib/utils`
+- [ ] 1.2 Add a React Query provider, the `sonner` `<Toaster />`, and a `@/components/CustomToast` component; wire them into `app/layout.tsx`
 
-## 2. Supabase setup
+## 2. Supabase clients & types (remote)
 
-- [ ] 2.1 `supabase init` and `supabase start`; create `.env.local` (URL, publishable key, service-role key) and committed `.env.example`; verify `.env.local` is gitignored; commit
-- [ ] 2.2 Add Supabase client utilities: `utils/supabase/client.ts` (browser), `utils/supabase/server.ts` (cookies getAll/setAll), `utils/supabase/middleware.ts` (`updateSession` using `getClaims()`); typecheck; commit
-- [ ] 2.3 Add root `middleware.ts` wiring `updateSession` with the asset-excluding matcher; verify app still boots; commit
+- [ ] 2.1 Create `supabase/browser-client.ts` (`createBrowserClient`) and `supabase/server-client.ts` (`createServerClient`, publishable key, cookie getAll/setAll); set `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`; add committed `.env.example`
+- [ ] 2.2 Generate DB types: `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`
 
-## 3. Channels schema & RLS
+## 3. Channels schema & RLS (remote)
 
-- [ ] 3.1 `supabase migration new channels`; write the `channels` table + RLS (public SELECT; owner-only INSERT/UPDATE/DELETE via `owner_user_id = (select auth.uid())`); `supabase migration up`; run advisors; generate types to `utils/supabase/types.ts`; commit
-- [ ] 3.2 Write the RLS integration test (`tests/integration/rls-channels.test.ts`): anonymous can read; owner can insert their own channel; cross-user insert is rejected; run and confirm PASS; commit
+- [ ] 3.1 `npx supabase migration new channels`; write the `channels` table (`id`, `owner_user_id` → `auth.users`, unique `slug`, `name`, `description`, `created_at`) + RLS (public SELECT; owner-only INSERT/UPDATE/DELETE via `owner_user_id = (select auth.uid())`); `npx supabase db push`; regenerate types
+- [ ] 3.2 Write a custom TypeScript verification script (not `psql`) that checks: anonymous can SELECT channels; an owner can INSERT their own channel; a cross-user INSERT is rejected; run it against the dev project and confirm expected results
 
-## 4. Authentication
+## 4. Authentication (browser client + React Query + Zustand)
 
-- [ ] 4.1 Add `lib/auth.ts` with `requireUser()` (redirects to `/login` when no claims) and `getOptionalUser()` (non-redirecting), both using `getClaims()`; typecheck; commit
-- [ ] 4.2 Add signup: `app/(auth)/signup/actions.ts` + `app/(auth)/signup/page.tsx`; disable email confirmation in local `config.toml` and restart Supabase; smoke-check signup; commit
-- [ ] 4.3 Add login + logout: `app/(auth)/login/actions.ts`, `app/(auth)/login/page.tsx`, `app/auth/signout/route.ts`; typecheck; commit
-- [ ] 4.4 Add `components/nav.tsx` reflecting auth state and render it in `app/layout.tsx`; typecheck; commit
-- [ ] 4.5 Write the auth E2E test (`tests/e2e/auth.spec.ts`): sign up → sign out → log back in; run and confirm PASS; commit
+- [ ] 4.1 Add `app/layout.types.ts` (`User`, `AuthState` from `@/supabase/types`) and `app/layout.stores.ts` (`useAuthStore` with `{ user, isAuthenticated, setUser }`)
+- [ ] 4.2 Login route: `app/(auth)/login/page.tsx` (Shadcn form), `app/(auth)/login/page.hooks.tsx` (`useUserAuth` with `signIn` mutation via browser client; invalidate `["user"]`; success/error toasts), `app/(auth)/login/page.types.ts`
+- [ ] 4.3 Signup route: `app/(auth)/signup/page.tsx` + `app/(auth)/signup/page.hooks.tsx` (`signUp` mutation with `emailRedirectTo`; resend-on-existing-user path; success/notification toasts; route to verify) + `app/(auth)/verify/page.tsx`
+- [ ] 4.4 Add `signOut` to `useUserAuth` (browser client; invalidate `["user"]`; toast) and a nav component that derives auth controls from `useAuthStore`; render nav in `app/layout.tsx`
+- [ ] 4.5 Auth E2E (`tests/e2e/auth.spec.ts`): signup shows verification-pending state; login with a pre-verified test account; logout returns to logged-out controls; run and confirm PASS
 
 ## 5. Public channel page
 
-- [ ] 5.1 Add `app/[channelSlug]/page.tsx` rendering channel name + description by slug, with `notFound()` for unknown slugs; typecheck; commit
-- [ ] 5.2 Add local seed (`supabase/seed.sql`): owner `auth.users` + `auth.identities` row + `channels` row; ensure `[db.seed]` enabled; `supabase db reset`; verify `/owner` renders; commit
-- [ ] 5.3 Write the channel-page E2E test (`tests/e2e/channel-page.spec.ts`): seeded channel renders; unknown slug returns 404; run and confirm PASS; commit
+- [ ] 5.1 `app/[channelSlug]/page.actions.ts` (`getChannelBySlugAction` using server client; public read), `app/[channelSlug]/page.hooks.tsx` (`useChannel`), `app/[channelSlug]/page.types.ts`, `app/[channelSlug]/page.tsx` (page shell renders immediately; channel name/description show inline skeletons while loading; not-found state when the query returns no row)
+- [ ] 5.2 Create the owner account (Supabase dashboard) and insert the owner `channels` row (SQL editor) on the remote project
+- [ ] 5.3 Channel-page E2E (`tests/e2e/channel-page.spec.ts`): seeded owner channel renders name/description; unknown slug shows the not-found state; run and confirm PASS
 
 ## 6. Verify & deploy
 
-- [ ] 6.1 Run full suite green: `npm test`, `npm run test:e2e`, `npx tsc --noEmit`, `npm run lint`; commit any fixes
-- [ ] 6.2 Create hosted Supabase project; `supabase link` + `supabase db push` (migrations only, never the seed); create the production owner account + channel via dashboard/SQL
-- [ ] 6.3 Deploy to Vercel with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (no service-role key); verify auth + `/owner` in production
-- [ ] 6.4 Add `vids.tube` custom domain in Vercel and confirm the site resolves
+- [ ] 6.1 `npx tsc --noEmit` and `npm run lint` clean; run E2E suite and the RLS verification script; confirm all green
+- [ ] 6.2 Deploy to Vercel with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; verify auth + `/owner` in production
+- [ ] 6.3 Add `vids.tube` custom domain in Vercel and confirm the site resolves

@@ -3,75 +3,97 @@
 ### Requirement: Account signup
 
 The system SHALL allow a visitor to create an account with an email address and
-a password.
+a password, using the Supabase browser client within a React Query mutation, and
+SHALL surface the outcome via a toast notification.
 
 #### Scenario: Successful signup
 
-- **WHEN** a visitor submits the signup form with a new email and a password of
-  at least 6 characters
-- **THEN** the system creates an account, establishes an authenticated session,
-  and redirects to the home page
+- **WHEN** a visitor submits the signup form with a new email and password
+- **THEN** the system creates the account, shows a success toast indicating a
+  verification email was sent, and routes the visitor to the verification page
 
 #### Scenario: Signup with an already-registered email
 
 - **WHEN** a visitor submits the signup form with an email that already has an
   account
-- **THEN** the system does not create a duplicate account and redirects back to
-  the signup page with an error message
+- **THEN** the system resends the verification email and shows a notification
+  toast, without creating a duplicate account
 
 ### Requirement: Account login
 
-The system SHALL allow a registered user to log in with their email and password.
+The system SHALL allow a registered user to log in with their email and password
+via the Supabase browser client within a React Query mutation.
 
 #### Scenario: Successful login
 
-- **WHEN** a registered user submits the login form with correct credentials
-- **THEN** the system establishes an authenticated session and redirects to the
-  home page
+- **WHEN** a registered, verified user submits the login form with correct
+  credentials
+- **THEN** the system establishes an authenticated session, invalidates the
+  cached user query, shows a success toast, and reflects the logged-in state
 
 #### Scenario: Login with incorrect credentials
 
 - **WHEN** a user submits the login form with an incorrect password
-- **THEN** the system does not establish a session and redirects back to the
-  login page with an error message
+- **THEN** the system does not establish a session and shows an error toast
 
 ### Requirement: Logout
 
-The system SHALL allow an authenticated user to end their session.
+The system SHALL allow an authenticated user to end their session via the
+Supabase browser client within a React Query mutation.
 
 #### Scenario: Successful logout
 
 - **WHEN** an authenticated user activates sign-out
-- **THEN** the system clears the session and the navigation shows logged-out
-  controls (Log in / Sign up)
+- **THEN** the system clears the session, invalidates the cached user query, and
+  the navigation shows logged-out controls (Log in / Sign up)
 
-### Requirement: Session persistence and refresh
+### Requirement: Client-managed auth state
 
-The system SHALL persist the authenticated session in cookies and refresh the
-auth token on each request via middleware.
+The system SHALL hold the current user and authentication flag in a client store
+(`useAuthStore`) and SHALL derive UI state (such as navigation) from it, without
+using middleware.
 
-#### Scenario: Session survives navigation
+#### Scenario: Auth state available across the app
 
-- **WHEN** an authenticated user navigates between pages
-- **THEN** the user remains authenticated without re-entering credentials
+- **WHEN** a user is authenticated
+- **THEN** components reading the auth store see `isAuthenticated` true and the
+  user record, and render authenticated UI
 
-### Requirement: Trustworthy server-side current-user check
+#### Scenario: Auth state cleared on logout
 
-The system SHALL provide a server-side helper that determines the current user
-using verified claims, and SHALL NOT rely on unverified session reads for
-authorization decisions.
+- **WHEN** the user signs out
+- **THEN** the auth store reports `isAuthenticated` false and a null user
 
-#### Scenario: Protected access for an authenticated user
+### Requirement: Server actions validate the authenticated user
 
-- **WHEN** server code calls the require-user helper while a valid session exists
-- **THEN** the helper returns the user's verified claims
+Server actions that perform authenticated database operations SHALL validate the
+caller with `auth.getUser()` before any query, and SHALL throw (no fallback) when
+the user is missing or unauthorized, logging the error with `console.error`.
 
-#### Scenario: Protected access for an anonymous visitor
+#### Scenario: Authorized action proceeds
 
-- **WHEN** server code calls the require-user helper with no valid session
-- **THEN** the helper redirects the visitor to the login page
+- **WHEN** an authenticated user invokes an action that calls `auth.getUser()`
+  successfully
+- **THEN** the action performs its query and returns the result
 
-#### Scenario: Optional user check when logged out
+#### Scenario: Unauthenticated action is rejected
 
-- **WHEN** server code calls the optional-user helper with no valid session
-- **THEN** the helper returns no user without redirecting
+- **WHEN** an action calls `auth.getUser()` and no valid user is present
+- **THEN** the action throws an "Unauthorized" error and performs no query
+
+### Requirement: Route protection via data queries
+
+The system SHALL gate protected routes and features using database queries
+implemented in React Query hooks, not middleware.
+
+#### Scenario: Protected feature denied without access
+
+- **WHEN** a user without the required ownership/permission loads a gated feature
+- **THEN** the gating React Query hook's underlying query returns no authorizing
+  row and the UI withholds the protected content
+
+#### Scenario: Protected feature allowed with access
+
+- **WHEN** a user with the required ownership/permission loads a gated feature
+- **THEN** the gating query returns the authorizing row and the UI renders the
+  protected content

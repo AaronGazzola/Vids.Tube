@@ -44,15 +44,25 @@ own.
 
 ### Requirement: Public channel page
 
-The system SHALL render a public page for a channel addressed by its slug, and
-SHALL return a 404 for an unknown slug.
+The system SHALL render a public page for a channel addressed by its slug. The
+page shell SHALL render immediately, with the data-dependent channel content
+fetched via a React Query hook and shown with inline loading skeletons while
+loading.
 
 #### Scenario: Existing channel renders
 
 - **WHEN** a visitor opens the page for an existing channel slug
-- **THEN** the system displays the channel name and description
+- **THEN** the system displays the channel name and description after the channel
+  query resolves
 
-#### Scenario: Unknown channel returns 404
+#### Scenario: Loading state
+
+- **WHEN** the channel query is in flight
+- **THEN** the page shell is visible and the channel name/description areas show
+  inline loading skeletons
+
+#### Scenario: Unknown channel shows a not-found state
 
 - **WHEN** a visitor opens the page for a slug that has no channel
-- **THEN** the system responds with a 404 not-found result
+- **THEN** the channel query returns no row and the page displays a not-found
+  state

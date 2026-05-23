@@ -43,8 +43,10 @@ Consequences:
 
 | Layer | Choice |
 |---|---|
-| Web framework | Next.js (App Router) on React, TypeScript |
-| Auth + DB + Realtime | Supabase (Postgres, Auth, Realtime) |
+| Web framework | Next.js 16 (App Router) on React 19, TypeScript |
+| UI components | Shadcn/ui + TailwindCSS v4; toasts via `sonner` + `@/components/CustomToast` |
+| State management | Zustand (client state), TanStack React Query (data fetching) |
+| Auth + DB + Realtime | Supabase (Postgres, Auth, Realtime) — **remote only, no local db** |
 | Object storage | Cloudflare R2 (zero egress) |
 | CDN | Cloudflare |
 | Ingest/transcode VM | Hetzner (dedicated CPU) |
@@ -52,23 +54,64 @@ Consequences:
 | Live delivery | Standard HLS, single 720p rendition in v1 (ABR + LL-HLS later) |
 | Payments | Stripe (credit top-ups) |
 | App hosting | Vercel (hobby) initially |
-| Tests | Vitest (unit/integration), Playwright (E2E) |
+| Tests | Playwright (E2E); DB/RLS checks via custom TypeScript scripts |
 
-## Conventions
+> The authoritative coding conventions live in `CLAUDE.md` at the repo root.
+> The summary below must stay consistent with it; `CLAUDE.md` wins on conflict.
+> Next.js 16 has breaking changes from prior versions — consult
+> `node_modules/next/dist/docs/` before writing app code (see `AGENTS.md`).
 
-- **Supabase auth:** use `@supabase/ssr` (`createBrowserClient` /
-  `createServerClient`); cookie sessions refreshed in `middleware.ts`. Trust
-  `supabase.auth.getClaims()` for server-side auth decisions — never
-  `getSession()`. Env vars: `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; `SUPABASE_SERVICE_ROLE_KEY` is
-  server-only.
+## Conventions (summary of CLAUDE.md)
+
+- **No middleware.** Route protection and feature gating are handled by database
+  queries implemented in React Query hooks — never in `middleware.ts`.
+- **Supabase clients:** browser client `@/supabase/browser-client` for auth
+  operations (`signUp`/`signIn`/`signOut`) and realtime; server client
+  `@/supabase/server-client` (publishable key) for table queries inside actions.
+  Generated types at `@/supabase/types`.
+- **Actions** (`*.actions.ts`): `"use server"`, validate auth with
+  `auth.getUser()` before queries, called only from React Query hooks, named
+  `featureNameAction`.
+- **Hooks** (`*.hooks.tsx`): React Query (`useQuery`/`useMutation`) call actions;
+  browser client for auth/realtime; update Zustand stores in `onSuccess`/`queryFn`;
+  loading/error via React Query (not the store); named `useFeatureName`.
+- **Stores** (`*.stores.ts`): Zustand; no `persist` for sensitive data; named
+  `useFeatureNameStore`; file name is plural `*.stores.ts`.
+- **Types** (`*.types.ts`): constructed from `@/supabase/types`; shared types in
+  `layout.types.ts`, page-specific in `page.types.ts`.
+- **Errors:** throw all errors (no fallback behavior); log with `console.error`.
+- **No comments** in any files. No `console.log` in app code.
+- **Class names:** import `cn` from `@/lib/utils`.
+- **Loading skeletons:** render the full page immediately; replace only the
+  data-dependent content (e.g. just the username text) with inline skeletons.
 - **RLS on every table** in exposed schemas; policies match the real access
   model. Never use user-editable `user_metadata` in authorization.
-- **Migrations** via Supabase CLI (`supabase migration new`); never edit applied
-  migrations, add new ones. Generate types with `supabase gen types`.
-- **TDD:** write the failing test first, minimal implementation, frequent commits.
+- **Supabase is remote-only (no local db):** create migrations with
+  `npx supabase migration new <name>` (never hand-write filenames); push with
+  `npx supabase db push`; query the db via a custom TypeScript script (not
+  `psql`); generate types with
+  `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`.
 - **Spec workflow:** OpenSpec is the source of truth. Each milestone/sub-project
   is a change in `openspec/changes/`; capabilities live in `openspec/specs/`.
+
+## File organization
+
+Co-locate utility files with the route they serve, following CLAUDE.md:
+
+```txt
+app/
+├── layout.tsx, layout.stores.ts, layout.actions.ts, layout.types.ts
+├── (auth)/login/
+│   ├── page.tsx, page.hooks.tsx, page.types.ts
+└── [channelSlug]/
+    ├── page.tsx, page.actions.ts, page.types.ts
+```
+
+- Shared functionality (auth state, theme) → higher in the tree
+  (`app/layout.stores.ts`).
+- Section-specific → that section's `layout.*`.
+- Page-specific → that page's `page.*`.
+- Reference templates: `docs/template_files/template.{types.ts,actions.ts,hooks.tsx,stores.ts}`.
 
 ## Milestones
 
@@ -89,7 +132,11 @@ Each gets its own OpenSpec change (or set of changes).
 
 ## Reference docs
 
-The original discovery/brainstorming artifacts live in
-`docs/superpowers/specs/` (roadmap + v1 design) and `docs/superpowers/plans/`
-(P1 TDD plan). OpenSpec changes/specs are the going-forward source of truth;
-those docs are the historical record of how decisions were reached.
+- **`CLAUDE.md`** (repo root) — authoritative coding conventions.
+- **`docs/template_files/`** — canonical patterns for actions/hooks/stores/types.
+- **`AGENTS.md`** — Next.js 16 agent rules (read the bundled Next docs first).
+- **`docs/superpowers/`** — the original discovery/brainstorming artifacts
+  (roadmap + v1 design + the P1 TDD plan). These record *how decisions were
+  reached*; they predate the CLAUDE.md conventions and their middleware /
+  local-Supabase / raw-form code is **superseded** by this change's artifacts.
+  OpenSpec changes/specs + CLAUDE.md are the going-forward source of truth.

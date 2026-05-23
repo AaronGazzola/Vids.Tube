@@ -1,5 +1,15 @@
 # vids.tube P1 — Foundation + Auth Implementation Plan
 
+> ⚠️ **SUPERSEDED — do not implement from this document.** This plan predates the
+> project conventions in `CLAUDE.md` and the templates in `docs/template_files/`.
+> Its code uses **middleware**, **local/Docker Supabase + seed.sql**, raw Tailwind
+> forms, and Next.js 15 — all of which conflict with the current conventions
+> (**no middleware**, **remote-only Supabase**, React Query + Zustand + Shadcn,
+> Next.js 16). The authoritative, up-to-date plan is the OpenSpec change
+> `openspec/changes/add-foundation-and-auth/` (`proposal.md`, `design.md`,
+> `specs/`, `tasks.md`). This file is retained only as a historical record of the
+> original decomposition.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up the vids.tube Next.js app with Supabase auth, a base data model, and a public channel page — a deployable site you can sign into.

@@ -1,83 +1,108 @@
 ## Context
 
-vids.tube is a green-field repository. This change creates the application
-foundation: a Next.js app, Supabase-backed auth, the channel data model, and a
-public channel page. It must establish patterns (auth, RLS, migrations, testing)
-that the remaining v1 changes reuse, and it must be multi-channel-ready even
-though v1 serves a single owner channel. See `openspec/project.md` for the
-stack and conventions.
+vids.tube is a green-field repository with a Next.js 16 (App Router) scaffold in
+place. This change adds Supabase-backed auth, the channel data model, and a
+public channel page, establishing the patterns the rest of v1 reuses. All work
+follows the conventions in `CLAUDE.md` and the patterns in `docs/template_files/`.
+It must be multi-channel-ready even though v1 serves a single owner channel. See
+`openspec/project.md` for the stack summary.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- A deployable Next.js app with email/password auth (signup, login, logout).
-- A single, trustworthy server-side current-user check.
-- A `channels` table with RLS: public read, owner-only writes.
-- A public channel page; unknown slugs return 404.
-- Test patterns: RLS integration tests (Vitest) and auth/page E2E (Playwright).
-- Deployed to Vercel against hosted Supabase, reachable at `vids.tube`.
+- Email/password auth (signup, login, logout) implemented per the template:
+  React Query mutation hooks calling the Supabase **browser** client, with
+  `sonner` toasts and a `useAuthStore` (Zustand) for client auth state.
+- A `channels` table (multi-channel-ready) with RLS: public read, owner-only
+  writes, pushed to the **remote** Supabase project.
+- A public channel page rendered by slug; unknown slugs return 404.
+- Channel data fetched through a server **action** (validates `auth.getUser()`)
+  called from a React Query hook.
+- Navigation reflecting auth state via the auth store.
+- Shadcn/ui components throughout; `cn` from `@/lib/utils`.
+- Playwright E2E for auth + channel page; a TypeScript script to verify RLS.
+- Deployed to Vercel against the remote Supabase project, at `vids.tube`.
 
 **Non-Goals:**
+- **Middleware of any kind** — explicitly forbidden by CLAUDE.md.
+- **Local Supabase / Docker / seed.sql / db reset** — the project is remote-only.
+- Social login / MFA / password reset (email/password only for now).
 - Video pipeline, VOD/live playback, credits, chat, comments, follow (later
   changes).
-- Social login / MFA / password reset flows (email/password only for now).
-- Email confirmation in local dev (disabled to keep the loop fast; may be
-  re-enabled in production later).
 - Adaptive bitrate, shorts, multi-creator onboarding.
 
 ## Decisions
 
-- **`@supabase/ssr` with cookie sessions, refreshed in middleware.**
-  Rationale: the current, supported pattern for Supabase auth in Next.js App
-  Router. Alternative considered: deprecated `@supabase/auth-helpers` — rejected
-  (superseded). Server auth decisions use `supabase.auth.getClaims()`, never
-  `getSession()`, which is not guaranteed to revalidate the token in server code.
+- **No middleware; client-side route protection.** Per CLAUDE.md, route
+  protection and feature gating are handled by database queries in React Query
+  hooks, not `middleware.ts`. Rationale: keeps auth/authorization logic
+  co-located with the data it guards and avoids edge-middleware coupling.
+  Alternative considered: `@supabase/ssr` middleware session refresh — rejected
+  because CLAUDE.md forbids middleware.
 
-- **Email/password auth only.** Rationale: simplest viable auth for an
-  owner-first MVP. Alternatives: Clerk (best UX, but splits the stack and adds a
-  vendor) or social login (more setup, not needed yet) — deferred.
+- **Auth runs in the browser client inside React Query hooks.** A `useUserAuth`
+  hook (in `app/(auth)/login/page.hooks.tsx`) exposes `signUp` / `signIn` /
+  `signOut` mutations using `@/supabase/browser-client`, mirroring
+  `docs/template_files/template.hooks.tsx`. Success/error surface via `sonner`
+  toasts (`@/components/CustomToast`); `useAuthStore` holds `{ user,
+  isAuthenticated }`. Rationale: matches the established project pattern exactly.
 
-- **`channels` table is multi-channel-ready from day one.** A `channels` row
-  keyed to `owner_user_id` with a unique `slug`. Rationale: avoids a painful
-  migration when multi-creator support arrives in v3; the cost now is trivial.
-  Alternative: a single hard-coded channel — rejected as short-sighted given the
-  platform vision.
+- **Email verification is on (remote project default).** Signup uses
+  `emailRedirectTo` and routes the user to a verification page, per the template
+  (`/verify`). Rationale: remote Supabase enforces confirmation; the template
+  already models the resend-on-existing-user path.
 
-- **RLS: public SELECT, owner-only INSERT/UPDATE/DELETE.** Channel pages are
-  public, so anonymous read is allowed; writes are restricted to the owner via
-  `owner_user_id = (select auth.uid())`. Rationale: matches the real access
-  model rather than a blanket `auth.uid()` policy.
+- **Server actions validate with `auth.getUser()`.** Channel reads/writes that
+  need the server client live in `*.actions.ts` with `"use server"`, call
+  `auth.getUser()`, throw on failure, and log with `console.error` — per
+  `template.actions.ts`. Public channel reads do not require auth (RLS allows
+  anonymous select).
 
-- **Local dev via Supabase CLI (Docker) with migrations + seed.** Rationale:
-  reproducible schema, real RLS to test against, clean migration history for the
-  hosted deploy. The seed creates an owner account + channel (incl. an
-  `auth.identities` row so password sign-in works locally).
+- **`channels` table is multi-channel-ready.** A `channels` row keyed to
+  `owner_user_id` with a unique `slug`. Rationale: avoids a painful migration when
+  multi-creator support arrives in v3. Alternative (a single hard-coded channel)
+  rejected as short-sighted.
 
-- **Vitest for RLS integration, Playwright for E2E.** Rationale: RLS is best
-  verified against a real Postgres with two client roles (anon + authenticated);
-  auth flows are inherently browser-level. Test env is loaded from `.env.local`
-  via a dedicated setup file (plain `dotenv/config` only reads `.env`).
+- **RLS: public SELECT, owner-only INSERT/UPDATE/DELETE** via
+  `owner_user_id = (select auth.uid())`. Rationale: channel pages are public;
+  writes restricted to the owner. Matches the real access model.
+
+- **Remote-only Supabase workflow.** Migrations created with
+  `npx supabase migration new`, pushed with `npx supabase db push`; types via
+  `npx supabase gen types typescript --project-id <ref> > supabase/types.ts`.
+  DB verification (RLS) is done with a custom TypeScript script (CLAUDE.md
+  forbids `psql`). Rationale: the project has no local database.
+
+- **File layout per CLAUDE.md.** Co-located `page.hooks.tsx` / `page.types.ts`
+  with each route; shared auth store/types in `app/layout.stores.ts` /
+  `app/layout.types.ts`. Supabase clients at `@/supabase/browser-client` and
+  `@/supabase/server-client`; types at `@/supabase/types`.
 
 ## Risks / Trade-offs
 
-- [Email confirmation disabled locally diverges from production] → Documented as
-  a non-goal; production re-enables confirmation in a later hardening pass.
+- [No middleware means the server client may read a stale/expired token] → Auth
+  state and route protection are client-side (browser client + React Query +
+  Zustand); server actions independently re-validate via `auth.getUser()`, so a
+  stale server cookie cannot grant access.
+- [Remote-only DB makes automated RLS testing touch a real project] → Use a
+  dedicated dev/staging Supabase project for the RLS verification script; never
+  run it against production. Keep test rows namespaced and cleaned up.
 - [Root-level dynamic route `app/[channelSlug]` catches all single-segment paths]
-  → Static routes (`/login`, `/signup`, `/auth/*`) take precedence in Next.js
-  routing, so reserved paths resolve correctly; acceptable for v1.
-- [Hand-written seed inserts into `auth.users`/`auth.identities` can break across
-  GoTrue versions] → Seed is local-dev only and not exercised by login in tests;
-  production owner is created via the dashboard.
-- [Service role key misuse] → Never set in the browser/Vercel for this change;
-  used only by integration tests and admin scripts locally.
+  → Static routes (`/login`, `/signup`, `/verify`) take precedence in Next.js
+  routing, so reserved paths resolve correctly.
+- [Next.js 16 breaking changes] → Consult `node_modules/next/dist/docs/` (per
+  `AGENTS.md`) before writing app code; do not assume prior-version APIs.
+- [Email verification adds a step to the signup E2E] → The E2E either uses a
+  pre-verified test account or asserts the verification-pending state rather than
+  a full inbox round-trip.
 
 ## Migration Plan
 
-- Local: `supabase start` → `supabase migration up` → `supabase db reset`
-  (applies migrations + seed).
-- Hosted: `supabase link` → `supabase db push` (migrations only; never run the
-  local seed against production). Create the production owner account + channel
-  via the dashboard/SQL editor.
+- Schema: `npx supabase migration new channels` → write SQL → `npx supabase db
+  push` to the remote project. Generate types with `npx supabase gen types ...
+  --project-id <ref>`.
+- Owner account + channel created via the Supabase dashboard / SQL editor (no
+  local seed).
 - Deploy: import repo to Vercel, set `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, add `vids.tube` custom domain.
 - Rollback: revert the Vercel deployment; the `channels` migration is additive
@@ -85,7 +110,7 @@ stack and conventions.
 
 ## Open Questions
 
-- Whether/when to re-enable email confirmation and add password reset in
-  production (deferred to a hardening change).
-- Whether profile fields beyond Supabase Auth defaults are needed before the
-  social features change (P6).
+- Whether to add password reset before the social-features change (P6).
+- Whether a separate dev/staging Supabase project exists for the RLS script, or
+  whether RLS is verified manually for now.
+- Whether profile fields beyond Supabase Auth defaults are needed before P6.
