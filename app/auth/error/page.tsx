@@ -1,19 +1,30 @@
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import Link from "next/link";
 
 export default function AuthErrorPage() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
-      <div className="rounded-lg border border-border bg-card p-8 text-center shadow-lg">
-        <h1 className="mb-4 text-2xl font-bold">Authentication Error</h1>
-        <p className="mb-6 text-muted-foreground">
-          There was a problem completing the authentication process. Please try
-          again.
-        </p>
-        <Button asChild>
-          <Link href="/login">Return to Login</Link>
-        </Button>
-      </div>
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <CardTitle>Authentication error</CardTitle>
+          <CardDescription>
+            There was a problem completing the authentication process. Please try
+            again.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link href="/login">Return to login</Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

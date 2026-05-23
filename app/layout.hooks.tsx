@@ -23,6 +23,10 @@ export function useUser() {
   });
 }
 
+export function useIsOwner() {
+  return useAuthStore((state) => state.isAuthenticated);
+}
+
 export function useUserAuth() {
   const queryClient = useQueryClient();
   const router = useRouter();

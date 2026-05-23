@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   description: "Community-driven video platform",
 };
 
+const themeScript = `(function(){try{var t=localStorage.getItem('vids-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,12 +33,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           <Nav />
           {children}
+          <Toaster />
         </Providers>
-        <Toaster />
       </body>
     </html>
   );
