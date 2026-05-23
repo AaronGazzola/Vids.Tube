@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "doppler run -- next dev",
     "build": "next build",
+    "build:local": "doppler run -- next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "doppler run -- playwright test",
+    "seed": "doppler run -- tsx supabase/seed.ts",
+    "rls-check": "doppler run -- tsx supabase/rls-check.ts",
+    "db:types": "supabase gen types typescript --linked > supabase/types.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
