@@ -1,0 +1,42 @@
+"use client";
+
+import { cn } from "@/lib/utils";
+import { Film, LayoutDashboard, Radio, Settings, Upload } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const items = [
+  { href: "/studio", label: "Overview", icon: LayoutDashboard },
+  { href: "/studio/upload", label: "Upload", icon: Upload },
+  { href: "/studio/live", label: "Go Live", icon: Radio },
+  { href: "/studio/videos", label: "Videos", icon: Film },
+  { href: "/studio/settings", label: "Settings", icon: Settings },
+];
+
+export function StudioSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="flex gap-1 overflow-x-auto border-b p-2 md:w-56 md:flex-col md:border-b-0 md:border-r md:p-3">
+      {items.map((item) => {
+        const active = pathname === item.href;
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
+              active
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
