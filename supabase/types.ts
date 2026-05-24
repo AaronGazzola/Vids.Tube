@@ -66,6 +66,111 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_keys: {
+        Row: {
+          channel_id: string
+          created_at: string
+          key: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          key: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_keys_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      streams: {
+        Row: {
+          channel_id: string
+          created_at: string
+          ended_at: string | null
+          hls_path: string | null
+          id: string
+          last_seen_at: string | null
+          max_viewers: number
+          started_at: string | null
+          status: string
+          title: string | null
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          ended_at?: string | null
+          hls_path?: string | null
+          id?: string
+          last_seen_at?: string | null
+          max_viewers?: number
+          started_at?: string | null
+          status?: string
+          title?: string | null
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          ended_at?: string | null
+          hls_path?: string | null
+          id?: string
+          last_seen_at?: string | null
+          max_viewers?: number
+          started_at?: string | null
+          status?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "streams_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

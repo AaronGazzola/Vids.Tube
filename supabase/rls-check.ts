@@ -46,6 +46,18 @@ async function run() {
   const { error: anonReadErr } = await anon.from("channels").select("*");
   assert("anonymous can read channels", anonReadErr === null);
 
+  const { error: anonStreamsErr } = await anon.from("streams").select("*");
+  assert("anonymous can read streams", anonStreamsErr === null);
+
+  const { error: anonChatErr } = await anon.from("chat_messages").select("*");
+  assert("anonymous can read chat_messages", anonChatErr === null);
+
+  const { data: anonKeys } = await anon.from("stream_keys").select("*");
+  assert(
+    "anonymous cannot read stream_keys (zero rows)",
+    (anonKeys?.length ?? 0) === 0
+  );
+
   const clientA = createClient<Database>(url, publishableKey);
   const { error: signInErr } = await clientA.auth.signInWithPassword({
     email: emailA,
@@ -66,6 +78,44 @@ async function run() {
     name: "Should fail",
   });
   assert("cross-user insert is rejected", crossInsertErr !== null);
+
+  const { data: nonOwnerKeys } = await clientA.from("stream_keys").select("*");
+  assert(
+    "non-owner authenticated user cannot read stream_keys (zero rows)",
+    (nonOwnerKeys?.length ?? 0) === 0
+  );
+
+  const { data: ownerStream, error: ownerStreamErr } = await admin
+    .from("streams")
+    .select("id")
+    .eq("status", "idle")
+    .limit(1)
+    .maybeSingle();
+  if (ownerStreamErr) throw ownerStreamErr;
+
+  if (ownerStream) {
+    const { data: selfMsg, error: selfMsgErr } = await clientA
+      .from("chat_messages")
+      .insert({
+        stream_id: ownerStream.id,
+        user_id: a.user.id,
+        body: `rls self ${stamp}`,
+      })
+      .select("id")
+      .maybeSingle();
+    assert("authenticated user can post chat as themselves", selfMsgErr === null);
+
+    const { error: spoofMsgErr } = await clientA.from("chat_messages").insert({
+      stream_id: ownerStream.id,
+      user_id: b.user.id,
+      body: `rls spoof ${stamp}`,
+    });
+    assert("posting chat as another user is rejected", spoofMsgErr !== null);
+
+    if (selfMsg) await admin.from("chat_messages").delete().eq("id", selfMsg.id);
+  } else {
+    console.log("SKIP: no idle stream present to test chat insert (run seed)");
+  }
 
   await admin.from("channels").delete().eq("owner_user_id", a.user.id);
   await admin.auth.admin.deleteUser(a.user.id);

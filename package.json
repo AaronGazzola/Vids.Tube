@@ -11,7 +11,7 @@
     "test:e2e": "doppler run -- playwright test",
     "seed": "doppler run -- tsx supabase/seed.ts",
     "rls-check": "doppler run -- tsx supabase/rls-check.ts",
-    "db:types": "supabase gen types typescript --linked > supabase/types.ts"
+    "db:types": "npx supabase gen types typescript --linked > supabase/types.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

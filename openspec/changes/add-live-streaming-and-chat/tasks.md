@@ -11,18 +11,18 @@
 
 ## 1. Schema & RLS
 
-- [ ] 1.1 `npx supabase migration new streams_stream_keys_chat`; in it create:
+- [x] 1.1 `npx supabase migration new streams_stream_keys_chat`; in it create:
   - `streams` (`id` uuid pk, `channel_id` fk → channels, `status` text check in (`idle`,`live`,`ended`) default `idle`, `title` text, `hls_path` text, `max_viewers` int not null default 25, `started_at` timestamptz, `ended_at` timestamptz, `last_seen_at` timestamptz, `created_at` timestamptz default now())
   - `stream_keys` (`channel_id` uuid pk fk → channels, `key` text not null, `created_at` timestamptz default now())
   - `chat_messages` (`id` uuid pk default gen_random_uuid(), `stream_id` fk → streams, `user_id` uuid fk → auth.users, `body` text not null, `created_at` timestamptz default now())
-- [ ] 1.2 Enable RLS on all three. Policies:
+- [x] 1.2 Enable RLS on all three. Policies:
   - `streams`: public SELECT (`using (true)`); NO client insert/update/delete (writes only via service-role ingest routes)
   - `stream_keys`: owner-only SELECT + UPDATE via `exists (select 1 from channels c where c.id = channel_id and c.owner_user_id = (select auth.uid()))`; no public access
   - `chat_messages`: public SELECT; INSERT for `authenticated` with `check (user_id = (select auth.uid()))`
-- [ ] 1.3 Enable Realtime on `chat_messages` (add to `supabase_realtime` publication).
-- [ ] 1.4 `npx supabase db push`; then regenerate types: `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`.
-- [ ] 1.5 Seed a `stream_keys` row + an `idle` `streams` row for the owner channel in `supabase/seed.ts`; run the seed.
-- [ ] 1.6 Extend `supabase/rls-check.ts`: assert anon can SELECT `streams`/`chat_messages` but NOT `stream_keys`; assert authenticated chat insert as self succeeds and as another user fails.
+- [x] 1.3 Enable Realtime on `chat_messages` (add to `supabase_realtime` publication).
+- [x] 1.4 `npx supabase db push`; then regenerate types: `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`.
+- [x] 1.5 Seed a `stream_keys` row + an `idle` `streams` row for the owner channel in `supabase/seed.ts`; run the seed.
+- [x] 1.6 Extend `supabase/rls-check.ts`: assert anon can SELECT `streams`/`chat_messages` but NOT `stream_keys`; assert authenticated chat insert as self succeeds and as another user fails.
 
 ## 2. Secrets & dependency
 
