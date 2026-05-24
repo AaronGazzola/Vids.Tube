@@ -1,0 +1,84 @@
+"use client";
+
+import { useLiveChat, usePostChatMessage } from "@/app/layout.hooks";
+import { useAuthStore } from "@/app/layout.stores";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+
+export function LiveChat({ streamId }: { streamId: string | null }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { data: messages = [], isPending } = useLiveChat(streamId);
+  const post = usePostChatMessage(streamId);
+  const [draft, setDraft] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const body = draft.trim();
+    if (!body) {
+      return;
+    }
+    post.mutate(body, { onSuccess: () => setDraft("") });
+  };
+
+  return (
+    <div className="flex h-full min-h-80 flex-col rounded-lg border">
+      <div className="border-b p-3 text-sm font-medium">Live chat</div>
+      <div className="flex-1 space-y-2 overflow-y-auto p-3">
+        {!streamId ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Chat is available during live streams.
+          </p>
+        ) : isPending ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Loading chat…
+          </p>
+        ) : messages.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">
+            No messages yet. Say hello!
+          </p>
+        ) : (
+          messages.map((message) => (
+            <div key={message.id} className="text-sm">
+              <span className="font-medium text-muted-foreground">
+                {message.user_id.slice(0, 8)}
+              </span>{" "}
+              <span>{message.body}</span>
+            </div>
+          ))
+        )}
+        <div ref={endRef} />
+      </div>
+      <div className="border-t p-3">
+        {!streamId ? (
+          <Input placeholder="Chat is offline" disabled />
+        ) : isAuthenticated ? (
+          <form onSubmit={onSubmit} className="flex gap-2">
+            <Input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Send a message"
+              maxLength={500}
+            />
+            <Button type="submit" disabled={post.isPending || !draft.trim()}>
+              Send
+            </Button>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">Sign in to chat</span>
+            <Button asChild size="sm">
+              <Link href="/login">Log in</Link>
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

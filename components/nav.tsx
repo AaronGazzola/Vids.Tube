@@ -3,7 +3,6 @@
 import { useUser } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { AccountMenu } from "@/components/account-menu";
-import { CreditsBadge } from "@/components/credits-badge";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -29,10 +28,7 @@ export function Nav() {
           {isPending ? (
             <Skeleton className="h-8 w-20" />
           ) : isAuthenticated ? (
-            <>
-              <CreditsBadge />
-              <AccountMenu />
-            </>
+            <AccountMenu />
           ) : (
             <>
               <Button variant="ghost" asChild>

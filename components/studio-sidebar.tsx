@@ -1,15 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Film, LayoutDashboard, Radio, Settings, Upload } from "lucide-react";
+import { LayoutDashboard, Radio, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/studio", label: "Overview", icon: LayoutDashboard },
-  { href: "/studio/upload", label: "Upload", icon: Upload },
   { href: "/studio/live", label: "Go Live", icon: Radio },
-  { href: "/studio/videos", label: "Videos", icon: Film },
   { href: "/studio/settings", label: "Settings", icon: Settings },
 ];
 

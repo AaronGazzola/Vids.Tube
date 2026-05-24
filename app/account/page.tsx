@@ -1,7 +1,7 @@
 "use client";
 
 import { useRequireAuth } from "@/app/layout.hooks";
-import { useAuthStore, useCreditsStore } from "@/app/layout.stores";
+import { useAuthStore } from "@/app/layout.stores";
 import { CustomToast } from "@/components/CustomToast";
 import {
   AlertDialog,
@@ -27,8 +27,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Coins } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 
 function stubToast(title: string) {
@@ -40,7 +38,6 @@ function stubToast(title: string) {
 export default function AccountPage() {
   const { isPending, isAuthenticated } = useRequireAuth();
   const user = useAuthStore((state) => state.user);
-  const balance = useCreditsStore((state) => state.balance);
 
   if (isPending || !isAuthenticated) {
     return (
@@ -105,22 +102,6 @@ export default function AccountPage() {
             Change password
           </Button>
         </CardFooter>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Credits</CardTitle>
-          <CardDescription>Your viewing credit balance.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-lg font-semibold">
-            <Coins className="h-5 w-5" />
-            {balance}
-          </span>
-          <Button variant="secondary" asChild>
-            <Link href="/credits">Manage credits</Link>
-          </Button>
-        </CardContent>
       </Card>
 
       <Card className="border-destructive/40">

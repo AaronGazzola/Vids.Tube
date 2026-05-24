@@ -1,32 +1,15 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-test("home renders the channel and video grid", async ({ page }) => {
+test("home renders the live area and nav", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Videos" })).toBeVisible();
   await expect(page.getByRole("link", { name: "vids.tube" })).toBeVisible();
+  await expect(page.getByText("No live stream right now")).toBeVisible();
 });
 
-test("credits page renders packages and history", async ({ page }) => {
-  await page.goto("/credits");
-  await expect(page.getByRole("heading", { name: "Credits" })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Buy credits" })
-  ).toBeVisible();
-});
-
-test("live page shows the sign-in wall for anonymous viewers", async ({
-  page,
-}) => {
+test("live page shows the offline state and chat panel", async ({ page }) => {
   await page.goto("/live");
-  await expect(
-    page.getByRole("heading", { name: "Sign in to keep watching" })
-  ).toBeVisible();
-});
-
-test("watch page renders a player placeholder", async ({ page }) => {
-  await page.goto("/watch/sample");
-  await expect(page.getByText("Player coming soon")).toBeVisible();
-  await expect(page.getByText("Comments coming soon")).toBeVisible();
+  await expect(page.getByText("No live stream right now")).toBeVisible();
+  await expect(page.getByText("Live chat")).toBeVisible();
 });
 
 test("account redirects anonymous users to login", async ({ page }) => {

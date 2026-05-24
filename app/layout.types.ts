@@ -1,3 +1,4 @@
+import type { Database } from "@/supabase/types";
 import type { User } from "@supabase/supabase-js";
 
 export type AuthState = {
@@ -9,3 +10,9 @@ export type AuthCredentials = {
   email: string;
   password: string;
 };
+
+export type Channel = Database["public"]["Tables"]["channels"]["Row"];
+export type Stream = Database["public"]["Tables"]["streams"]["Row"];
+export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
+
+export type ViewerCapState = "connecting" | "admitted" | "full";

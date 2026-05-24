@@ -4,10 +4,20 @@ import { CustomToast } from "@/components/CustomToast";
 import { supabase } from "@/supabase/browser-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  getChatMessagesAction,
+  getLiveStreamAction,
+  getOwnerChannelAction,
+  postChatMessageAction,
+} from "./layout.actions";
 import { useAuthStore } from "./layout.stores";
-import type { AuthCredentials } from "./layout.types";
+import type {
+  AuthCredentials,
+  ChatMessage,
+  ViewerCapState,
+} from "./layout.types";
 
 export function useUser() {
   const setUser = useAuthStore((state) => state.setUser);
@@ -194,4 +204,127 @@ export function useUserAuth() {
   });
 
   return { signUp, signIn, signOut };
+}
+
+export function useOwnerChannel() {
+  return useQuery({
+    queryKey: ["owner-channel"],
+    queryFn: () => getOwnerChannelAction(),
+  });
+}
+
+export function useLiveStream(channelId: string | undefined) {
+  return useQuery({
+    queryKey: ["live-stream", channelId],
+    queryFn: () => getLiveStreamAction(channelId!),
+    enabled: !!channelId,
+    refetchInterval: 15000,
+  });
+}
+
+export function useViewerCap(
+  streamId: string | null,
+  maxViewers: number
+): ViewerCapState {
+  const [state, setState] = useState<ViewerCapState>("connecting");
+
+  useEffect(() => {
+    if (!streamId) {
+      return;
+    }
+
+    const presenceKey = crypto.randomUUID();
+    const channel = supabase.channel(`presence:stream:${streamId}`, {
+      config: { presence: { key: presenceKey } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const presence = channel.presenceState<{ online_at: string }>();
+        const members = Object.entries(presence).map(([key, metas]) => ({
+          key,
+          at: metas[0]?.online_at ?? "",
+        }));
+        members.sort((a, b) =>
+          a.at === b.at ? a.key.localeCompare(b.key) : a.at.localeCompare(b.at)
+        );
+        const rank = members.findIndex((m) => m.key === presenceKey);
+        if (rank === -1) {
+          setState("connecting");
+        } else if (rank < maxViewers) {
+          setState("admitted");
+        } else {
+          setState("full");
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, maxViewers]);
+
+  return state;
+}
+
+export function useLiveChat(streamId: string | null) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["chat", streamId],
+    queryFn: () => getChatMessagesAction(streamId!),
+    enabled: !!streamId,
+  });
+
+  useEffect(() => {
+    if (!streamId) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`chat:${streamId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `stream_id=eq.${streamId}`,
+        },
+        (payload) => {
+          const message = payload.new as ChatMessage;
+          queryClient.setQueryData<ChatMessage[]>(
+            ["chat", streamId],
+            (old = []) =>
+              old.some((m) => m.id === message.id) ? old : [...old, message]
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, queryClient]);
+
+  return query;
+}
+
+export function usePostChatMessage(streamId: string | null) {
+  return useMutation({
+    mutationFn: (body: string) => postChatMessageAction(streamId!, body),
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Message not sent"
+          message={error.message}
+        />
+      ));
+    },
+  });
 }

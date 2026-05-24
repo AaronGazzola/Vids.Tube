@@ -12,11 +12,3 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: false,
   setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
-
-type CreditsStore = {
-  balance: number;
-};
-
-export const useCreditsStore = create<CreditsStore>(() => ({
-  balance: 120,
-}));
