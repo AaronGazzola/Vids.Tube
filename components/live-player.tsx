@@ -27,6 +27,7 @@ export function LivePlayer({ src }: { src: string }) {
         lowLatencyMode: true,
         liveDurationInfinity: true,
         backBufferLength: 30,
+        maxLiveSyncPlaybackRate: 1.5,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
