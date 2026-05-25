@@ -45,12 +45,14 @@ export function LivePlayer({ src }: { src: string }) {
   }, [src]);
 
   return (
-    <video
-      ref={videoRef}
-      controls
-      autoPlay
-      playsInline
-      className="aspect-video w-full rounded-lg bg-black"
-    />
+    <div className="flex w-full justify-center overflow-hidden rounded-lg bg-black">
+      <video
+        ref={videoRef}
+        controls
+        autoPlay
+        playsInline
+        className="max-h-[80vh] w-auto max-w-full"
+      />
+    </div>
   );
 }

@@ -40,15 +40,21 @@ export default function StudioLivePage() {
 
   const isLive = stream?.status === "live";
   const rtmpHost = STREAM_HOST.replace(/^https?:\/\//, "") || "stream.vids.tube";
-  const rtmpUrl = `rtmp://${rtmpHost}/${data?.channelSlug ?? ""}`;
+  const rtmpUrl = `rtmp://${rtmpHost}:1935`;
   const key = data?.key ?? "";
-  const keyValue = revealed ? key : key ? "•".repeat(24) : "";
+  const channelSlug = data?.channelSlug ?? "";
+  const obsKey = key ? `${channelSlug}?key=${key}` : "";
+  const keyValue = obsKey
+    ? revealed
+      ? obsKey
+      : `${channelSlug}?key=${"•".repeat(20)}`
+    : "";
 
   const copyKey = async () => {
-    if (!key) {
+    if (!obsKey) {
       return;
     }
-    await navigator.clipboard.writeText(key);
+    await navigator.clipboard.writeText(obsKey);
     toast.custom(() => (
       <CustomToast
         variant="success"
@@ -71,8 +77,9 @@ export default function StudioLivePage() {
         <CardHeader>
           <CardTitle>Stream setup</CardTitle>
           <CardDescription>
-            Point OBS at this server and stream key, then start streaming.
-            Configure OBS for a 720p output.
+            In OBS, set Service to Custom, paste the Server and Stream Key below,
+            then start streaming. The stream key includes your channel name. Wide
+            (16:9) and mobile (9:16) formats both work.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
