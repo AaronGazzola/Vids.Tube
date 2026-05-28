@@ -1,6 +1,7 @@
 # vids.tube — Product Roadmap
 
 **Date:** 2026-05-23
+**Last updated:** 2026-05-29
 **Domain:** vids.tube
 **Status:** Active
 
@@ -71,18 +72,30 @@ Implications:
 
 Each milestone gets its own spec → implementation plan → build cycle.
 
-### v1 — MVP (current)
-Live streaming (owner only), automatic VOD recording, free VOD playback, live
-chat, credit system (signup allowance + Stripe top-ups, per-minute metering for
-live), per-stream anonymous viewer cap, auth, comments on VODs, follow. Single
-channel, multi-channel-ready data model. See the v1 design spec.
+### v1 — MVP (in progress)
+
+**Shipped (2026-05-25, deployed at vids.tube):**
+- Auth (Supabase) — login / signup / verify.
+- Single-channel pages with multi-channel-ready data model.
+- Studio "Go live" page (shows owner the RTMP server + stream key for OBS).
+- Live streaming (owner only): OBS → RTMP → MediaMTX on a Hetzner VM → **LL-HLS** at `stream.vids.tube` (nginx + Let's Encrypt). ~1–3s latency.
+- Live chat via Supabase Realtime, persisted in `chat_messages`.
+- Live access model: **free + concurrent-viewer cap** (soft cap via Realtime Presence "stream full" wall, default 25; backstopped by a hard edge bandwidth cap on the VM). The originally-designed credit-gating is sequenced as a later v1 slice — see [Finishing v1 — plan](#finishing-v1--plan).
+
+**Remaining (see Finishing v1 — plan):**
+- Automatic VOD recording → Cloudflare R2; free VOD playback page + channel listing.
+- Comments on VODs (auth required).
+- Follow / subscribe to a channel.
+- Credit system (signup allowance + Stripe top-ups + per-minute live metering + balance UI), re-introducing credit-gating on live on top of today's free+capped model.
+
+See the [v1 design spec](./2026-05-23-vids-tube-v1-design.md) for the full original scope.
 
 ### v2 — Content depth
 - Shorts: clip-from-stream UI, vertical reformat pipeline, vertical feed + swipe player.
 - Adaptive bitrate ladder (e.g. 360p / 720p / 1080p).
-- Low-latency HLS (LL-HLS) for ~3s live latency.
 - Creator analytics dashboard (retention curves, watch-time) from the watch
   data already captured in v1.
+- (Low-latency HLS already shipped in v1.)
 
 ### v3 — Platform opening
 - Multi-creator onboarding (others can stream).
@@ -107,6 +120,121 @@ channel, multi-channel-ready data model. See the v1 design spec.
 | CDN | Cloudflare |
 | Ingest/transcode VM | Hetzner (dedicated CPU) |
 | Live ingest engine | MediaMTX + FFmpeg |
-| Live delivery | Standard HLS (LL-HLS deferred to v2) |
+| Live delivery | LL-HLS (1s segments / 200ms parts), nginx on the VM |
 | Payments | Stripe (credit top-ups) |
 | App hosting | Vercel (hobby) initially; revisit self-host later |
+
+## Finishing v1 — plan
+
+The remaining MVP work, broken into four ordered slices. Each slice gets its own
+spec → implementation plan → build cycle. External setup needed before any of
+this starts is covered in the
+[Finishing v1 — External Setup](./2026-05-29-finishing-v1-setup-design.md) doc.
+
+### Slice 1: VOD pipeline
+
+**Goal:** Every completed live stream becomes a free-to-watch VOD on the channel
+page.
+
+**In scope:**
+- MediaMTX records each stream to local disk on the VM (matching the current
+  LL-HLS rendition).
+- An uploader on the VM pushes the finalized recording to R2 (`vids-tube-vod`)
+  on stream-end.
+- The `streams.offline` ingest hook (or a new completion hook) marks the stream
+  ended and creates/updates a `videos` row (`status` processing → ready) with
+  `source_stream_id`, `hls_path` / `mp4_path`, `duration_s`, `thumbnail_path`.
+- Channel page lists the channel's published VODs (newest first).
+- Watch page plays the VOD via hls.js from `cdn.vids.tube`.
+- Public — no playback token, no credit deduction, no cap (matches the design's
+  "VOD is free" stance).
+
+**Open questions for the slice's spec:**
+- **Recording format:** write HLS/fMP4 during the stream and finalize at end
+  (fastest publish, simplest) vs. write a single MP4 and segment after
+  (smaller live overhead, slower publish).
+- **Should live HLS also move to R2?** Today live is served direct from the VM
+  via nginx and works. Moving live HLS to R2 (segment-by-segment upload, live
+  playlist points at `cdn.vids.tube`) buys CDN caching + offloads bandwidth
+  from the VM, but adds uploader complexity and an end-to-end latency hit.
+  Recommendation: keep live on the VM for now, ship VOD on R2 only.
+- **Thumbnails:** first-frame, mid-frame, or 3-up sprite? Generation in the
+  same FFmpeg invocation as the recording.
+- **Local retention:** how many days the VM keeps a local copy of the recording
+  after successful upload.
+
+**External deps:** R2 ready (see Setup doc).
+
+### Slice 2: Comments on VODs
+
+**Goal:** Authenticated users can comment on a VOD; comments render under the
+player.
+
+**In scope:**
+- `comments` table (`id`, `video_id`, `user_id`, `body`, `created_at`) with RLS:
+  public read; authenticated insert-as-self; own-delete; no edits.
+- Comment list + composer under the VOD player.
+- Realtime: prefer Supabase Realtime subscribe for new comments; acceptable
+  fallback is poll-on-focus (decide in spec based on whether Realtime channel
+  count is a concern).
+
+**Open questions:** flat vs threaded (recommend flat for v1); per-user
+rate-limit. Moderation tooling is deferred to v4.
+
+**External deps:** none.
+
+### Slice 3: Follow / subscribe
+
+**Goal:** Authenticated users can follow a channel; the channel page shows
+follower count and a follow/unfollow button.
+
+**In scope:**
+- `follows` table (already in original v1 design) with RLS: user manages own
+  follows; public can read aggregate count.
+- Channel-page follow button + count.
+
+**Out of scope:** following feed page (defer); follower notifications (defer to
+v3 with the recommendation algorithm).
+
+**External deps:** none.
+
+### Slice 4: Credit system
+
+**Goal:** Re-introduce credit-gating on live, on top of the current free+capped
+model — signup grant, Stripe top-ups, per-minute live metering, balance UI.
+
+**In scope (from the original v1 design):**
+- `credit_ledger` (append-only) + `credit_balances` (materialized current
+  balance for fast atomic deduction).
+- Signup grant via a post-signup action or Supabase trigger.
+- Stripe Checkout for top-ups; signature-verified, idempotent webhook → ledger
+  row + balance increase.
+- Short-TTL signed playback token for live; heartbeat (~10s) deducts credits
+  via atomic guarded SQL update and re-validates entitlement.
+- Balance UI on the account page; top-up modal on the live page when balance
+  hits 0.
+- Anonymous viewers: continue to allow under the existing per-stream cap
+  without credits (so live stays accessible to anonymous viewers up to the cap,
+  and the credit gate kicks in only for the authenticated path) — confirm in
+  spec.
+
+**Open questions (carried over from the original v1 design):**
+- Signup grant amount, per-minute live price, credit-pack denominations
+  (also Stripe product/price setup waits on these).
+- Whether the per-stream anonymous cap stays once credits exist, and at what
+  value.
+- Playback-token TTL + heartbeat interval.
+- Token-gating route in Next.js vs. a Cloudflare Worker at the edge.
+- Whether the live URL itself moves behind a token (couples this slice to
+  Slice 1's "does live move to R2" question).
+
+**External deps:** Stripe ready (see Setup doc).
+
+### Build order rationale
+
+- **VOD first** — biggest remaining piece, unblocks comments (needs `videos`),
+  and the main user-visible value-add post-live.
+- **Comments + follow next** — cheap Supabase-only wins that enrich the channel
+  and watch pages once VODs exist.
+- **Credits last** — most complex slice, sits on top of everything, carries the
+  deferred pricing decisions, and depends on Stripe being fully wired.
