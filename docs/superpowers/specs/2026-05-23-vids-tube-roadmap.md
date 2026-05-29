@@ -130,6 +130,8 @@ The remaining MVP work, broken into four ordered slices. Each slice gets its own
 spec → implementation plan → build cycle. External setup needed before any of
 this starts is covered in the
 [Finishing v1 — External Setup](./2026-05-29-finishing-v1-setup-design.md) doc.
+External services needed across *all* future milestones (v1→v4+) are catalogued
+in [External Services Across the Roadmap](./2026-05-29-external-services-roadmap.md).
 
 ### Slice 1: VOD pipeline
 
