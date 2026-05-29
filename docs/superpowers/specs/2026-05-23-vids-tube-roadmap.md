@@ -82,13 +82,14 @@ Each milestone gets its own spec → implementation plan → build cycle.
 - Live chat via Supabase Realtime, persisted in `chat_messages`.
 - Live access model: **free + concurrent-viewer cap** (soft cap via Realtime Presence "stream full" wall, default 25; backstopped by a hard edge bandwidth cap on the VM). The originally-designed credit-gating is sequenced as a later v1 slice — see [Finishing v1 — plan](#finishing-v1--plan).
 
-**Remaining (see Finishing v1 — plan):**
+**Remaining to finish v1 (see Finishing v1 — plan):**
 - Automatic VOD recording → Cloudflare R2; free VOD playback page + channel listing.
 - Comments on VODs (auth required).
 - Follow / subscribe to a channel.
-- Credit system (signup allowance + Stripe top-ups + per-minute live metering + balance UI), re-introducing credit-gating on live on top of today's free+capped model.
 
-See the [v1 design spec](./2026-05-23-vids-tube-v1-design.md) for the full original scope.
+**Credits: deferred out of v1 (decided 2026-05-29).** Live stays **free + viewer-capped**. The full credit system (signup grant + Stripe top-ups + per-minute live metering + balance UI + credit-gating) is **not** part of finishing v1 — it becomes its own future `add-credits` change. The design is preserved below under [Deferred — Credit system](#deferred--credit-system) and in the [v1 design spec](./2026-05-23-vids-tube-v1-design.md); nothing is being built or scaffolded now.
+
+See the [v1 design spec](./2026-05-23-vids-tube-v1-design.md) for the full original scope (credits included there are now deferred per above).
 
 ### v2 — Content depth
 - Shorts: clip-from-stream UI, vertical reformat pipeline, vertical feed + swipe player.
@@ -126,9 +127,9 @@ See the [v1 design spec](./2026-05-23-vids-tube-v1-design.md) for the full origi
 
 ## Finishing v1 — plan
 
-The remaining MVP work, broken into four ordered slices. Each slice gets its own
-spec → implementation plan → build cycle. External setup needed before any of
-this starts is covered in the
+The remaining MVP work, broken into **three** ordered slices (credits deferred —
+see below). Each slice gets its own spec → implementation plan → build cycle.
+External setup needed before any of this starts is covered in the
 [Finishing v1 — External Setup](./2026-05-29-finishing-v1-setup-design.md) doc.
 External services needed across *all* future milestones (v1→v4+) are catalogued
 in [External Services Across the Roadmap](./2026-05-29-external-services-roadmap.md).
@@ -138,34 +139,18 @@ in [External Services Across the Roadmap](./2026-05-29-external-services-roadmap
 **Goal:** Every completed live stream becomes a free-to-watch VOD on the channel
 page.
 
-**In scope:**
-- MediaMTX records each stream to local disk on the VM (matching the current
-  LL-HLS rendition).
-- An uploader on the VM pushes the finalized recording to R2 (`vids-tube-vod`)
-  on stream-end.
-- The `streams.offline` ingest hook (or a new completion hook) marks the stream
-  ended and creates/updates a `videos` row (`status` processing → ready) with
-  `source_stream_id`, `hls_path` / `mp4_path`, `duration_s`, `thumbnail_path`.
-- Channel page lists the channel's published VODs (newest first).
-- Watch page plays the VOD via hls.js from `cdn.vids.tube`.
-- Public — no playback token, no credit deduction, no cap (matches the design's
-  "VOD is free" stance).
+**Now specced in OpenSpec:** the authoritative detail lives in the
+`add-vod-pipeline` change (`openspec/changes/add-vod-pipeline/`). The decisions
+below were settled there: record fMP4 on the VM → finalize to a single seekable
+MP4 (`-c copy`) → upload to R2; two-phase publish (the `offline` hook creates a
+`processing` `videos` row, a new `/api/ingest/recording` hook flips it `ready`);
+watch page plays the MP4 via a native `<video>` from `cdn.vids.tube`; channel
+page lists `ready` VODs newest-first; public + free (no token, no cap). Remaining
+open questions (thumbnail frame, local retention, crashed-stream VOD) are tracked
+in that change's `design.md`.
 
-**Open questions for the slice's spec:**
-- **Recording format:** write HLS/fMP4 during the stream and finalize at end
-  (fastest publish, simplest) vs. write a single MP4 and segment after
-  (smaller live overhead, slower publish).
-- **Should live HLS also move to R2?** Today live is served direct from the VM
-  via nginx and works. Moving live HLS to R2 (segment-by-segment upload, live
-  playlist points at `cdn.vids.tube`) buys CDN caching + offloads bandwidth
-  from the VM, but adds uploader complexity and an end-to-end latency hit.
-  Recommendation: keep live on the VM for now, ship VOD on R2 only.
-- **Thumbnails:** first-frame, mid-frame, or 3-up sprite? Generation in the
-  same FFmpeg invocation as the recording.
-- **Local retention:** how many days the VM keeps a local copy of the recording
-  after successful upload.
-
-**External deps:** R2 ready (see Setup doc).
+**External deps:** R2 + `cdn.vids.tube` (done — verified 2026-05-29; cdn cert
+provisioning at last check).
 
 ### Slice 2: Comments on VODs
 
@@ -200,12 +185,19 @@ v3 with the recommendation algorithm).
 
 **External deps:** none.
 
-### Slice 4: Credit system
+### Deferred — Credit system
 
-**Goal:** Re-introduce credit-gating on live, on top of the current free+capped
+**Status (2026-05-29): deferred out of finishing v1.** Live stays free +
+viewer-capped. This is **not** being built or scaffolded now — no tables, no
+types, no UI. When it is built it becomes its own `add-credits` OpenSpec change.
+The Stripe account is ready; Stripe keys are not yet in Doppler and only need to
+be added when this work starts. The design below is preserved as the seed for
+that future change.
+
+**Goal (future):** Re-introduce credit-gating on live, on top of the free+capped
 model — signup grant, Stripe top-ups, per-minute live metering, balance UI.
 
-**In scope (from the original v1 design):**
+**Intended scope (from the original v1 design):**
 - `credit_ledger` (append-only) + `credit_balances` (materialized current
   balance for fast atomic deduction).
 - Signup grant via a post-signup action or Supabase trigger.
@@ -230,7 +222,7 @@ model — signup grant, Stripe top-ups, per-minute live metering, balance UI.
 - Whether the live URL itself moves behind a token (couples this slice to
   Slice 1's "does live move to R2" question).
 
-**External deps:** Stripe ready (see Setup doc).
+**External deps (when built):** Stripe keys in Doppler (account already ready).
 
 ### Build order rationale
 
@@ -238,5 +230,6 @@ model — signup grant, Stripe top-ups, per-minute live metering, balance UI.
   and the main user-visible value-add post-live.
 - **Comments + follow next** — cheap Supabase-only wins that enrich the channel
   and watch pages once VODs exist.
-- **Credits last** — most complex slice, sits on top of everything, carries the
-  deferred pricing decisions, and depends on Stripe being fully wired.
+- **Credits deferred** — most complex piece, lowest near-term value at this
+  scale, and live already works free + viewer-capped without it. Pulled out of
+  the v1 finish line; revisit as `add-credits` later.

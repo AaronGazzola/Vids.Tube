@@ -1,8 +1,15 @@
 # vids.tube — v1 (MVP) Design Spec
 
 **Date:** 2026-05-23
-**Status:** Approved (design); pending implementation plan
+**Status:** Approved (design); partially superseded — see note
 **Related:** [Roadmap](./2026-05-23-vids-tube-roadmap.md)
+
+> **Sequencing note (2026-05-29):** Live shipped **free + concurrent-viewer-capped**,
+> not credit-gated. The **credit system described below is deferred out of v1** and
+> will be built later as a separate `add-credits` change. Finishing v1 = VOD +
+> comments + follow. The [roadmap](./2026-05-23-vids-tube-roadmap.md) is the
+> current source of truth for sequencing; the credit sections here are preserved
+> as design for the future change.
 
 ## Purpose
 
