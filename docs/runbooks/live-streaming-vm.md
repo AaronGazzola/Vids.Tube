@@ -277,10 +277,20 @@ provider = Cloudflare
 access_key_id = ${R2_ACCESS_KEY_ID}
 secret_access_key = ${R2_SECRET_ACCESS_KEY}
 endpoint = https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
-acl = private
+no_check_bucket = true
 EOF
 rclone lsd r2:${R2_BUCKET_VOD}   # sanity check: should not error
 ```
+
+**`no_check_bucket = true` is required.** The R2 API token is scoped to the
+`vids-tube-vod` bucket, so rclone's default pre-upload bucket-existence check
+(a bucket-level op) returns `403 AccessDenied` and every upload fails — even
+though listing and object PUTs are permitted. Skipping the check fixes it. (Do
+not set `acl`; R2's token-scoped uploads don't need it.)
+
+Note: the first upload attempt logs a transient `501 NotImplemented` and rclone
+succeeds on the retry. It fails fast (before sending the file body), so it costs
+a round-trip, not re-uploaded bytes — harmless.
 
 ### 8.3 Finalize script
 
