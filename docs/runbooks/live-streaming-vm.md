@@ -83,6 +83,7 @@ SH
 cat > /usr/local/bin/mtx-notready.sh <<'SH'
 #!/usr/bin/env bash
 curl -s -o /dev/null -X POST -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" "https://vids.tube/api/ingest/offline?path=${MTX_PATH}"
+nohup /usr/local/bin/mtx-finalize-vod.sh "${MTX_PATH}" >>/var/log/vids-tube-finalize.log 2>&1 &
 SH
 chmod +x /usr/local/bin/mtx-live.sh /usr/local/bin/mtx-notready.sh
 ```
@@ -114,6 +115,12 @@ paths:
     runOnReady: /usr/local/bin/mtx-live.sh
     runOnReadyRestart: yes
     runOnNotReady: /usr/local/bin/mtx-notready.sh
+    # Record the session for VOD (remux, no transcode). A long segment duration
+    # makes each session a single file, so finalize is a trivial remux. See §8.
+    record: yes
+    recordPath: /var/lib/vids-tube/rec/%path/%Y-%m-%d_%H-%M-%S-%f
+    recordFormat: fmp4
+    recordSegmentDuration: 24h
 ```
 
 systemd unit `/etc/systemd/system/mediamtx.service` (secret in the env, never in
@@ -236,3 +243,106 @@ With nothing live, the app home/`/live` shows "No live stream right now".
 If go-live doesn't register, check: the VM's `INGEST_SHARED_SECRET` matches the
 `prd` value; `/api/ingest/auth` returns 200 for the publish; nginx proxies
 `:8888`; and the OBS stream key matches Studio → Go live.
+
+## 8. VOD recording & upload (R2)
+
+When a stream ends, the app's `offline` hook creates a `videos` row in
+`processing`; this VM step finalizes the recording, uploads it to R2, and calls
+`/api/ingest/recording` to flip the row to `ready`. VODs are then served free
+from `https://cdn.vids.tube` (zero egress).
+
+### 8.1 R2 credentials
+
+```bash
+install -d -m 700 /etc/vids-tube
+cat > /etc/vids-tube/r2.env <<EOF
+R2_ACCOUNT_ID=<account id>
+R2_ACCESS_KEY_ID=<access key>
+R2_SECRET_ACCESS_KEY=<secret>
+R2_BUCKET_VOD=vids-tube-vod
+EOF
+chmod 600 /etc/vids-tube/r2.env
+```
+
+### 8.2 rclone remote for R2
+
+```bash
+apt-get install -y rclone
+set -a; . /etc/vids-tube/r2.env; set +a
+mkdir -p /root/.config/rclone
+cat > /root/.config/rclone/rclone.conf <<EOF
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = ${R2_ACCESS_KEY_ID}
+secret_access_key = ${R2_SECRET_ACCESS_KEY}
+endpoint = https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+acl = private
+EOF
+rclone lsd r2:${R2_BUCKET_VOD}   # sanity check: should not error
+```
+
+### 8.3 Finalize script
+
+`runOnNotReady` (§3) launches this in the background. It remuxes the session
+recording to a single faststart MP4, grabs a thumbnail at `min(10s, dur/2)`,
+uploads both under `vod/<slug>/<ts>.{mp4,jpg}`, then notifies the app. On any
+failure it exits non-zero and the `videos` row stays `processing` (never shown).
+
+```bash
+cat > /usr/local/bin/mtx-finalize-vod.sh <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+SLUG="$1"
+set -a; . /etc/vids-tube/r2.env; set +a
+
+REC_DIR="/var/lib/vids-tube/rec/${SLUG}"
+SRC="$(ls -t ${REC_DIR}/*.mp4 2>/dev/null | head -1 || true)"
+[ -z "${SRC:-}" ] && { echo "no recording for ${SLUG}"; exit 0; }
+
+TS="$(date +%s)"
+OUT="/var/lib/vids-tube/out/${SLUG}"; mkdir -p "$OUT"
+MP4="${OUT}/${TS}.mp4"; JPG="${OUT}/${TS}.jpg"
+
+ffmpeg -y -i "$SRC" -c copy -movflags +faststart "$MP4"
+DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$MP4" | cut -d. -f1)"
+[ -z "${DUR:-}" ] && DUR=0
+SEEK=$(( DUR < 20 ? DUR/2 : 10 ))
+ffmpeg -y -ss "$SEEK" -i "$MP4" -frames:v 1 "$JPG"
+
+KEY_MP4="vod/${SLUG}/${TS}.mp4"; KEY_JPG="vod/${SLUG}/${TS}.jpg"
+rclone copyto "$MP4" "r2:${R2_BUCKET_VOD}/${KEY_MP4}"
+rclone copyto "$JPG" "r2:${R2_BUCKET_VOD}/${KEY_JPG}"
+
+curl -fsS -o /dev/null -X POST \
+  -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
+  -H "content-type: application/json" \
+  -d "{\"mp4Path\":\"${KEY_MP4}\",\"thumbnailPath\":\"${KEY_JPG}\",\"durationS\":${DUR}}" \
+  "https://vids.tube/api/ingest/recording?path=${SLUG}"
+
+rm -f "$SRC"
+SH
+chmod +x /usr/local/bin/mtx-finalize-vod.sh
+```
+
+`INGEST_SHARED_SECRET` is inherited from the MediaMTX service env (§3). After
+editing configs: `systemctl restart mediamtx`.
+
+### 8.4 Retention & manual re-run
+
+- The source fMP4 is deleted on a successful upload; the finalized MP4 is kept
+  under `/var/lib/vids-tube/out/<slug>/` as a safety copy — prune it on a
+  schedule (e.g. `find /var/lib/vids-tube/out -mtime +7 -delete`).
+- If a VOD is stuck `processing` (finalize failed — see
+  `/var/log/vids-tube-finalize.log`), fix the cause and re-run manually:
+  `/usr/local/bin/mtx-finalize-vod.sh owner`.
+
+### 8.5 VOD smoke test
+
+After the live smoke test (§7), stopping the stream should: fire the offline
+hook (`videos` row → `processing`), then within a few seconds the finalize log
+shows the upload and the row flips to `ready`. Confirm:
+
+- `rclone ls r2:vids-tube-vod/vod/owner/` lists the `.mp4` + `.jpg`.
+- The channel page (`/owner`) lists the new VOD; opening it plays and seeks from
+  `https://cdn.vids.tube`.

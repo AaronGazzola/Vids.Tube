@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { VideoGrid } from "@/components/video-grid";
 import { useParams } from "next/navigation";
 import { useChannel } from "./page.hooks";
 
@@ -21,7 +22,9 @@ export default function ChannelPage() {
           {channel.description && (
             <p className="mt-2 text-muted-foreground">{channel.description}</p>
           )}
-          <p className="mt-8 text-sm text-muted-foreground">No videos yet.</p>
+          <div className="mt-8">
+            <VideoGrid channelId={channel.id} />
+          </div>
         </>
       ) : (
         <div className="text-center">

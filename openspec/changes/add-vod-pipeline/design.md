@@ -44,18 +44,23 @@ custom-domain delegation, Stripe — Stripe unused here) is in
      stream `ended`) **also** inserts a `videos` row with `status='processing'`
      and `source_stream_id`.
   2. After the finalize script finishes uploading the MP4 + thumbnail, it calls a
-     new `/api/ingest/recording` hook (shared-secret guarded) with the stream id,
-     the R2 object keys, and the duration; the app flips that row to
+     new `/api/ingest/recording` hook (shared-secret guarded) identified by the
+     **channel slug** (`?path=<slug>`, like every other ingest hook — the VM
+     never knows the DB stream uuid), carrying the R2 object keys and the
+     duration; the app flips that channel's current `processing` row to
      `status='ready'` and stamps `published_at`.
   Rationale: viewers never see a half-uploaded VOD; a failed/aborted upload
   leaves the row `processing` (never surfaced publicly) rather than a broken
-  `ready` row.
+  `ready` row. Keying by slug (not stream uuid) keeps the hook consistent with
+  `auth`/`live`/`offline` and avoids requiring the VM to learn the DB id.
 
-- **VOD object key scheme.** `vod/<channel_slug>/<stream_id>.mp4` and
-  `vod/<channel_slug>/<stream_id>.jpg` in `R2_BUCKET_VOD`. The watch page builds
-  the source as `${NEXT_PUBLIC_VOD_BASE_URL}/<mp4_path>`. Keys are stored on the
-  `videos` row (`mp4_path`, `thumbnail_path`) so the base URL can change without
-  a data migration.
+- **VOD object key scheme.** `vod/<channel_slug>/<recording-timestamp>.mp4` and
+  `vod/<channel_slug>/<recording-timestamp>.jpg` in `R2_BUCKET_VOD` (the VM
+  generates the timestamp; it cannot know the DB stream uuid). The app stores
+  whatever keys the finalize hook reports on the `videos` row (`mp4_path`,
+  `thumbnail_path`), and the watch page builds the source as
+  `${NEXT_PUBLIC_VOD_BASE_URL}/<mp4_path>` — so the base URL can change without a
+  data migration.
 
 - **Public read of ready VODs only.** `videos` RLS exposes `status='ready'` rows
   to everyone (VOD is public + free); `processing`/`failed` rows are invisible to

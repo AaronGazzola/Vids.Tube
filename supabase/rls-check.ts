@@ -117,6 +117,74 @@ async function run() {
     console.log("SKIP: no idle stream present to test chat insert (run seed)");
   }
 
+  const { data: anyChannel } = await admin
+    .from("channels")
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (anyChannel) {
+    const { data: readyVid } = await admin
+      .from("videos")
+      .insert({
+        channel_id: anyChannel.id,
+        status: "ready",
+        title: `rls ready ${stamp}`,
+        published_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    const { data: procVid } = await admin
+      .from("videos")
+      .insert({
+        channel_id: anyChannel.id,
+        status: "processing",
+        title: `rls proc ${stamp}`,
+      })
+      .select("id")
+      .single();
+
+    const { data: anonVideos } = await anon.from("videos").select("id, status");
+    assert(
+      "anonymous sees ready video",
+      (anonVideos ?? []).some((v) => v.id === readyVid?.id)
+    );
+    assert(
+      "anonymous does not see processing video",
+      !(anonVideos ?? []).some((v) => v.id === procVid?.id)
+    );
+
+    const { data: authVideos } = await clientA
+      .from("videos")
+      .select("id, status");
+    assert(
+      "authenticated user does not see processing video",
+      !(authVideos ?? []).some((v) => v.id === procVid?.id)
+    );
+
+    const { error: vidInsertErr } = await clientA.from("videos").insert({
+      channel_id: anyChannel.id,
+      status: "ready",
+      title: "should fail",
+    });
+    assert("client insert into videos is rejected", vidInsertErr !== null);
+
+    const { data: updRows } = await clientA
+      .from("videos")
+      .update({ title: "hacked" })
+      .eq("id", readyVid?.id ?? "")
+      .select("id");
+    assert(
+      "client update on videos affects no rows",
+      (updRows?.length ?? 0) === 0
+    );
+
+    if (readyVid) await admin.from("videos").delete().eq("id", readyVid.id);
+    if (procVid) await admin.from("videos").delete().eq("id", procVid.id);
+  } else {
+    console.log("SKIP: no channel present to test videos RLS (run seed)");
+  }
+
   await admin.from("channels").delete().eq("owner_user_id", a.user.id);
   await admin.auth.admin.deleteUser(a.user.id);
   await admin.auth.admin.deleteUser(b.user.id);
