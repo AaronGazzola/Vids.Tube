@@ -20,8 +20,11 @@ function generateStreamKey() {
 async function seed() {
   console.log("Starting database seed...");
 
-  const ownerEmail = "owner@vids.tube";
-  const ownerPassword = "Password123!";
+  const ownerEmail = process.env.ADMIN_EMAIL;
+  const ownerPassword = process.env.ADMIN_PASSWORD;
+  if (!ownerEmail || !ownerPassword) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be set");
+  }
 
   const { data: created, error: createError } =
     await supabase.auth.admin.createUser({
