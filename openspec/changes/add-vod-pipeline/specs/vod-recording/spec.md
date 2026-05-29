@@ -63,10 +63,17 @@ duration.
 #### Scenario: VOD is published
 
 - **WHEN** the finalize script calls `/api/ingest/recording` with the valid
-  shared secret, the stream id, the MP4 and thumbnail object keys, and the
+  shared secret, the channel slug, the MP4 and thumbnail object keys, and the
   duration
-- **THEN** the system sets the corresponding `videos` row to `status='ready'`,
-  records `mp4_path`, `thumbnail_path`, `duration_s`, and stamps `published_at`
+- **THEN** the system sets that channel's current `processing` `videos` row to
+  `status='ready'`, records `mp4_path`, `thumbnail_path`, `duration_s`, and
+  stamps `published_at`
+
+#### Scenario: No processing VOD for the channel
+
+- **WHEN** `/api/ingest/recording` is called with a valid secret but the channel
+  has no `processing` `videos` row
+- **THEN** the system returns not-found and changes no `videos` row
 
 #### Scenario: Forged recording hook changes nothing
 

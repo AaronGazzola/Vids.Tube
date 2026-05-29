@@ -26,15 +26,55 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const { error } = await supabaseAdmin
+  const { data: liveStream, error: liveError } = await supabaseAdmin
+    .from("streams")
+    .select("id, title")
+    .eq("channel_id", channel.id)
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (liveError) {
+    console.error(liveError);
+    return new NextResponse(null, { status: 500 });
+  }
+  if (!liveStream) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const { error: endError } = await supabaseAdmin
     .from("streams")
     .update({ status: "ended", ended_at: new Date().toISOString() })
-    .eq("channel_id", channel.id)
-    .eq("status", "live");
+    .eq("id", liveStream.id);
 
-  if (error) {
-    console.error(error);
+  if (endError) {
+    console.error(endError);
     return new NextResponse(null, { status: 500 });
+  }
+
+  const { data: existingVideo, error: existingVideoError } = await supabaseAdmin
+    .from("videos")
+    .select("id")
+    .eq("source_stream_id", liveStream.id)
+    .maybeSingle();
+
+  if (existingVideoError) {
+    console.error(existingVideoError);
+    return new NextResponse(null, { status: 500 });
+  }
+
+  if (!existingVideo) {
+    const { error: videoError } = await supabaseAdmin.from("videos").insert({
+      channel_id: channel.id,
+      source_stream_id: liveStream.id,
+      status: "processing",
+      title: liveStream.title,
+    });
+    if (videoError) {
+      console.error(videoError);
+      return new NextResponse(null, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true });

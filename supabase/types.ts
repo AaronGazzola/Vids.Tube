@@ -171,6 +171,60 @@ export type Database = {
           },
         ]
       }
+      videos: {
+        Row: {
+          channel_id: string
+          created_at: string
+          duration_s: number | null
+          id: string
+          mp4_path: string | null
+          published_at: string | null
+          source_stream_id: string | null
+          status: string
+          thumbnail_path: string | null
+          title: string | null
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          duration_s?: number | null
+          id?: string
+          mp4_path?: string | null
+          published_at?: string | null
+          source_stream_id?: string | null
+          status?: string
+          thumbnail_path?: string | null
+          title?: string | null
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          duration_s?: number | null
+          id?: string
+          mp4_path?: string | null
+          published_at?: string | null
+          source_stream_id?: string | null
+          status?: string
+          thumbnail_path?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videos_source_stream_id_fkey"
+            columns: ["source_stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
