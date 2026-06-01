@@ -295,45 +295,25 @@ a round-trip, not re-uploaded bytes — harmless.
 ### 8.3 Finalize script
 
 `runOnNotReady` (§3) launches this in the background. It remuxes the session
-recording to a single faststart MP4, grabs a thumbnail at `min(10s, dur/2)`,
-uploads both under `vod/<slug>/<ts>.{mp4,jpg}`, then notifies the app. On any
-failure it exits non-zero and the `videos` row stays `processing` (never shown).
+recording to a single faststart MP4, captures pixel dimensions (`ffprobe`),
+grabs a poster thumbnail at `min(10s, dur/2)`, extracts 5 hover-preview stills
+(~480px wide at 5%/25%/45%/65%/85% of the duration), uploads everything to R2
+under `vod/<slug>/<ts>.{mp4,jpg}` and `vod/<slug>/<ts>/preview-<n>.jpg`, then
+notifies the app. On any hard failure it exits non-zero and the `videos` row
+stays `processing` (never shown). Dimension-probe and individual preview-still
+failures are **soft** — the script logs and continues.
+
+The script lives in the repo at [`scripts/vm/mtx-finalize-vod.sh`](../../scripts/vm/mtx-finalize-vod.sh)
+so it stays in version control. Install it on the VM with:
 
 ```bash
-cat > /usr/local/bin/mtx-finalize-vod.sh <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-SLUG="$1"
-set -a; . /etc/vids-tube/r2.env; set +a
-
-REC_DIR="/var/lib/vids-tube/rec/${SLUG}"
-SRC="$(ls -t ${REC_DIR}/*.mp4 2>/dev/null | head -1 || true)"
-[ -z "${SRC:-}" ] && { echo "no recording for ${SLUG}"; exit 0; }
-
-TS="$(date +%s)"
-OUT="/var/lib/vids-tube/out/${SLUG}"; mkdir -p "$OUT"
-MP4="${OUT}/${TS}.mp4"; JPG="${OUT}/${TS}.jpg"
-
-ffmpeg -y -i "$SRC" -c copy -movflags +faststart "$MP4"
-DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$MP4" | cut -d. -f1)"
-[ -z "${DUR:-}" ] && DUR=0
-SEEK=$(( DUR < 20 ? DUR/2 : 10 ))
-ffmpeg -y -ss "$SEEK" -i "$MP4" -frames:v 1 "$JPG"
-
-KEY_MP4="vod/${SLUG}/${TS}.mp4"; KEY_JPG="vod/${SLUG}/${TS}.jpg"
-rclone copyto "$MP4" "r2:${R2_BUCKET_VOD}/${KEY_MP4}"
-rclone copyto "$JPG" "r2:${R2_BUCKET_VOD}/${KEY_JPG}"
-
-curl -fsS -o /dev/null -X POST \
-  -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
-  -H "content-type: application/json" \
-  -d "{\"mp4Path\":\"${KEY_MP4}\",\"thumbnailPath\":\"${KEY_JPG}\",\"durationS\":${DUR}}" \
-  "https://vids.tube/api/ingest/recording?path=${SLUG}"
-
-rm -f "$SRC"
-SH
-chmod +x /usr/local/bin/mtx-finalize-vod.sh
+apt-get install -y jq
+install -m 0755 scripts/vm/mtx-finalize-vod.sh /usr/local/bin/mtx-finalize-vod.sh
 ```
+
+(`jq` is a new dependency — it builds the JSON payload sent to the recording
+hook. Earlier VMs that pre-date this change already have ffmpeg installed; jq
+is the only additional package.)
 
 `INGEST_SHARED_SECRET` is inherited from the MediaMTX service env (§3). After
 editing configs: `systemctl restart mediamtx`.

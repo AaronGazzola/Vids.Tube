@@ -53,18 +53,20 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 500 });
   }
 
-  const { data: existingVideo, error: existingVideoError } = await supabaseAdmin
-    .from("videos")
-    .select("id")
-    .eq("source_stream_id", liveStream.id)
-    .maybeSingle();
+  const { data: existingProcessing, error: existingVideoError } =
+    await supabaseAdmin
+      .from("videos")
+      .select("id")
+      .eq("source_stream_id", liveStream.id)
+      .eq("status", "processing")
+      .maybeSingle();
 
   if (existingVideoError) {
     console.error(existingVideoError);
     return new NextResponse(null, { status: 500 });
   }
 
-  if (!existingVideo) {
+  if (!existingProcessing) {
     const { error: videoError } = await supabaseAdmin.from("videos").insert({
       channel_id: channel.id,
       source_stream_id: liveStream.id,

@@ -1,5 +1,48 @@
+import type { Database } from "@/supabase/types";
 import { NextResponse } from "next/server";
 import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
+
+type VideoUpdate = Database["public"]["Tables"]["videos"]["Update"];
+
+type RecordingPayload = {
+  mp4Path?: string;
+  thumbnailPath?: string;
+  durationS?: number;
+  width?: number;
+  height?: number;
+  previewPaths?: string[];
+};
+
+function sanitizePreviewPaths(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const cleaned: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      return null;
+    }
+    const trimmed = entry.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    cleaned.push(trimmed);
+  }
+  return cleaned;
+}
+
+function sanitizeDimension(value: unknown): number | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.round(value);
+}
 
 export async function POST(request: Request) {
   if (!hasValidIngestSecret(request)) {
@@ -12,11 +55,9 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    mp4Path?: string;
-    thumbnailPath?: string;
-    durationS?: number;
-  } | null;
+  const body = (await request
+    .json()
+    .catch(() => null)) as RecordingPayload | null;
 
   if (!body || !body.mp4Path) {
     return new NextResponse(null, { status: 400 });
@@ -53,15 +94,34 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 404 });
   }
 
+  const update: VideoUpdate = {
+    status: "ready",
+    mp4_path: body.mp4Path,
+    thumbnail_path: body.thumbnailPath ?? null,
+    duration_s: body.durationS ?? null,
+    published_at: new Date().toISOString(),
+  };
+
+  const width = sanitizeDimension(body.width);
+  if (width !== undefined) {
+    update.width = width;
+  }
+  const height = sanitizeDimension(body.height);
+  if (height !== undefined) {
+    update.height = height;
+  }
+
+  if (body.previewPaths !== undefined) {
+    const previewPaths = sanitizePreviewPaths(body.previewPaths);
+    if (previewPaths === null) {
+      return new NextResponse(null, { status: 400 });
+    }
+    update.preview_paths = previewPaths;
+  }
+
   const { error: updateError } = await supabaseAdmin
     .from("videos")
-    .update({
-      status: "ready",
-      mp4_path: body.mp4Path,
-      thumbnail_path: body.thumbnailPath ?? null,
-      duration_s: body.durationS ?? null,
-      published_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", pending.id);
 
   if (updateError) {

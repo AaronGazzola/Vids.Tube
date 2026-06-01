@@ -42,6 +42,33 @@ export async function getChannelVideosAction(
   return data ?? [];
 }
 
+export async function getChannelProcessingVideosAction(
+  channelId: string
+): Promise<Video[]> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("videos")
+    .select("*")
+    .eq("channel_id", channelId)
+    .in("status", ["processing", "failed"])
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch processing videos");
+  }
+
+  return data ?? [];
+}
+
 const BRANDING_BUCKET = "channel-assets";
 
 const MIME_EXT: Record<string, string> = {

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getChannelBySlugAction,
+  getChannelProcessingVideosAction,
   getChannelVideosAction,
   uploadChannelBrandingAction,
 } from "./page.actions";
@@ -21,6 +22,18 @@ export function useChannelVideos(channelId: string | undefined) {
     queryKey: ["channel-videos", channelId],
     queryFn: () => getChannelVideosAction(channelId!),
     enabled: !!channelId,
+  });
+}
+
+export function useChannelProcessingVideos(
+  channelId: string | undefined,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: ["channel-processing-videos", channelId],
+    queryFn: () => getChannelProcessingVideosAction(channelId!),
+    enabled: !!channelId && enabled,
+    refetchInterval: enabled ? 10_000 : false,
   });
 }
 

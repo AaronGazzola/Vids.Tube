@@ -128,7 +128,7 @@ export default function ChannelPage() {
             <h2 className="mb-4 text-lg font-semibold tracking-tight">
               Videos
             </h2>
-            <VideoGrid channelId={channel.id} />
+            <VideoGrid channel={channel} />
           </section>
           {isOwner && (
             <>
