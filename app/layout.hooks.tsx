@@ -38,6 +38,16 @@ export function useIsOwner() {
   return useAuthStore((state) => state.isAuthenticated);
 }
 
+export function useIsChannelOwner(
+  channel: { owner_user_id: string } | null | undefined
+) {
+  const user = useAuthStore((state) => state.user);
+  if (!channel || !user) {
+    return false;
+  }
+  return channel.owner_user_id === user.id;
+}
+
 export function useRequireAuth() {
   const { isPending } = useUser();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);

@@ -185,6 +185,73 @@ async function run() {
     console.log("SKIP: no channel present to test videos RLS (run seed)");
   }
 
+  const { data: ownedChannel } = await admin
+    .from("channels")
+    .select("id")
+    .eq("owner_user_id", a.user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (ownedChannel) {
+    const ownerPath = `${ownedChannel.id}/avatar-${stamp}.png`;
+    const fileBytes = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+
+    const { error: ownerUploadErr } = await clientA.storage
+      .from("channel-assets")
+      .upload(ownerPath, fileBytes, { contentType: "image/png", upsert: false });
+    assert(
+      "channel owner can upload to their channel-assets folder",
+      ownerUploadErr === null
+    );
+
+    const publicUrl = `${url}/storage/v1/object/public/channel-assets/${ownerPath}`;
+    const publicGet = await fetch(publicUrl);
+    assert(
+      "uploaded channel asset is publicly readable",
+      publicGet.status === 200
+    );
+
+    const { data: bChannel } = await admin
+      .from("channels")
+      .insert({
+        owner_user_id: b.user.id,
+        slug: `rls_b_chan_${stamp}`,
+        name: "User B channel",
+      })
+      .select("id")
+      .single();
+
+    if (bChannel) {
+      const { error: crossUploadErr } = await clientA.storage
+        .from("channel-assets")
+        .upload(`${bChannel.id}/avatar-${stamp}.png`, fileBytes, {
+          contentType: "image/png",
+          upsert: true,
+        });
+      assert(
+        "user cannot upload to a channel they do not own",
+        crossUploadErr !== null
+      );
+    }
+
+    const { error: anonUploadErr } = await anon.storage
+      .from("channel-assets")
+      .upload(`${ownedChannel.id}/banner-${stamp}.png`, fileBytes, {
+        contentType: "image/png",
+        upsert: true,
+      });
+    assert(
+      "anonymous user cannot upload to channel-assets",
+      anonUploadErr !== null
+    );
+
+    await admin.storage.from("channel-assets").remove([ownerPath]);
+  } else {
+    console.log("SKIP: no owned channel for user A to test storage RLS");
+  }
+
   await admin.from("channels").delete().eq("owner_user_id", a.user.id);
   await admin.auth.admin.deleteUser(a.user.id);
   await admin.auth.admin.deleteUser(b.user.id);

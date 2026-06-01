@@ -41,6 +41,8 @@ export type Database = {
     Tables: {
       channels: {
         Row: {
+          avatar_path: string | null
+          banner_path: string | null
           created_at: string
           description: string
           id: string
@@ -49,6 +51,8 @@ export type Database = {
           slug: string
         }
         Insert: {
+          avatar_path?: string | null
+          banner_path?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -57,6 +61,8 @@ export type Database = {
           slug: string
         }
         Update: {
+          avatar_path?: string | null
+          banner_path?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -94,6 +100,70 @@ export type Database = {
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          user_id: string
+          video_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          user_id: string
+          video_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          user_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_votes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_votes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
             referencedColumns: ["id"]
           },
         ]
@@ -176,37 +246,46 @@ export type Database = {
           channel_id: string
           created_at: string
           duration_s: number | null
+          height: number | null
           id: string
           mp4_path: string | null
+          preview_paths: string[]
           published_at: string | null
           source_stream_id: string | null
           status: string
           thumbnail_path: string | null
           title: string | null
+          width: number | null
         }
         Insert: {
           channel_id: string
           created_at?: string
           duration_s?: number | null
+          height?: number | null
           id?: string
           mp4_path?: string | null
+          preview_paths?: string[]
           published_at?: string | null
           source_stream_id?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          width?: number | null
         }
         Update: {
           channel_id?: string
           created_at?: string
           duration_s?: number | null
+          height?: number | null
           id?: string
           mp4_path?: string | null
+          preview_paths?: string[]
           published_at?: string | null
           source_stream_id?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          width?: number | null
         }
         Relationships: [
           {
