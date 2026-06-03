@@ -1,9 +1,7 @@
-import { LiveView } from "@/components/live-view";
+import { getOwnerChannelAction } from "@/app/layout.actions";
+import { redirect } from "next/navigation";
 
-export default function LivePage() {
-  return (
-    <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
-      <LiveView />
-    </main>
-  );
+export default async function LivePage() {
+  const channel = await getOwnerChannelAction();
+  redirect(channel ? `/${channel.slug}` : "/");
 }

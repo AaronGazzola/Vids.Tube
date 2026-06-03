@@ -6,11 +6,13 @@ import { toast } from "sonner";
 import {
   deleteCommentAction,
   editCommentAction,
+  getStreamChatReplayAction,
   getVideoAction,
   listCommentsAction,
   postCommentAction,
   voteCommentAction,
 } from "./page.actions";
+import { toReplayMessages } from "@/lib/chat-replay";
 import type { ScoredComment, VoteValue } from "./page.types";
 
 const commentsKey = (videoId: string) => ["comments", videoId] as const;
@@ -19,6 +21,15 @@ export function useVideo(videoId: string) {
   return useQuery({
     queryKey: ["video", videoId],
     queryFn: () => getVideoAction(videoId),
+  });
+}
+
+export function useChatReplay(streamId: string | null) {
+  return useQuery({
+    queryKey: ["chat-replay", streamId],
+    queryFn: () => getStreamChatReplayAction(streamId!),
+    enabled: !!streamId,
+    select: toReplayMessages,
   });
 }
 

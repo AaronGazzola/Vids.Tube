@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import { Controls } from "./controls";
 import { PLAYBACK_SPEEDS, type PlaybackSpeed } from "./speed-menu";
@@ -19,6 +20,8 @@ export type VideoPlayerProps = {
   width?: number | null;
   height?: number | null;
   className?: string;
+  onTimeUpdate?: (currentTime: number) => void;
+  onDimensions?: (width: number, height: number) => void;
 };
 
 const SEEK_STEP_SECONDS = 5;
@@ -44,15 +47,43 @@ export function VideoPlayer({
   width,
   height,
   className,
+  onTimeUpdate,
+  onDimensions,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [intrinsic, setIntrinsic] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const state = useVideoState(videoRef, containerRef);
 
-  const vertical = isVertical(width, height);
+  const vertical = intrinsic
+    ? isVertical(intrinsic.width, intrinsic.height)
+    : isVertical(width, height);
+
+  const handleLoadedMetadata = useCallback(
+    (e: ReactSyntheticEvent<HTMLVideoElement>) => {
+      const video = e.currentTarget;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (w > 0 && h > 0) {
+        setIntrinsic({ width: w, height: h });
+        onDimensions?.(w, h);
+      }
+    },
+    [onDimensions]
+  );
+
+  const handleTimeUpdate = useCallback(
+    (e: ReactSyntheticEvent<HTMLVideoElement>) => {
+      onTimeUpdate?.(e.currentTarget.currentTime);
+    },
+    [onTimeUpdate]
+  );
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -260,6 +291,8 @@ export function VideoPlayer({
         playsInline
         preload="metadata"
         onClick={handleVideoClick}
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
         onPlay={handlePlay}
         onPause={handlePause}
         onEnded={handlePause}

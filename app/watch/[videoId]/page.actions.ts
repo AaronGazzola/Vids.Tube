@@ -2,6 +2,7 @@
 
 import { createClient } from "@/supabase/server-client";
 import type {
+  ChatReplay,
   Comment,
   ScoredComment,
   Video,
@@ -41,6 +42,40 @@ export async function getVideoAction(videoId: string): Promise<Video | null> {
   }
 
   return data;
+}
+
+export async function getStreamChatReplayAction(
+  streamId: string
+): Promise<ChatReplay> {
+  if (!UUID_RE.test(streamId)) {
+    return { startedAt: null, messages: [] };
+  }
+
+  const supabase = await createClient();
+
+  const { data: stream, error: streamError } = await supabase
+    .from("streams")
+    .select("started_at")
+    .eq("id", streamId)
+    .maybeSingle();
+
+  if (streamError) {
+    console.error(streamError);
+    throw new Error("Failed to fetch stream for chat replay");
+  }
+
+  const { data: messages, error } = await supabase
+    .from("chat_messages")
+    .select("id, user_id, body, created_at")
+    .eq("stream_id", streamId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch chat replay");
+  }
+
+  return { startedAt: stream?.started_at ?? null, messages: messages ?? [] };
 }
 
 export async function listCommentsAction(

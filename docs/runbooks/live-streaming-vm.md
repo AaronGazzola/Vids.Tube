@@ -303,6 +303,16 @@ notifies the app. On any hard failure it exits non-zero and the `videos` row
 stays `processing` (never shown). Dimension-probe and individual preview-still
 failures are **soft** — the script logs and continues.
 
+The dimension probe is **rotation-aware**: `ffprobe` returns *coded* dimensions
+that ignore rotation metadata, so the script reads the stream rotation
+(`stream_side_data=rotation`, falling back to the legacy `stream_tags=rotate`)
+and swaps width/height for a ±90° turn, reporting the *displayed* orientation.
+A portrait phone capture is frequently a rotated landscape raster, so without
+this swap a vertical VOD would be published as landscape. This only affects
+VODs recorded after the VM is updated to this version of the script; existing
+rows keep their stored (or null) dimensions, and the player still derives
+orientation from the video's intrinsic size at render time.
+
 The script lives in the repo at [`scripts/vm/mtx-finalize-vod.sh`](../../scripts/vm/mtx-finalize-vod.sh)
 so it stays in version control. Install it on the VM with:
 

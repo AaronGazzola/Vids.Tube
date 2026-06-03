@@ -47,7 +47,11 @@ DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$MP4" | cut -
 if [ -z "${DUR:-}" ]; then DUR=0; fi
 
 # Capture pixel dimensions. Treat probe failure as soft so VODs still publish
-# (the player falls back to 16:9 when width/height are null).
+# (the player derives orientation from the video's intrinsic size when these
+# are null). ffprobe reports *coded* dimensions, which ignore rotation
+# metadata, so we also read the rotation and swap width/height for ±90° turns
+# to report the *displayed* orientation (a portrait phone capture is often a
+# rotated landscape raster).
 WIDTH=""
 HEIGHT=""
 if DIMS="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$MP4" 2>/dev/null)"; then
@@ -59,6 +63,21 @@ if DIMS="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,heigh
   fi
 else
   echo "ffprobe failed to read dimensions — continuing without"
+fi
+
+if [ -n "$WIDTH" ] && [ -n "$HEIGHT" ]; then
+  ROTATION="$(ffprobe -v error -select_streams v:0 -show_entries stream_side_data=rotation -of default=nw=1:nk=1 "$MP4" 2>/dev/null | head -1)"
+  if [ -z "${ROTATION:-}" ]; then
+    ROTATION="$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=rotate -of default=nw=1:nk=1 "$MP4" 2>/dev/null | head -1)"
+  fi
+  case "${ROTATION#-}" in
+    90|270)
+      echo "rotation ${ROTATION}° detected — swapping width/height to display orientation"
+      SWAP="$WIDTH"
+      WIDTH="$HEIGHT"
+      HEIGHT="$SWAP"
+      ;;
+  esac
 fi
 
 # Poster thumbnail at min(10s, dur/2).

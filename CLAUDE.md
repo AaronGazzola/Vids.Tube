@@ -169,3 +169,17 @@ In order to query the database, create and run a custom typescript script. (Do n
 ## Generate types:
 
 `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`
+
+
+
+# Spec & task governance
+
+How OpenSpec changes and deferred work are managed. These rules exist to prevent process poisoning (incomplete active changes being treated as a mandate and re-implemented, causing regressions) and corner-cutting. Follow them exactly.
+
+1. **Active changes are build-now-only.** An active OpenSpec change contains only tasks that will be implemented in code in the current cycle. Never leave "manual verification," "legal review," "blocked on external," or "future enhancement" tasks as unchecked boxes in an active change.
+2. **Non-code work leaves the change.** The moment a task cannot be finished in code (needs live data, user sign-off, an external key, or it is a future idea), move it to a **Linear issue** and remove it from `tasks.md`. Do not leave it unchecked.
+3. **Archive when code-complete + verified.** Run `openspec-verify-change` before archiving. Never leave a change active with lingering unchecked tasks — that lingering is the poisoning vector.
+4. **Linear is the idea-channel, never the build-channel.** Never implement directly from a Linear issue. To build a backlog item, first promote it into a **new** OpenSpec change (spec → plan → implement).
+5. **No silent checking.** Check a task box only with evidence the work is actually done. "Done but unverifiable right now" becomes a Linear verification issue — never a checked box.
+
+**Backlog location:** Linear, Gazzola (personal) workspace, **"Az"** team, **"Vids.Tube"** project. Read open issues there before starting deferred work.
