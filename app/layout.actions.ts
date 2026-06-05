@@ -1,7 +1,12 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
-import type { Channel, ChatMessage, Stream } from "./layout.types";
+import type {
+  ActionResult,
+  Channel,
+  ChatMessage,
+  Stream,
+} from "./layout.types";
 
 const STALE_MS = 60_000;
 
@@ -80,7 +85,7 @@ export async function getChatMessagesAction(
 export async function postChatMessageAction(
   streamId: string,
   body: string
-): Promise<ChatMessage> {
+): Promise<ActionResult<ChatMessage>> {
   const supabase = await createClient();
 
   const {
@@ -88,12 +93,12 @@ export async function postChatMessageAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return { error: "You must be signed in to send messages." };
   }
 
   const trimmed = body.trim();
   if (!trimmed) {
-    throw new Error("Message cannot be empty");
+    return { error: "Message cannot be empty." };
   }
 
   const { data, error } = await supabase
@@ -107,5 +112,5 @@ export async function postChatMessageAction(
     throw new Error("Failed to post message");
   }
 
-  return data;
+  return { data };
 }

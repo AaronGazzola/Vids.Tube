@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import type { ActionResult } from "@/app/layout.types";
 import type {
   ChatReplay,
   Comment,
@@ -145,13 +146,13 @@ export async function listCommentsAction(
 export async function postCommentAction(
   videoId: string,
   body: string
-): Promise<Comment> {
+): Promise<ActionResult<Comment>> {
   const trimmed = normalizeBody(body);
   if (!isValidBody(trimmed)) {
-    throw new Error("Comment must be between 1 and 4000 characters");
+    return { error: "Comment must be between 1 and 4000 characters." };
   }
   if (!UUID_RE.test(videoId)) {
-    throw new Error("Invalid video id");
+    return { error: "Invalid video id." };
   }
 
   const supabase = await createClient();
@@ -161,7 +162,7 @@ export async function postCommentAction(
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    throw new Error("Not signed in");
+    return { error: "You must be signed in to comment." };
   }
 
   const { data, error } = await supabase
@@ -179,19 +180,19 @@ export async function postCommentAction(
     throw new Error("Failed to post comment");
   }
 
-  return data;
+  return { data };
 }
 
 export async function editCommentAction(
   commentId: string,
   body: string
-): Promise<Comment> {
+): Promise<ActionResult<Comment>> {
   const trimmed = normalizeBody(body);
   if (!isValidBody(trimmed)) {
-    throw new Error("Comment must be between 1 and 4000 characters");
+    return { error: "Comment must be between 1 and 4000 characters." };
   }
   if (!UUID_RE.test(commentId)) {
-    throw new Error("Invalid comment id");
+    return { error: "Invalid comment id." };
   }
 
   const supabase = await createClient();
@@ -201,7 +202,7 @@ export async function editCommentAction(
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    throw new Error("Not signed in");
+    return { error: "You must be signed in to edit comments." };
   }
 
   const { data, error } = await supabase
@@ -217,14 +218,14 @@ export async function editCommentAction(
     throw new Error("Failed to edit comment");
   }
 
-  return data;
+  return { data };
 }
 
 export async function deleteCommentAction(
   commentId: string
-): Promise<{ id: string }> {
+): Promise<ActionResult<{ id: string }>> {
   if (!UUID_RE.test(commentId)) {
-    throw new Error("Invalid comment id");
+    return { error: "Invalid comment id." };
   }
 
   const supabase = await createClient();
@@ -234,7 +235,7 @@ export async function deleteCommentAction(
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    throw new Error("Not signed in");
+    return { error: "You must be signed in to delete comments." };
   }
 
   const { error } = await supabase
@@ -248,18 +249,18 @@ export async function deleteCommentAction(
     throw new Error("Failed to delete comment");
   }
 
-  return { id: commentId };
+  return { data: { id: commentId } };
 }
 
 export async function voteCommentAction(
   commentId: string,
   value: VoteValue
-): Promise<{ commentId: string; value: VoteValue }> {
+): Promise<ActionResult<{ commentId: string; value: VoteValue }>> {
   if (!UUID_RE.test(commentId)) {
-    throw new Error("Invalid comment id");
+    return { error: "Invalid comment id." };
   }
   if (value !== -1 && value !== 0 && value !== 1) {
-    throw new Error("Invalid vote value");
+    return { error: "Invalid vote value." };
   }
 
   const supabase = await createClient();
@@ -269,7 +270,7 @@ export async function voteCommentAction(
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    throw new Error("Not signed in");
+    return { error: "You must be signed in to vote." };
   }
 
   if (value === 0) {
@@ -282,7 +283,7 @@ export async function voteCommentAction(
       console.error(error);
       throw new Error("Failed to remove vote");
     }
-    return { commentId, value };
+    return { data: { commentId, value } };
   }
 
   const { error } = await supabase.from("comment_votes").upsert(
@@ -298,5 +299,5 @@ export async function voteCommentAction(
     throw new Error("Failed to record vote");
   }
 
-  return { commentId, value };
+  return { data: { commentId, value } };
 }

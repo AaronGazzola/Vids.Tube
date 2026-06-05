@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import type { ActionResult } from "@/app/layout.types";
 import type { Channel, Video } from "./page.types";
 
 export async function getChannelBySlugAction(
@@ -86,7 +87,7 @@ export async function uploadChannelBrandingAction(
   channelId: string,
   kind: "avatar" | "banner",
   formData: FormData
-): Promise<string> {
+): Promise<ActionResult<string>> {
   const supabase = await createClient();
 
   const {
@@ -96,10 +97,10 @@ export async function uploadChannelBrandingAction(
 
   if (authError) {
     console.error(authError);
-    throw new Error("Not signed in");
+    return { error: "You must be signed in." };
   }
   if (!user) {
-    throw new Error("Not signed in");
+    return { error: "You must be signed in." };
   }
 
   const { data: channel, error: channelError } = await supabase
@@ -113,25 +114,27 @@ export async function uploadChannelBrandingAction(
     throw new Error("Failed to load channel");
   }
   if (!channel) {
-    throw new Error("Channel not found");
+    return { error: "Channel not found." };
   }
   if (channel.owner_user_id !== user.id) {
-    throw new Error("Not authorized to edit this channel");
+    return { error: "You're not authorized to edit this channel." };
   }
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    throw new Error("No file provided");
+    return { error: "No file provided." };
   }
 
   const ext = MIME_EXT[file.type];
   if (!ext) {
-    throw new Error("Unsupported file type — use JPG, PNG, or WebP");
+    return { error: "Unsupported file type — use JPG, PNG, or WebP." };
   }
 
   if (file.size > MAX_SIZE[kind]) {
     const limitMb = MAX_SIZE[kind] / (1024 * 1024);
-    throw new Error(`File too large — ${kind} must be ${limitMb} MB or smaller`);
+    return {
+      error: `File too large — ${kind} must be ${limitMb} MB or smaller.`,
+    };
   }
 
   const path = `${channelId}/${kind}-${Date.now()}.${ext}`;
@@ -175,5 +178,5 @@ export async function uploadChannelBrandingAction(
     }
   }
 
-  return path;
+  return { data: path };
 }

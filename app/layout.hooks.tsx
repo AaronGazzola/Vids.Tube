@@ -326,7 +326,13 @@ export function useLiveChat(streamId: string | null) {
 
 export function usePostChatMessage(streamId: string | null) {
   return useMutation({
-    mutationFn: (body: string) => postChatMessageAction(streamId!, body),
+    mutationFn: async (body: string) => {
+      const res = await postChatMessageAction(streamId!, body);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onError: (error) => {
       toast.custom(() => (
         <CustomToast

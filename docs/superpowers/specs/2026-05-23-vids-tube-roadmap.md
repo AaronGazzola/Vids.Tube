@@ -185,14 +185,27 @@ v3 with the recommendation algorithm).
 
 **External deps:** none.
 
-### Deferred — Credit system
+### Deferred — Paid live (monetization)
 
-**Status (2026-05-29): deferred out of finishing v1.** Live stays free +
-viewer-capped. This is **not** being built or scaffolded now — no tables, no
-types, no UI. When it is built it becomes its own `add-credits` OpenSpec change.
-The Stripe account is ready; Stripe keys are not yet in Doppler and only need to
-be added when this work starts. The design below is preserved as the seed for
-that future change.
+**Status (2026-06-05): the monetization model was redesigned.** The per-minute
+credit-wallet model below is **superseded** by a **per-stream access-ticket model
+with dynamic, pre-booked pricing** — see
+[Monetization Model Design](./2026-06-05-monetization-model-design.md) for the
+authoritative design. In short: free = delayed cast from R2 (no chat); paid =
+real-time live + chat; viewers buy bookable per-stream tickets (no wallet);
+pricing is dynamic and pre-funds capacity ahead of need; streamers add their own
+margin (100% to them, 0% platform cut beyond cost + processing). Build it for the
+single owner-streamer first; prerequisites are Stripe, Terms/eligibility, and a
+refund policy.
+
+The original credit-wallet text is kept below for history only.
+
+**Status (2026-05-29, historical): deferred out of finishing v1.** Live stays
+free + viewer-capped. This is **not** being built or scaffolded now — no tables,
+no types, no UI. When it is built it becomes its own `add-credits` OpenSpec
+change. The Stripe account is ready; Stripe keys are not yet in Doppler and only
+need to be added when this work starts. The design below is preserved as the seed
+for that future change.
 
 **Goal (future):** Re-introduce credit-gating on live, on top of the free+capped
 model — signup grant, Stripe top-ups, per-minute live metering, balance UI.

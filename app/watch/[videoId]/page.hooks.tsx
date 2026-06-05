@@ -45,7 +45,13 @@ export function usePostComment(videoId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: string) => postCommentAction(videoId, body),
+    mutationFn: async (body: string) => {
+      const res = await postCommentAction(videoId, body);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commentsKey(videoId) });
     },
@@ -65,8 +71,19 @@ export function useEditComment(videoId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
-      editCommentAction(commentId, body),
+    mutationFn: async ({
+      commentId,
+      body,
+    }: {
+      commentId: string;
+      body: string;
+    }) => {
+      const res = await editCommentAction(commentId, body);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commentsKey(videoId) });
     },
@@ -86,7 +103,13 @@ export function useDeleteComment(videoId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commentId: string) => deleteCommentAction(commentId),
+    mutationFn: async (commentId: string) => {
+      const res = await deleteCommentAction(commentId);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commentsKey(videoId) });
     },
@@ -113,8 +136,13 @@ export function useVoteComment(videoId: string) {
     { commentId: string; value: VoteValue },
     VoteContext
   >({
-    mutationFn: ({ commentId, value }) =>
-      voteCommentAction(commentId, value),
+    mutationFn: async ({ commentId, value }) => {
+      const res = await voteCommentAction(commentId, value);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onMutate: async ({ commentId, value }) => {
       await queryClient.cancelQueries({ queryKey: commentsKey(videoId) });
       const previous = queryClient.getQueryData<ScoredComment[]>(

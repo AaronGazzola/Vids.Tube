@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionResult } from "@/app/layout.types";
 import { createClient } from "@/supabase/server-client";
 import { randomBytes } from "crypto";
 
@@ -7,14 +8,19 @@ function generateStreamKey() {
   return `vt_live_${randomBytes(24).toString("hex")}`;
 }
 
-async function getOwnedChannel() {
+type OwnedChannel = {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  channel: { id: string; slug: string };
+};
+
+async function getOwnedChannel(): Promise<ActionResult<OwnedChannel>> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return { error: "You must be signed in." };
   }
 
   const { data: channel, error } = await supabase
@@ -30,14 +36,18 @@ async function getOwnedChannel() {
     throw new Error("Failed to load channel");
   }
   if (!channel) {
-    throw new Error("No channel found");
+    return { error: "No channel found for your account." };
   }
 
-  return { supabase, channel };
+  return { data: { supabase, channel } };
 }
 
 export async function getStreamKeyAction() {
-  const { supabase, channel } = await getOwnedChannel();
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { supabase, channel } = owned.data;
 
   const { data, error } = await supabase
     .from("stream_keys")
@@ -57,8 +67,14 @@ export async function getStreamKeyAction() {
   };
 }
 
-export async function regenerateStreamKeyAction() {
-  const { supabase, channel } = await getOwnedChannel();
+export async function regenerateStreamKeyAction(): Promise<
+  ActionResult<{ key: string }>
+> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { supabase, channel } = owned.data;
 
   const key = generateStreamKey();
   const { error } = await supabase
@@ -70,5 +86,5 @@ export async function regenerateStreamKeyAction() {
     throw new Error("Failed to regenerate stream key");
   }
 
-  return { key };
+  return { data: { key } };
 }

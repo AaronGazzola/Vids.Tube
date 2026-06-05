@@ -41,7 +41,7 @@ export function useUploadChannelBranding(slug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       channelId,
       kind,
       file,
@@ -52,7 +52,11 @@ export function useUploadChannelBranding(slug: string) {
     }) => {
       const formData = new FormData();
       formData.append("file", file);
-      return uploadChannelBrandingAction(channelId, kind, formData);
+      const res = await uploadChannelBrandingAction(channelId, kind, formData);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
     },
     onSuccess: (_path, { kind }) => {
       queryClient.invalidateQueries({ queryKey: ["channel", slug] });

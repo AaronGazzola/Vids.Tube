@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Don't include any comments in any files.
 - Don't use `console.log` in any app code unless requested, delete all logs after the related development is completed
-- All errors should be thrown - no "fallback" functionality
+- Error handling follows the expected-vs-unexpected split (see "Error handling in actions" below) - no silent "fallback" functionality
 - All errors should be logged with `console.error`
 - Import "cn" from "@/lib/utils" to concatenate classes.
 - Don't use middleware - route protection and feature gating should be handled by database queries implemented in react-query hooks.
@@ -133,6 +133,25 @@ app/
 - Always validate auth with `auth.getUser()` before queries
 - Called actions exclusively from React Query hooks
 - Function naming: `featureNameAction` (e.g., `loginAction`, `getUserProfileAction`)
+
+## Error handling in actions
+
+Next.js strips thrown Server Action error messages in production (the client only gets a generic 500 + digest). So errors are split by kind:
+
+- **Expected errors** (validation, auth, permission, not-found, business rules) → **return** them as a value, never throw. Use the shared `ActionResult<T> = { data: T } | { error: string }` type (in `app/layout.types.ts`). The `error` string is user-facing — write it as a clear message; the message survives to the client in production.
+- **Unexpected errors** (DB/storage/infra failures, bugs) → **throw** after `console.error`. These are correctly masked in production and surface a generic toast; details stay in the server log.
+- **Mutation hooks unwrap** the result so the existing `onError → toast` plumbing is unchanged:
+
+  ```ts
+  mutationFn: async (vars) => {
+    const res = await someAction(vars);
+    if ("error" in res) throw new Error(res.error);
+    return res.data;
+  },
+  ```
+
+- **Query actions** keep throwing (their failures are unexpected and aren't surfaced as toasts); expected absence is data (return `null`/`[]`).
+- **Browser-client operations** (`supabase.auth.*`) are not Server Actions and aren't masked — throw as usual.
 
 ## Hooks (`*.hooks.tsx`)
 

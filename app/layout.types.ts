@@ -11,6 +11,8 @@ export type AuthCredentials = {
   password: string;
 };
 
+export type ActionResult<T> = { data: T } | { error: string };
+
 export type Channel = Database["public"]["Tables"]["channels"]["Row"];
 export type Stream = Database["public"]["Tables"]["streams"]["Row"];
 export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];

@@ -19,7 +19,13 @@ export function useRegenerateStreamKey() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => regenerateStreamKeyAction(),
+    mutationFn: async () => {
+      const res = await regenerateStreamKeyAction();
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stream-key"] });
       toast.custom(() => (
