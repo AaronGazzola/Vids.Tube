@@ -18,3 +18,20 @@ export type Stream = Database["public"]["Tables"]["streams"]["Row"];
 export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 
 export type ViewerCapState = "connecting" | "admitted" | "full";
+
+export type CreateChannelInput = {
+  handle: string;
+  name?: string;
+};
+
+export type UpdateChannelInput = {
+  channelId: string;
+  name: string;
+  handle: string;
+  description: string;
+};
+
+export type HandleAvailability = {
+  handle: string;
+  available: boolean;
+};

@@ -7,15 +7,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  checkHandleAvailabilityAction,
+  createChannelAction,
   getChatMessagesAction,
   getLiveStreamAction,
+  getMyChannelAction,
   getOwnerChannelAction,
   postChatMessageAction,
+  updateChannelAction,
 } from "./layout.actions";
 import { useAuthStore } from "./layout.stores";
 import type {
   AuthCredentials,
   ChatMessage,
+  CreateChannelInput,
+  UpdateChannelInput,
   ViewerCapState,
 } from "./layout.types";
 
@@ -35,7 +41,12 @@ export function useUser() {
 }
 
 export function useIsOwner() {
-  return useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+  const { data: ownerChannel } = useOwnerChannel();
+  if (!user || !ownerChannel) {
+    return false;
+  }
+  return ownerChannel.owner_user_id === user.id;
 }
 
 export function useIsChannelOwner(
@@ -74,6 +85,33 @@ export function useRequireOwner() {
   }, [isPending, isOwner, router]);
 
   return { isPending, isOwner };
+}
+
+export function useRequireChannel() {
+  const { isPending: userPending } = useUser();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const myChannel = useMyChannel();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (userPending || !isAuthenticated || myChannel.isPending) {
+      return;
+    }
+    if (!myChannel.data) {
+      router.replace("/onboarding");
+    }
+  }, [
+    userPending,
+    isAuthenticated,
+    myChannel.isPending,
+    myChannel.data,
+    router,
+  ]);
+
+  return {
+    isPending: userPending || myChannel.isPending,
+    channel: myChannel.data ?? null,
+  };
 }
 
 export function useUserAuth() {
@@ -220,6 +258,99 @@ export function useOwnerChannel() {
   return useQuery({
     queryKey: ["owner-channel"],
     queryFn: () => getOwnerChannelAction(),
+  });
+}
+
+export function useMyChannel() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  return useQuery({
+    queryKey: ["my-channel"],
+    queryFn: () => getMyChannelAction(),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useHandleAvailability(handle: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["handle-availability", handle],
+    queryFn: async () => {
+      const res = await checkHandleAvailabilityAction(handle);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    enabled,
+    retry: false,
+  });
+}
+
+export function useCreateChannel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateChannelInput) => {
+      const res = await createChannelAction(input);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-channel"] });
+      queryClient.invalidateQueries({ queryKey: ["owner-channel"] });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Channel created"
+          message="Your handle is yours — welcome aboard."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't create channel"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useUpdateChannel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateChannelInput) => {
+      const res = await updateChannelAction(input);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: (channel) => {
+      queryClient.invalidateQueries({ queryKey: ["my-channel"] });
+      queryClient.invalidateQueries({ queryKey: ["owner-channel"] });
+      queryClient.invalidateQueries({ queryKey: ["channel", channel.slug] });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Channel updated"
+          message="Your changes have been saved."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't save changes"
+          message={error.message}
+        />
+      ));
+    },
   });
 }
 

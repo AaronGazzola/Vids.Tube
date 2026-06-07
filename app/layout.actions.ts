@@ -2,12 +2,23 @@
 
 import { createClient } from "@/supabase/server-client";
 import { STALE_MS } from "@/lib/stream";
+import {
+  isReservedHandle,
+  isValidHandle,
+  normalizeHandle,
+  HANDLE_REQUIREMENT,
+} from "@/lib/handle";
 import type {
   ActionResult,
   Channel,
   ChatMessage,
+  CreateChannelInput,
+  HandleAvailability,
   Stream,
+  UpdateChannelInput,
 } from "./layout.types";
+
+const UNIQUE_VIOLATION = "23505";
 
 export async function getOwnerChannelAction(): Promise<Channel | null> {
   const supabase = await createClient();
@@ -25,6 +36,169 @@ export async function getOwnerChannelAction(): Promise<Channel | null> {
   }
 
   return data;
+}
+
+export async function getMyChannelAction(): Promise<Channel | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("channels")
+    .select("*")
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch your channel");
+  }
+
+  return data;
+}
+
+export async function checkHandleAvailabilityAction(
+  rawHandle: string
+): Promise<ActionResult<HandleAvailability>> {
+  const handle = normalizeHandle(rawHandle);
+
+  if (!isValidHandle(handle)) {
+    return { error: HANDLE_REQUIREMENT };
+  }
+  if (isReservedHandle(handle)) {
+    return { data: { handle, available: false } };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("channels")
+    .select("id")
+    .eq("handle", handle)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to check handle availability");
+  }
+
+  return { data: { handle, available: !data } };
+}
+
+export async function createChannelAction(
+  input: CreateChannelInput
+): Promise<ActionResult<Channel>> {
+  const handle = normalizeHandle(input.handle);
+
+  if (!isValidHandle(handle)) {
+    return { error: HANDLE_REQUIREMENT };
+  }
+  if (isReservedHandle(handle)) {
+    return { error: "That handle is unavailable." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to create a channel." };
+  }
+
+  const name = input.name?.trim() || `@${handle}`;
+
+  const { data, error } = await supabase
+    .from("channels")
+    .insert({ owner_user_id: user.id, handle, slug: handle, name })
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      if (error.message.includes("owner_user_id")) {
+        return { error: "You already have a channel." };
+      }
+      return { error: "That handle is taken." };
+    }
+    console.error(error);
+    throw new Error("Failed to create channel");
+  }
+
+  return { data };
+}
+
+export async function updateChannelAction(
+  input: UpdateChannelInput
+): Promise<ActionResult<Channel>> {
+  const handle = normalizeHandle(input.handle);
+  const name = input.name.trim();
+
+  if (!name) {
+    return { error: "Channel name cannot be empty." };
+  }
+  if (!isValidHandle(handle)) {
+    return { error: HANDLE_REQUIREMENT };
+  }
+  if (isReservedHandle(handle)) {
+    return { error: "That handle is unavailable." };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to edit your channel." };
+  }
+
+  const { data: channel, error: channelError } = await supabase
+    .from("channels")
+    .select("id, owner_user_id")
+    .eq("id", input.channelId)
+    .maybeSingle();
+
+  if (channelError) {
+    console.error(channelError);
+    throw new Error("Failed to load channel");
+  }
+  if (!channel) {
+    return { error: "Channel not found." };
+  }
+  if (channel.owner_user_id !== user.id) {
+    return { error: "You're not authorized to edit this channel." };
+  }
+
+  const { data, error } = await supabase
+    .from("channels")
+    .update({
+      name,
+      handle,
+      slug: handle,
+      description: input.description.trim(),
+    })
+    .eq("id", input.channelId)
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      return { error: "That handle is taken." };
+    }
+    console.error(error);
+    throw new Error("Failed to update channel");
+  }
+
+  return { data };
 }
 
 export async function getLiveStreamAction(

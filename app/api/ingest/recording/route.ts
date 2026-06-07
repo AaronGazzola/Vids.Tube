@@ -49,11 +49,7 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const slug = searchParams.get("path") ?? searchParams.get("channel");
-  if (!slug) {
-    return new NextResponse(null, { status: 400 });
-  }
+  const INGEST_CHANNEL_SLUG = "azanything";
 
   const body = (await request
     .json()
@@ -66,7 +62,7 @@ export async function POST(request: Request) {
   const { data: channel, error: channelError } = await supabaseAdmin
     .from("channels")
     .select("id")
-    .eq("slug", slug)
+    .eq("slug", INGEST_CHANNEL_SLUG)
     .maybeSingle();
 
   if (channelError) {

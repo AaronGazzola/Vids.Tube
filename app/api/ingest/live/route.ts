@@ -8,15 +8,15 @@ export async function POST(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const slug = searchParams.get("path") ?? searchParams.get("channel");
-  if (!slug) {
-    return new NextResponse(null, { status: 400 });
-  }
+  const mtxPath =
+    searchParams.get("path") ?? searchParams.get("channel") ?? "owner";
+
+  const INGEST_CHANNEL_SLUG = "azanything";
 
   const { data: channel, error: channelError } = await supabaseAdmin
     .from("channels")
     .select("id, slug")
-    .eq("slug", slug)
+    .eq("slug", INGEST_CHANNEL_SLUG)
     .maybeSingle();
 
   if (channelError) {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const host = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
-  const hlsPath = `${host}/${channel.slug}/index.m3u8`;
+  const hlsPath = `${host}/${mtxPath}/index.m3u8`;
   const now = new Date().toISOString();
 
   const { data: existing, error: existingError } = await supabaseAdmin

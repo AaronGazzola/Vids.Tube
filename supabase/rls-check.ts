@@ -68,6 +68,7 @@ async function run() {
   const { error: ownInsertErr } = await clientA.from("channels").insert({
     owner_user_id: a.user.id,
     slug: `rls_own_${stamp}`,
+    handle: `rls_own_${stamp}`,
     name: "User A channel",
   });
   assert("owner can insert their own channel", ownInsertErr === null);
@@ -75,6 +76,7 @@ async function run() {
   const { error: crossInsertErr } = await clientA.from("channels").insert({
     owner_user_id: b.user.id,
     slug: `rls_cross_${stamp}`,
+    handle: `rls_cross_${stamp}`,
     name: "Should fail",
   });
   assert("cross-user insert is rejected", crossInsertErr !== null);
@@ -218,6 +220,7 @@ async function run() {
       .insert({
         owner_user_id: b.user.id,
         slug: `rls_b_chan_${stamp}`,
+        handle: `rls_b_chan_${stamp}`,
         name: "User B channel",
       })
       .select("id")
