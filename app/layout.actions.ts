@@ -1,14 +1,13 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { STALE_MS } from "@/lib/stream";
 import type {
   ActionResult,
   Channel,
   ChatMessage,
   Stream,
 } from "./layout.types";
-
-const STALE_MS = 60_000;
 
 export async function getOwnerChannelAction(): Promise<Channel | null> {
   const supabase = await createClient();
