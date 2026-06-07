@@ -50,5 +50,5 @@
 ## 6. Verify & deploy
 
 - [x] 6.1 `npx tsc --noEmit` and `npm run lint` clean; run E2E suite and the RLS verification script; confirm all green
-- [ ] 6.2 Deploy to Vercel with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; verify auth + `/owner` in production
-- [ ] 6.3 Add `vids.tube` custom domain in Vercel and confirm the site resolves
+
+> Non-code deploy/ops tasks moved to Linear per CLAUDE.md spec governance: Vercel production deploy + verify → AZ-49; `vids.tube` custom domain → AZ-50.

@@ -108,10 +108,7 @@
 
 ## 7. Smoke test (VM — owner-run)
 
-- [ ] 7.1 Push a short looping FFmpeg test file over RTMP; stop it; assert: the
-  `streams` row flips `ended`, a `videos` row appears `processing` then `ready`,
-  the MP4 + thumbnail exist in R2, and the watch page plays + seeks from
-  `cdn.vids.tube`. (Documented in runbook §8.5; owner-run on the VM.)
+> Owner-run RTMP smoke test moved to Linear per CLAUDE.md spec governance (needs the live VM; can't be completed in code) → AZ-51.
 
 ## 8. Verify
 
