@@ -20,8 +20,9 @@ test.beforeAll(async () => {
   const { data: owner, error } = await admin
     .from("channels")
     .select("id, owner_user_id")
-    .eq("slug", "owner")
-    .single();
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (error || !owner) throw error ?? new Error("owner channel missing");
   ownerChannelId = owner.id;
   ownerUserId = owner.owner_user_id;
@@ -129,7 +130,12 @@ test("VOD without source chat shows no replay panel", async ({ page }) => {
   await expect(page.getByText("Chat replay", { exact: true })).toHaveCount(0);
 });
 
-test("a new broadcast after a prior session creates a fresh stream with empty chat", async ({
+// Skipped: the ingest hook hardcodes the owner channel slug and channels are now
+// owner-gated + unique-per-owner (AZ-23), so a throwaway test channel can't drive
+// this path; exercising it would mutate the live owner channel. The session
+// decision logic is covered by tests/unit/stream-session.test.ts (decideGoLive).
+// Owner-channel-aware rework tracked in AZ-48.
+test.skip("a new broadcast after a prior session creates a fresh stream with empty chat", async ({
   request,
 }) => {
   const slug = `e2e-session-${stamp}`;
@@ -249,7 +255,10 @@ test("two sequential broadcasts each replay only their own chat, spread across t
   }
 });
 
-test("a reconnect within the staleness window keeps the same stream id", async ({
+// Skipped: same reason as the new-broadcast test above — ingest hardcodes the
+// owner channel and a test channel can't drive it. Reconnect logic is covered by
+// tests/unit/stream-session.test.ts. Rework tracked in AZ-48.
+test.skip("a reconnect within the staleness window keeps the same stream id", async ({
   request,
 }) => {
   const slug = `e2e-reconnect-${stamp}`;
