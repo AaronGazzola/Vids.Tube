@@ -1,7 +1,8 @@
 "use client";
 
-import { useRequireAuth } from "@/app/layout.hooks";
+import { useMyChannel, useRequireAuth } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
+import { ChannelSettingsForm } from "@/components/channel-settings-form";
 import { CustomToast } from "@/components/CustomToast";
 import {
   AlertDialog,
@@ -14,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { channelAssetUrl } from "@/lib/storage";
 import { toast } from "sonner";
 
 function stubToast(title: string) {
@@ -38,6 +40,7 @@ function stubToast(title: string) {
 export default function AccountPage() {
   const { isPending, isAuthenticated } = useRequireAuth();
   const user = useAuthStore((state) => state.user);
+  const { data: channel, isPending: channelPending } = useMyChannel();
 
   if (isPending || !isAuthenticated) {
     return (
@@ -49,35 +52,32 @@ export default function AccountPage() {
 
   const email = user?.email ?? "";
   const initials = email ? email.slice(0, 2).toUpperCase() : "?";
-  const displayName = email ? email.split("@")[0] : "";
+  const avatarUrl = channelAssetUrl(channel?.avatar_path ?? null);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 p-4 md:p-6">
       <div className="flex items-center gap-4">
         <Avatar className="h-16 w-16">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={channel?.name ?? ""} />}
           <AvatarFallback className="text-lg">{initials}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-2xl font-bold">{displayName}</h1>
-          <p className="text-sm text-muted-foreground">{email}</p>
+          {channelPending ? (
+            <Skeleton className="h-7 w-40" />
+          ) : (
+            <h1 className="text-2xl font-bold">{channel?.name ?? email}</h1>
+          )}
+          {channelPending ? (
+            <Skeleton className="mt-1 h-4 w-32" />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {channel ? `@${channel.handle}` : email}
+            </p>
+          )}
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Your public display details.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="displayName">Display name</Label>
-            <Input id="displayName" defaultValue={displayName} />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => stubToast("Profile save")}>Save</Button>
-        </CardFooter>
-      </Card>
+      <ChannelSettingsForm />
 
       <Card>
         <CardHeader>

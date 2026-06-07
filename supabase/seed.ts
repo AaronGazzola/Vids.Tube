@@ -73,6 +73,7 @@ async function seed() {
       .insert({
         owner_user_id: ownerId,
         slug: "owner",
+        handle: "owner",
         name: "Owner Channel",
         description: "The first channel on vids.tube.",
       })

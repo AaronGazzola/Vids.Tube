@@ -45,6 +45,7 @@ export type Database = {
           banner_path: string | null
           created_at: string
           description: string
+          handle: string
           id: string
           name: string
           owner_user_id: string
@@ -55,6 +56,7 @@ export type Database = {
           banner_path?: string | null
           created_at?: string
           description?: string
+          handle: string
           id?: string
           name: string
           owner_user_id: string
@@ -65,6 +67,7 @@ export type Database = {
           banner_path?: string | null
           created_at?: string
           description?: string
+          handle?: string
           id?: string
           name?: string
           owner_user_id?: string

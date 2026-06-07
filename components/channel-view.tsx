@@ -4,7 +4,11 @@ import {
   useChannel,
   useChannelVideos,
 } from "@/app/[channelSlug]/page.hooks";
-import { useIsChannelOwner, useLiveStream } from "@/app/layout.hooks";
+import {
+  useIsChannelOwner,
+  useLiveStream,
+  useOwnerChannel,
+} from "@/app/layout.hooks";
 import { BrandingUploadDialog } from "@/components/branding-upload-dialog";
 import { LiveChat } from "@/components/live-chat";
 import { LiveStage } from "@/components/live-stage";
@@ -46,9 +50,16 @@ function ChannelHeaderSkeleton() {
 
 export function ChannelView({ slug }: { slug: string }) {
   const { data: channel, isPending } = useChannel(slug);
+  const { data: ownerChannel, isPending: ownerPending } = useOwnerChannel();
   const { data: videos } = useChannelVideos(channel?.id);
   const { data: stream } = useLiveStream(channel?.id);
   const isOwner = useIsChannelOwner(channel);
+
+  const isPlatformOwnerChannel =
+    !!channel &&
+    !!ownerChannel &&
+    channel.owner_user_id === ownerChannel.owner_user_id;
+  const canView = isPlatformOwnerChannel || isOwner;
 
   const isLive = stream?.status === "live" && !!stream.hls_path;
   const streamId = isLive ? stream.id : null;
@@ -60,9 +71,9 @@ export function ChannelView({ slug }: { slug: string }) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
-      {isPending ? (
+      {isPending || ownerPending ? (
         <ChannelHeaderSkeleton />
-      ) : channel ? (
+      ) : channel && canView ? (
         <>
           <div className="relative aspect-[5/1] w-full overflow-hidden rounded-xl bg-gradient-to-br from-primary/30 via-primary/10 to-muted">
             {bannerUrl && (
@@ -114,7 +125,7 @@ export function ChannelView({ slug }: { slug: string }) {
               </h1>
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">
-                  @{channel.slug}
+                  @{channel.handle}
                 </span>
                 {videos && (
                   <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useOwnerChannel, useUser } from "@/app/layout.hooks";
+import { useMyChannel, useUser } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { AccountMenu } from "@/components/account-menu";
 import { Logo } from "@/components/logo";
@@ -12,7 +12,7 @@ import Link from "next/link";
 
 export function Nav() {
   const { isPending } = useUser();
-  const { data: channel, isPending: channelPending } = useOwnerChannel();
+  const { data: channel, isPending: channelPending } = useMyChannel();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return (
@@ -26,9 +26,9 @@ export function Nav() {
           vids.tube
         </Link>
         <div className="flex items-center gap-2">
-          {channelPending ? (
+          {isAuthenticated && channelPending ? (
             <Skeleton className="h-8 w-32" />
-          ) : channel ? (
+          ) : isAuthenticated && channel ? (
             <Button variant="ghost" asChild>
               <Link href={`/${channel.slug}`}>
                 <Tv className="mr-2 h-4 w-4" />
