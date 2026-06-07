@@ -17,8 +17,9 @@ test.beforeAll(async () => {
   const { data: owner, error: ownerErr } = await admin
     .from("channels")
     .select("id")
-    .eq("slug", "owner")
-    .single();
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (ownerErr || !owner) throw ownerErr ?? new Error("owner channel missing");
   ownerChannelId = owner.id;
 
