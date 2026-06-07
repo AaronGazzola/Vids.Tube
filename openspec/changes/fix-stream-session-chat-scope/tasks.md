@@ -22,5 +22,5 @@
 ## 4. Verification
 
 - [x] 4.1 `openspec validate fix-stream-session-chat-scope --strict` passes
-- [ ] 4.2 Run the unit + e2e test suites and confirm green (NOTE: local `vitest` invocation is broken by a pre-existing `ERR_REQUIRE_ESM` in `std-env`, unrelated to this change; e2e requires `doppler` + a running dev server + remote DB)
-- [ ] 4.3 Manually verify against a live channel: end a stream, start a new one, confirm the new live chat is empty and the prior session's VOD replay is unchanged
+- [x] 4.2 Run the unit + e2e test suites and confirm green — `vitest` now runs clean (16/16; the prior `std-env` ESM blocker is gone post main-merge); full Playwright e2e via `PLAYWRIGHT_PORT=3100 doppler run -- npx playwright test` is 14 passed / 6 skipped (skips tracked by AZ-48)
+- [x] 4.3 Verified against the live `azanything` channel via the real ingest hooks (snapshot → go-live → end → go-live → cleanup): the new session is a fresh row with empty chat, and the prior session's chat is unchanged
