@@ -17,7 +17,7 @@
 - [x] 3.2 Unit + e2e for the reconnect case: a ready hook within `STALE_MS` of a `live` row reuses the same `id` and does not reset `started_at`
 - [x] 3.3 Unit test for the stale-`live` case: `decideGoLive` returns `new-after-stale` (orphan ended, new session row created)
 - [x] 3.4 Extend `tests/e2e/live-vod.spec.ts`: a new broadcast shows an empty live chat (no carryover from a prior session)
-- [ ] 3.5 Extend `tests/e2e/live-vod.spec.ts`: two sequential broadcasts each produce a VOD whose chat replay shows only its own session's messages, spread across the duration (revealing progressively, not clustered at `t=0`)
+- [x] 3.5 Extend `tests/e2e/live-vod.spec.ts`: two sequential broadcasts each produce a VOD whose chat replay shows only its own session's messages, spread across the duration (revealing progressively, not clustered at `t=0`)
 
 ## 4. Verification
 

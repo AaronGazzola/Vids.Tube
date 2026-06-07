@@ -181,6 +181,74 @@ test("a new broadcast after a prior session creates a fresh stream with empty ch
   }
 });
 
+test("two sequential broadcasts each replay only their own chat, spread across the timeline", async ({
+  page,
+}) => {
+  const mk = async (label: string, startMs: number) => {
+    const { data: stream } = await admin
+      .from("streams")
+      .insert({
+        channel_id: ownerChannelId,
+        status: "ended",
+        started_at: new Date(startMs).toISOString(),
+        ended_at: new Date(startMs + 120_000).toISOString(),
+      })
+      .select("id")
+      .single();
+    await admin.from("chat_messages").insert([
+      {
+        stream_id: stream!.id,
+        user_id: ownerUserId,
+        body: `${label}-early`,
+        created_at: new Date(startMs).toISOString(),
+      },
+      {
+        stream_id: stream!.id,
+        user_id: ownerUserId,
+        body: `${label}-late`,
+        created_at: new Date(startMs + 60_000).toISOString(),
+      },
+    ]);
+    const { data: video } = await admin
+      .from("videos")
+      .insert({
+        channel_id: ownerChannelId,
+        status: "ready",
+        title: `E2E ${label} VOD`,
+        mp4_path: `vod/e2e-${stamp}/${label}.mp4`,
+        source_stream_id: stream!.id,
+        published_at: new Date(startMs + 120_000).toISOString(),
+      })
+      .select("id")
+      .single();
+    return { streamId: stream!.id, videoId: video!.id };
+  };
+
+  const first = await mk("alpha", stamp - 10_800_000);
+  const second = await mk("bravo", stamp - 9_000_000);
+
+  try {
+    await page.goto(`/watch/${first.videoId}`);
+    await expect(page.getByText("Chat replay", { exact: true })).toBeVisible();
+    await expect(page.getByText("alpha-early")).toBeVisible();
+    await expect(page.getByText("alpha-late")).toHaveCount(0);
+    await expect(page.getByText("bravo-early")).toHaveCount(0);
+    await expect(page.getByText("bravo-late")).toHaveCount(0);
+
+    await page.goto(`/watch/${second.videoId}`);
+    await expect(page.getByText("Chat replay", { exact: true })).toBeVisible();
+    await expect(page.getByText("bravo-early")).toBeVisible();
+    await expect(page.getByText("bravo-late")).toHaveCount(0);
+    await expect(page.getByText("alpha-early")).toHaveCount(0);
+    await expect(page.getByText("alpha-late")).toHaveCount(0);
+  } finally {
+    await admin.from("videos").delete().eq("id", first.videoId);
+    await admin.from("videos").delete().eq("id", second.videoId);
+    await admin.from("streams").delete().eq("id", first.streamId);
+    await admin.from("streams").delete().eq("id", second.streamId);
+  }
+});
+
 test("a reconnect within the staleness window keeps the same stream id", async ({
   request,
 }) => {
