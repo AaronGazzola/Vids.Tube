@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { decideGoLive } from "@/lib/stream";
 import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
 
 export async function POST(request: Request) {
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from("streams")
-    .select("id, status")
+    .select("id, status, last_seen_at")
     .eq("channel_id", channel.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -43,35 +44,41 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 500 });
   }
 
-  const wasLive = existing?.status === "live";
+  const decision = decideGoLive(existing, Date.now());
 
-  if (existing) {
+  if (decision.action === "reconnect") {
     const { error } = await supabaseAdmin
       .from("streams")
-      .update({
-        status: "live",
-        hls_path: hlsPath,
-        last_seen_at: now,
-        ended_at: null,
-        ...(wasLive ? {} : { started_at: now }),
-      })
-      .eq("id", existing.id);
+      .update({ hls_path: hlsPath, last_seen_at: now })
+      .eq("id", decision.streamId);
     if (error) {
       console.error(error);
       return new NextResponse(null, { status: 500 });
     }
-  } else {
-    const { error } = await supabaseAdmin.from("streams").insert({
-      channel_id: channel.id,
-      status: "live",
-      hls_path: hlsPath,
-      started_at: now,
-      last_seen_at: now,
-    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (decision.action === "new-after-stale") {
+    const { error } = await supabaseAdmin
+      .from("streams")
+      .update({ status: "ended", ended_at: now })
+      .eq("id", decision.staleStreamId);
     if (error) {
       console.error(error);
       return new NextResponse(null, { status: 500 });
     }
+  }
+
+  const { error } = await supabaseAdmin.from("streams").insert({
+    channel_id: channel.id,
+    status: "live",
+    hls_path: hlsPath,
+    started_at: now,
+    last_seen_at: now,
+  });
+  if (error) {
+    console.error(error);
+    return new NextResponse(null, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

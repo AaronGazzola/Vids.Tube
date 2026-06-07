@@ -10,19 +10,19 @@ test("signup shows the verification-pending state", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/verify$/);
   await expect(
-    page.getByRole("heading", { name: "Check your email" })
+    page.getByText("Check your email", { exact: true })
   ).toBeVisible();
 });
 
 test("seeded owner can log in and log out", async ({ page }) => {
   await page.goto("/login");
-  await page.fill('input[name="email"]', "owner@vids.tube");
-  await page.fill('input[name="password"]', "Password123!");
+  await page.fill('input[name="email"]', process.env.ADMIN_EMAIL!);
+  await page.fill('input[name="password"]', process.env.ADMIN_PASSWORD!);
   await page.click('button[type="submit"]');
 
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
 });

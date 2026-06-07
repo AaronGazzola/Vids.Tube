@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { STALE_MS } from "@/lib/stream";
 import {
   isReservedHandle,
   isValidHandle,
@@ -16,8 +17,6 @@ import type {
   Stream,
   UpdateChannelInput,
 } from "./layout.types";
-
-const STALE_MS = 60_000;
 
 const UNIQUE_VIOLATION = "23505";
 
