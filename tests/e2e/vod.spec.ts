@@ -10,18 +10,20 @@ const admin = createClient(
 const stamp = Date.now();
 
 let ownerChannelId: string;
+let ownerSlug: string;
 let olderVideoId: string;
 let newerVideoId: string;
 
 test.beforeAll(async () => {
   const { data: owner, error: ownerErr } = await admin
     .from("channels")
-    .select("id")
+    .select("id, slug")
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (ownerErr || !owner) throw ownerErr ?? new Error("owner channel missing");
   ownerChannelId = owner.id;
+  ownerSlug = owner.slug;
 
   const { data: older } = await admin
     .from("videos")
@@ -55,10 +57,21 @@ test.afterAll(async () => {
   await admin.from("videos").delete().eq("id", newerVideoId);
 });
 
-// Skipped: channel-page viewing is now owner-gated, so throwaway channels can no
-// longer be created and viewed anonymously. Rework tracked in AZ-48.
-test.skip("channel page lists ready VODs newest-first", () => {});
-test.skip("channel page with no VODs shows the empty state", () => {});
+// Owner-gated rework (AZ-48): channel viewing is now restricted to the platform
+// owner's channel, so these assert against the seeded owner channel (which always
+// has VODs) rather than a throwaway channel. The old "channel with no VODs shows
+// the empty state" case is unreachable under owner-gating — the only viewable
+// channel is the owner's, which has VODs — so it is removed rather than reworked.
+test("the owner channel lists ready VODs newest-first", async ({ page }) => {
+  await page.goto(`/${ownerSlug}`);
+  const newer = page.getByText("E2E Newer VOD", { exact: true });
+  const older = page.getByText("E2E Older VOD", { exact: true });
+  await expect(newer).toBeVisible();
+  await expect(older).toBeVisible();
+  const newerBox = await newer.boundingBox();
+  const olderBox = await older.boundingBox();
+  expect(newerBox!.y).toBeLessThan(olderBox!.y);
+});
 
 test("watch page renders the player for a ready video", async ({ page }) => {
   await page.goto(`/watch/${newerVideoId}`);
