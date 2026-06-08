@@ -201,6 +201,7 @@ export type Database = {
         Row: {
           channel_id: string
           created_at: string
+          description: string | null
           ended_at: string | null
           hls_path: string | null
           id: string
@@ -208,11 +209,13 @@ export type Database = {
           max_viewers: number
           started_at: string | null
           status: string
+          thumbnail_path: string | null
           title: string | null
         }
         Insert: {
           channel_id: string
           created_at?: string
+          description?: string | null
           ended_at?: string | null
           hls_path?: string | null
           id?: string
@@ -220,11 +223,13 @@ export type Database = {
           max_viewers?: number
           started_at?: string | null
           status?: string
+          thumbnail_path?: string | null
           title?: string | null
         }
         Update: {
           channel_id?: string
           created_at?: string
+          description?: string | null
           ended_at?: string | null
           hls_path?: string | null
           id?: string
@@ -232,6 +237,7 @@ export type Database = {
           max_viewers?: number
           started_at?: string | null
           status?: string
+          thumbnail_path?: string | null
           title?: string | null
         }
         Relationships: [
@@ -248,6 +254,7 @@ export type Database = {
         Row: {
           channel_id: string
           created_at: string
+          description: string | null
           duration_s: number | null
           height: number | null
           id: string
@@ -263,6 +270,7 @@ export type Database = {
         Insert: {
           channel_id: string
           created_at?: string
+          description?: string | null
           duration_s?: number | null
           height?: number | null
           id?: string
@@ -278,6 +286,7 @@ export type Database = {
         Update: {
           channel_id?: string
           created_at?: string
+          description?: string | null
           duration_s?: number | null
           height?: number | null
           id?: string

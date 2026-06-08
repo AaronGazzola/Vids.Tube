@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from("videos")
-    .select("id")
+    .select("id, thumbnail_path")
     .eq("channel_id", channel.id)
     .eq("status", "processing")
     .order("created_at", { ascending: false })
@@ -93,10 +93,13 @@ export async function POST(request: Request) {
   const update: VideoUpdate = {
     status: "ready",
     mp4_path: body.mp4Path,
-    thumbnail_path: body.thumbnailPath ?? null,
     duration_s: body.durationS ?? null,
     published_at: new Date().toISOString(),
   };
+
+  if (!pending.thumbnail_path) {
+    update.thumbnail_path = body.thumbnailPath ?? null;
+  }
 
   const width = sanitizeDimension(body.width);
   if (width !== undefined) {

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabaseAdmin.from("streams").insert({
     channel_id: channel.id,
-    status: "live",
+    status: "preview",
     hls_path: hlsPath,
     started_at: now,
     last_seen_at: now,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { endBroadcastSession } from "@/lib/broadcast-end";
 import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
 
 export async function POST(request: Request) {
@@ -22,57 +23,28 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const { data: liveStream, error: liveError } = await supabaseAdmin
+  const { data: session, error: sessionError } = await supabaseAdmin
     .from("streams")
-    .select("id, title")
+    .select("id, channel_id, status, title, description, thumbnail_path")
     .eq("channel_id", channel.id)
-    .eq("status", "live")
+    .in("status", ["preview", "live"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (liveError) {
-    console.error(liveError);
+  if (sessionError) {
+    console.error(sessionError);
     return new NextResponse(null, { status: 500 });
   }
-  if (!liveStream) {
+  if (!session) {
     return NextResponse.json({ ok: true });
   }
 
-  const { error: endError } = await supabaseAdmin
-    .from("streams")
-    .update({ status: "ended", ended_at: new Date().toISOString() })
-    .eq("id", liveStream.id);
-
-  if (endError) {
-    console.error(endError);
+  try {
+    await endBroadcastSession(session);
+  } catch (error) {
+    console.error(error);
     return new NextResponse(null, { status: 500 });
-  }
-
-  const { data: existingProcessing, error: existingVideoError } =
-    await supabaseAdmin
-      .from("videos")
-      .select("id")
-      .eq("source_stream_id", liveStream.id)
-      .eq("status", "processing")
-      .maybeSingle();
-
-  if (existingVideoError) {
-    console.error(existingVideoError);
-    return new NextResponse(null, { status: 500 });
-  }
-
-  if (!existingProcessing) {
-    const { error: videoError } = await supabaseAdmin.from("videos").insert({
-      channel_id: channel.id,
-      source_stream_id: liveStream.id,
-      status: "processing",
-      title: liveStream.title,
-    });
-    if (videoError) {
-      console.error(videoError);
-      return new NextResponse(null, { status: 500 });
-    }
   }
 
   return NextResponse.json({ ok: true });

@@ -107,6 +107,11 @@ export default function WatchPage() {
             )}
           </div>
           <h1 className="text-2xl font-bold">{video.title ?? "Untitled"}</h1>
+          {video.description && (
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+              {video.description}
+            </p>
+          )}
           <CommentsSection videoId={video.id} />
         </div>
       ) : (
