@@ -1,4 +1,11 @@
-## MODIFIED Requirements
+## REMOVED Requirements
+
+### Requirement: Go Live tool (placeholder)
+
+**Reason**: Replaced by the real preview→Go-live control surface delivered in this change.
+**Migration**: Superseded by the "Go Live tool" requirement below.
+
+## ADDED Requirements
 
 ### Requirement: Go Live tool
 
