@@ -11,6 +11,7 @@ const stamp = Date.now();
 
 let ownerChannelId: string;
 let ownerUserId: string;
+let ownerSlug: string;
 let sourceStreamId: string;
 let portraitVideoId: string;
 let replayVideoId: string;
@@ -19,13 +20,14 @@ let noReplayVideoId: string;
 test.beforeAll(async () => {
   const { data: owner, error } = await admin
     .from("channels")
-    .select("id, owner_user_id")
+    .select("id, owner_user_id, slug")
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error || !owner) throw error ?? new Error("owner channel missing");
   ownerChannelId = owner.id;
   ownerUserId = owner.owner_user_id;
+  ownerSlug = owner.slug;
 
   const nowIso = new Date(stamp).toISOString();
   const base = stamp - 3_600_000;
@@ -107,10 +109,58 @@ test.afterAll(async () => {
   await admin.from("streams").delete().eq("id", sourceStreamId);
 });
 
-// Skipped: channel-page viewing is now owner-gated, so a dedicated live/offline
-// channel can no longer be created and viewed anonymously. Rework tracked in AZ-48.
-test.skip("offline channel shows the scheduled placeholder and no chat", () => {});
-test.skip("live channel shows the live chat panel", () => {});
+// Owner-gated rework (AZ-48): only the platform owner's channel is viewable, so
+// these drive and assert the seeded owner channel directly (guarded so a real
+// in-progress broadcast is never disturbed; the brief live row is cleaned up).
+async function ownerIsLive(): Promise<boolean> {
+  const { count } = await admin
+    .from("streams")
+    .select("*", { count: "exact", head: true })
+    .eq("channel_id", ownerChannelId)
+    .eq("status", "live");
+  return (count ?? 0) > 0;
+}
+
+test("the owner channel shows the scheduled placeholder when offline", async ({
+  page,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+  await page.goto(`/${ownerSlug}`);
+  await expect(page.getByText("No stream scheduled right now")).toBeVisible();
+  await expect(page.getByText("Live chat", { exact: true })).toHaveCount(0);
+});
+
+test("the owner channel shows the live chat panel when live", async ({
+  page,
+  request,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const res = await request.post(`/api/ingest/live`, {
+    headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
+  });
+  expect(res.ok()).toBeTruthy();
+  const { data: liveRow } = await admin
+    .from("streams")
+    .select("id")
+    .eq("channel_id", ownerChannelId)
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  try {
+    await page.goto(`/${ownerSlug}`);
+    await expect(page.getByText("Live chat", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("No stream scheduled right now")
+    ).toHaveCount(0);
+  } finally {
+    if (liveRow) {
+      await admin.from("streams").delete().eq("id", liveRow.id);
+    }
+  }
+});
 
 test("portrait VOD renders in a vertical container", async ({ page }) => {
   await page.goto(`/watch/${portraitVideoId}`);
@@ -130,26 +180,20 @@ test("VOD without source chat shows no replay panel", async ({ page }) => {
   await expect(page.getByText("Chat replay", { exact: true })).toHaveCount(0);
 });
 
-// Skipped: the ingest hook hardcodes the owner channel slug and channels are now
-// owner-gated + unique-per-owner (AZ-23), so a throwaway test channel can't drive
-// this path; exercising it would mutate the live owner channel. The session
-// decision logic is covered by tests/unit/stream-session.test.ts (decideGoLive).
-// Owner-channel-aware rework tracked in AZ-48.
-test.skip("a new broadcast after a prior session creates a fresh stream with empty chat", async ({
+// Owner-gated rework (AZ-48): the ingest hook hardcodes the owner channel, so this
+// drives the seeded owner channel directly. Guarded against a real broadcast; the
+// prior-session rows and the new live row are cleaned up. (decideGoLive's pure
+// logic is also unit-covered in tests/unit/stream-session.test.ts.)
+test("a new broadcast after a prior session creates a fresh stream with empty chat", async ({
   request,
 }) => {
-  const slug = `e2e-session-${stamp}`;
-  const { data: ch } = await admin
-    .from("channels")
-    .insert({ owner_user_id: ownerUserId, slug, name: "E2E Session" })
-    .select("id")
-    .single();
+  test.skip(await ownerIsLive(), "owner channel is currently live");
 
   const base = stamp - 7_200_000;
   const { data: ended } = await admin
     .from("streams")
     .insert({
-      channel_id: ch!.id,
+      channel_id: ownerChannelId,
       status: "ended",
       started_at: new Date(base).toISOString(),
       ended_at: new Date(base + 60_000).toISOString(),
@@ -162,8 +206,9 @@ test.skip("a new broadcast after a prior session creates a fresh stream with emp
     body: "previous session message",
   });
 
+  let newLiveId: string | null = null;
   try {
-    const res = await request.post(`/api/ingest/live?path=${slug}`, {
+    const res = await request.post(`/api/ingest/live`, {
       headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
     });
     expect(res.ok()).toBeTruthy();
@@ -171,19 +216,25 @@ test.skip("a new broadcast after a prior session creates a fresh stream with emp
     const { data: streams } = await admin
       .from("streams")
       .select("id, status")
-      .eq("channel_id", ch!.id)
+      .eq("channel_id", ownerChannelId)
+      .eq("status", "live")
       .order("created_at", { ascending: false });
-    const live = streams!.find((s) => s.status === "live");
+    const live = streams![0];
     expect(live, "a new live stream row exists").toBeTruthy();
-    expect(live!.id, "the new session is not the prior row").not.toBe(ended!.id);
+    expect(live.id, "the new session is not the prior ended row").not.toBe(
+      ended!.id
+    );
+    newLiveId = live.id;
 
     const { count } = await admin
       .from("chat_messages")
       .select("*", { count: "exact", head: true })
-      .eq("stream_id", live!.id);
+      .eq("stream_id", live.id);
     expect(count, "the new session's chat is empty").toBe(0);
   } finally {
-    await admin.from("channels").delete().eq("id", ch!.id);
+    if (newLiveId) await admin.from("streams").delete().eq("id", newLiveId);
+    await admin.from("chat_messages").delete().eq("stream_id", ended!.id);
+    await admin.from("streams").delete().eq("id", ended!.id);
   }
 });
 
@@ -255,46 +306,49 @@ test("two sequential broadcasts each replay only their own chat, spread across t
   }
 });
 
-// Skipped: same reason as the new-broadcast test above — ingest hardcodes the
-// owner channel and a test channel can't drive it. Reconnect logic is covered by
-// tests/unit/stream-session.test.ts. Rework tracked in AZ-48.
-test.skip("a reconnect within the staleness window keeps the same stream id", async ({
+// Owner-gated rework (AZ-48): drive the seeded owner channel. Guarded so it only
+// runs when the owner is offline, then seeds a single fresh live row; the reconnect
+// must reuse that row (no new row, started_at unchanged) rather than start a session.
+test("a reconnect within the staleness window keeps the same stream id", async ({
   request,
 }) => {
-  const slug = `e2e-reconnect-${stamp}`;
-  const { data: ch } = await admin
-    .from("channels")
-    .insert({ owner_user_id: ownerUserId, slug, name: "E2E Reconnect" })
-    .select("id")
-    .single();
+  test.skip(await ownerIsLive(), "owner channel is currently live");
 
   const nowIso = new Date().toISOString();
   const { data: liveRow } = await admin
     .from("streams")
     .insert({
-      channel_id: ch!.id,
+      channel_id: ownerChannelId,
       status: "live",
       hls_path: "https://example.com/reconnect/index.m3u8",
       started_at: nowIso,
       last_seen_at: nowIso,
     })
-    .select("id")
+    .select("id, started_at")
     .single();
 
+  const createdIds = new Set<string>([liveRow!.id]);
   try {
-    const res = await request.post(`/api/ingest/live?path=${slug}`, {
+    const res = await request.post(`/api/ingest/live`, {
       headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
     });
     expect(res.ok()).toBeTruthy();
 
-    const { data: streams } = await admin
+    const { data: live } = await admin
       .from("streams")
-      .select("id, status")
-      .eq("channel_id", ch!.id);
-    expect(streams, "no extra stream row was created").toHaveLength(1);
-    expect(streams![0].id, "the ongoing session is reused").toBe(liveRow!.id);
-    expect(streams![0].status).toBe("live");
+      .select("id, status, started_at")
+      .eq("channel_id", ownerChannelId)
+      .eq("status", "live");
+    live!.forEach((s) => createdIds.add(s.id));
+    expect(live, "no extra live row was created — the session is reused").toHaveLength(1);
+    expect(live![0].id, "the ongoing session is reused").toBe(liveRow!.id);
+    expect(
+      live![0].started_at,
+      "started_at is not reset on reconnect"
+    ).toBe(liveRow!.started_at);
   } finally {
-    await admin.from("channels").delete().eq("id", ch!.id);
+    for (const id of createdIds) {
+      await admin.from("streams").delete().eq("id", id);
+    }
   }
 });
