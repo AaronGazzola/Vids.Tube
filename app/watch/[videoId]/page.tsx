@@ -6,10 +6,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { VideoPlayer } from "@/components/video-player";
 import { cn } from "@/lib/utils";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useChatReplay, useVideo } from "./page.hooks";
 
 const VOD_BASE_URL = process.env.NEXT_PUBLIC_VOD_BASE_URL ?? "";
+
+const REPLAY_COLLAPSED_KEY = "vodReplayCollapsed";
+
+const replayCollapsedListeners = new Set<() => void>();
+
+function subscribeReplayCollapsed(callback: () => void) {
+  replayCollapsedListeners.add(callback);
+  return () => {
+    replayCollapsedListeners.delete(callback);
+  };
+}
+
+function getReplayCollapsedSnapshot(): boolean {
+  return window.localStorage.getItem(REPLAY_COLLAPSED_KEY) === "true";
+}
+
+function getReplayCollapsedServerSnapshot(): boolean {
+  return false;
+}
+
+function setReplayCollapsedPreference(value: boolean) {
+  window.localStorage.setItem(REPLAY_COLLAPSED_KEY, String(value));
+  replayCollapsedListeners.forEach((listener) => listener());
+}
 
 function vodUrl(path: string | null): string | undefined {
   if (!path) {
@@ -25,9 +49,17 @@ export default function WatchPage() {
     video?.source_stream_id ?? null
   );
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
-  const [replayDismissed, setReplayDismissed] = useState(false);
+  const replayCollapsed = useSyncExternalStore(
+    subscribeReplayCollapsed,
+    getReplayCollapsedSnapshot,
+    getReplayCollapsedServerSnapshot
+  );
 
-  const showReplay = replayMessages.length > 0 && !replayDismissed;
+  const toggleReplayCollapsed = () =>
+    setReplayCollapsedPreference(!replayCollapsed);
+
+  const hasReplay = replayMessages.length > 0;
+  const replayExpanded = hasReplay && !replayCollapsed;
 
   const isVertical =
     !!video?.width &&
@@ -51,7 +83,8 @@ export default function WatchPage() {
         <div className="flex flex-col gap-4">
           <div
             className={cn(
-              showReplay && "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]"
+              "flex flex-col gap-4",
+              replayExpanded && "lg:grid lg:grid-cols-[1fr_340px]"
             )}
           >
             <VideoPlayer
@@ -61,12 +94,13 @@ export default function WatchPage() {
               height={video.height}
               onTimeUpdate={(time) => setCurrentTimeMs(time * 1000)}
             />
-            {showReplay && (
-              <div className="lg:h-[70vh]">
+            {hasReplay && (
+              <div className={cn(replayExpanded && "lg:h-[70vh]")}>
                 <ChatReplay
                   messages={replayMessages}
                   currentTimeMs={currentTimeMs}
-                  onDismiss={() => setReplayDismissed(true)}
+                  collapsed={replayCollapsed}
+                  onToggleCollapsed={toggleReplayCollapsed}
                   className="h-full"
                 />
               </div>

@@ -174,6 +174,28 @@ test("VOD with source-stream chat shows the replay panel", async ({ page }) => {
   await expect(page.getByText("Chat replay", { exact: true })).toBeVisible();
 });
 
+test("the replay panel can be collapsed and re-expanded", async ({ page }) => {
+  await page.goto(`/watch/${replayVideoId}`);
+
+  const collapse = page.getByRole("button", { name: "Collapse chat replay" });
+  const expand = page.getByRole("button", { name: "Show chat replay" });
+  const listPlaceholder = page.getByText(
+    "Chat replay will appear as the video plays."
+  );
+
+  await expect(collapse).toBeVisible();
+  await expect(listPlaceholder).toBeVisible();
+
+  await collapse.click();
+  await expect(expand).toBeVisible();
+  await expect(collapse).toHaveCount(0);
+  await expect(listPlaceholder).toHaveCount(0);
+
+  await expand.click();
+  await expect(collapse).toBeVisible();
+  await expect(listPlaceholder).toBeVisible();
+});
+
 test("VOD without source chat shows no replay panel", async ({ page }) => {
   await page.goto(`/watch/${noReplayVideoId}`);
   await expect(page.locator("video")).toBeVisible();
