@@ -130,7 +130,7 @@ test("the owner channel shows the scheduled placeholder when offline", async ({
   await expect(page.getByText("Live chat", { exact: true })).toHaveCount(0);
 });
 
-test("the owner channel shows the live chat panel when live", async ({
+test("a connected encoder stays private (preview) until go-live", async ({
   page,
   request,
 }) => {
@@ -140,25 +140,146 @@ test("the owner channel shows the live chat panel when live", async ({
     headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
   });
   expect(res.ok()).toBeTruthy();
-  const { data: liveRow } = await admin
+
+  const { data: session } = await admin
     .from("streams")
-    .select("id")
+    .select("id, status")
     .eq("channel_id", ownerChannelId)
-    .eq("status", "live")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   try {
+    expect(session?.status, "encoder connect lands in preview").toBe("preview");
     await page.goto(`/${ownerSlug}`);
-    await expect(page.getByText("Live chat", { exact: true })).toBeVisible();
-    await expect(
-      page.getByText("No stream scheduled right now")
-    ).toHaveCount(0);
+    await expect(page.getByText("No stream scheduled right now")).toBeVisible();
+    await expect(page.getByText("Live chat", { exact: true })).toHaveCount(0);
   } finally {
-    if (liveRow) {
-      await admin.from("streams").delete().eq("id", liveRow.id);
-    }
+    if (session) await admin.from("streams").delete().eq("id", session.id);
+  }
+});
+
+test("a live broadcast shows its title, description, and chat on the channel page", async ({
+  page,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const nowIso = new Date().toISOString();
+  const { data: live } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "live",
+      hls_path: "https://example.com/live/index.m3u8",
+      title: `E2E Live ${stamp}`,
+      description: `E2E live description ${stamp}`,
+      started_at: nowIso,
+      last_seen_at: nowIso,
+    })
+    .select("id")
+    .single();
+
+  try {
+    await page.goto(`/${ownerSlug}`);
+    await expect(page.getByText(`E2E Live ${stamp}`)).toBeVisible();
+    await expect(
+      page.getByText(`E2E live description ${stamp}`)
+    ).toBeVisible();
+    await expect(page.getByText("Live chat", { exact: true })).toBeVisible();
+  } finally {
+    await admin.from("streams").delete().eq("id", live!.id);
+  }
+});
+
+test("ending a live broadcast creates a VOD that inherits title, description, and custom thumbnail", async ({
+  request,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const nowIso = new Date().toISOString();
+  const customThumb = `live-thumb/${ownerChannelId}/e2e-${stamp}.jpg`;
+  const { data: live } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "live",
+      hls_path: "https://example.com/live/index.m3u8",
+      title: `E2E Inherit ${stamp}`,
+      description: `E2E inherit description ${stamp}`,
+      thumbnail_path: customThumb,
+      started_at: nowIso,
+      last_seen_at: nowIso,
+    })
+    .select("id")
+    .single();
+
+  try {
+    const res = await request.post(`/api/ingest/offline`, {
+      headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    const { data: stream } = await admin
+      .from("streams")
+      .select("status")
+      .eq("id", live!.id)
+      .single();
+    expect(stream?.status, "the stream is ended").toBe("ended");
+
+    const { data: vod } = await admin
+      .from("videos")
+      .select("title, description, thumbnail_path, status")
+      .eq("source_stream_id", live!.id)
+      .maybeSingle();
+    expect(vod, "a VOD was created for the ended live session").toBeTruthy();
+    expect(vod!.title).toBe(`E2E Inherit ${stamp}`);
+    expect(vod!.description).toBe(`E2E inherit description ${stamp}`);
+    expect(vod!.thumbnail_path, "custom thumbnail is inherited").toBe(
+      customThumb
+    );
+  } finally {
+    await admin.from("videos").delete().eq("source_stream_id", live!.id);
+    await admin.from("streams").delete().eq("id", live!.id);
+  }
+});
+
+test("a preview-only session that ends creates no VOD", async ({ request }) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const nowIso = new Date().toISOString();
+  const { data: preview } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "preview",
+      hls_path: "https://example.com/preview/index.m3u8",
+      started_at: nowIso,
+      last_seen_at: nowIso,
+    })
+    .select("id")
+    .single();
+
+  try {
+    const res = await request.post(`/api/ingest/offline`, {
+      headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    const { data: stream } = await admin
+      .from("streams")
+      .select("status")
+      .eq("id", preview!.id)
+      .single();
+    expect(stream?.status, "the preview session is ended").toBe("ended");
+
+    const { count } = await admin
+      .from("videos")
+      .select("*", { count: "exact", head: true })
+      .eq("source_stream_id", preview!.id);
+    expect(count, "no VOD is created for a preview-only session").toBe(0);
+  } finally {
+    await admin.from("videos").delete().eq("source_stream_id", preview!.id);
+    await admin.from("streams").delete().eq("id", preview!.id);
   }
 });
 
@@ -228,7 +349,7 @@ test("a new broadcast after a prior session creates a fresh stream with empty ch
     body: "previous session message",
   });
 
-  let newLiveId: string | null = null;
+  let newSessionId: string | null = null;
   try {
     const res = await request.post(`/api/ingest/live`, {
       headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
@@ -239,22 +360,23 @@ test("a new broadcast after a prior session creates a fresh stream with empty ch
       .from("streams")
       .select("id, status")
       .eq("channel_id", ownerChannelId)
-      .eq("status", "live")
+      .eq("status", "preview")
       .order("created_at", { ascending: false });
-    const live = streams![0];
-    expect(live, "a new live stream row exists").toBeTruthy();
-    expect(live.id, "the new session is not the prior ended row").not.toBe(
-      ended!.id
-    );
-    newLiveId = live.id;
+    const session = streams![0];
+    expect(session, "a new preview stream row exists").toBeTruthy();
+    expect(
+      session.id,
+      "the new session is not the prior ended row"
+    ).not.toBe(ended!.id);
+    newSessionId = session.id;
 
     const { count } = await admin
       .from("chat_messages")
       .select("*", { count: "exact", head: true })
-      .eq("stream_id", live.id);
+      .eq("stream_id", session.id);
     expect(count, "the new session's chat is empty").toBe(0);
   } finally {
-    if (newLiveId) await admin.from("streams").delete().eq("id", newLiveId);
+    if (newSessionId) await admin.from("streams").delete().eq("id", newSessionId);
     await admin.from("chat_messages").delete().eq("stream_id", ended!.id);
     await admin.from("streams").delete().eq("id", ended!.id);
   }

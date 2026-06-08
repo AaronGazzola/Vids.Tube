@@ -25,7 +25,8 @@ Going live is encoder-triggered: MediaMTX's ready hook POSTs `/api/ingest/live`,
   - *Alternative considered:* Supabase `channel-assets` bucket (reuse branding upload verbatim) — rejected; it splits thumbnail resolution across two stores.
 - **Custom-thumbnail precedence at finalize.** The offline hook copies `streams.thumbnail_path` onto the processing `videos` row. The recording hook sets `thumbnail_path` from the auto-extracted key **only if** the row's `thumbnail_path` is null — so a custom thumbnail survives.
 - **Preview is owner-only on reads.** `getLiveStreamAction`/`useLiveStream` (public channel page) treat only `live` as live; `preview` reads as offline for viewers. Studio uses an owner-scoped read to self-preview the `preview` stream.
-- **Preview-only sessions produce no VOD.** The offline hook creates the processing `videos` row only when the ending session had reached public `live` (e.g. has a public `started_at`/was `live`).
+- **Preview-only sessions produce no VOD.** The offline hook finds the most-recent ongoing session (`preview` or `live`), sets it `ended`, and creates the processing `videos` row only when that session's status was `live` at the moment the offline hook fired (read the status before ending). A `preview` row that ends is just marked `ended`.
+- **`started_at` is not reset at go-live.** It is set once at encoder-connect (recording/session start). Go live only flips `status` `preview→live`. Because the recording (from MediaMTX `runOnReady`) and the VOD chat-replay offsets both anchor to `started_at`, leaving it at the recording start keeps replay aligned; resetting it to the go-live moment would shift chat earlier by the preview duration.
 
 ## Risks / Trade-offs
 

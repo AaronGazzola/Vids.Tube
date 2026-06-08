@@ -23,5 +23,5 @@ while `live`.
 #### Scenario: Live — manage the broadcast
 
 - **WHEN** the owner opens `/studio/live` while the broadcast is `live`
-- **THEN** the page shows a live indicator and the current viewer count and an
-  End control to stop the broadcast
+- **THEN** the page shows a live indicator and an End control to stop the
+  broadcast (live viewer count is tracked separately under analytics, AZ-26)

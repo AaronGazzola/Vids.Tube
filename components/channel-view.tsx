@@ -145,7 +145,19 @@ export function ChannelView({ slug }: { slug: string }) {
           <section className="mt-8">
             {isLive ? (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-                <LiveStage stream={stream} loading={false} />
+                <div className="space-y-3">
+                  <LiveStage stream={stream} loading={false} />
+                  {stream?.title && (
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      {stream.title}
+                    </h2>
+                  )}
+                  {stream?.description && (
+                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                      {stream.description}
+                    </p>
+                  )}
+                </div>
                 <div className="lg:h-[70vh]">
                   <LiveChat streamId={streamId} />
                 </div>

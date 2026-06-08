@@ -23,6 +23,18 @@ export function isLiveAndFresh(
   return nowMs - lastSeen <= staleMs;
 }
 
+export function isOngoingAndFresh(
+  row: Pick<StreamSessionRow, "status" | "last_seen_at">,
+  nowMs: number,
+  staleMs: number = STALE_MS
+): boolean {
+  if (row.status !== "live" && row.status !== "preview") {
+    return false;
+  }
+  const lastSeen = row.last_seen_at ? new Date(row.last_seen_at).getTime() : 0;
+  return nowMs - lastSeen <= staleMs;
+}
+
 export function decideGoLive(
   existing: StreamSessionRow | null,
   nowMs: number,
@@ -31,10 +43,10 @@ export function decideGoLive(
   if (!existing) {
     return { action: "new" };
   }
-  if (isLiveAndFresh(existing, nowMs, staleMs)) {
+  if (isOngoingAndFresh(existing, nowMs, staleMs)) {
     return { action: "reconnect", streamId: existing.id };
   }
-  if (existing.status === "live") {
+  if (existing.status === "live" || existing.status === "preview") {
     return { action: "new-after-stale", staleStreamId: existing.id };
   }
   return { action: "new" };

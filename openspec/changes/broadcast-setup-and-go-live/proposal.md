@@ -23,7 +23,8 @@ A live stream today is born the instant the encoder connects (the ingest `live` 
 - `stream-pipeline`: the ready hook now lands a session in private `preview` (not public `live`); promotion to public `live` is an explicit owner action; a `preview` session that ends without going live leaves no public artifact.
 - `vod-recording`: the processing VOD inherits the broadcast's `description` and `thumbnail_path` (not just `title`), and the recording-complete hook must not overwrite an owner-set custom thumbnail with the auto-extracted one.
 - `studio`: the Go Live tool changes from a disabled placeholder to the real preview/go-live/end experience.
-- `channel-live`: the channel page treats only `live` (not `preview`) as publicly live, and displays the live broadcast's title near the player.
+- `channel-live`: the channel page treats only `live` (not `preview`) as publicly live, and displays the live broadcast's title (and description) near the player.
+- `vod-playback`: the watch page shows the VOD's inherited description below the title.
 
 ## Impact
 

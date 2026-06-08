@@ -29,8 +29,9 @@ unless the broadcast has a non-empty title.
 
 - **WHEN** the owner sets a non-empty title and triggers Go live on a `preview`
   broadcast
-- **THEN** the broadcast becomes public `live`, its public `started_at` is set,
-  and viewers can now watch it
+- **THEN** the broadcast becomes public `live` and viewers can now watch it
+  (its `started_at`, set at encoder-connect/recording start, is left unchanged so
+  VOD chat replay stays aligned with the recording)
 
 #### Scenario: Go live blocked without a title
 
