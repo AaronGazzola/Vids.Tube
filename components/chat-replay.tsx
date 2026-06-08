@@ -4,18 +4,20 @@ import type { ReplayMessage } from "@/app/watch/[videoId]/page.types";
 import { Button } from "@/components/ui/button";
 import { visibleReplayMessages } from "@/lib/chat-replay";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 export function ChatReplay({
   messages,
   currentTimeMs,
-  onDismiss,
+  collapsed,
+  onToggleCollapsed,
   className,
 }: {
   messages: ReplayMessage[];
   currentTimeMs: number;
-  onDismiss: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   className?: string;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
@@ -29,6 +31,22 @@ export function ChatReplay({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [visible.length]);
 
+  if (collapsed) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="Show chat replay"
+        onClick={onToggleCollapsed}
+        className={cn("w-full justify-start gap-2", className)}
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Chat replay
+      </Button>
+    );
+  }
+
   return (
     <div className={cn("flex h-full min-h-80 flex-col rounded-lg border", className)}>
       <div className="flex items-center justify-between border-b p-3 text-sm font-medium">
@@ -37,10 +55,10 @@ export function ChatReplay({
           type="button"
           size="icon-sm"
           variant="ghost"
-          aria-label="Hide chat replay"
-          onClick={onDismiss}
+          aria-label="Collapse chat replay"
+          onClick={onToggleCollapsed}
         >
-          <X className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
