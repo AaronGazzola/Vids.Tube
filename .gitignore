@@ -19,6 +19,9 @@
 /.next/
 /out/
 
+# react-email preview server
+.react-email/
+
 # production
 /build
 

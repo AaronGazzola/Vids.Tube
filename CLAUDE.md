@@ -202,3 +202,40 @@ How OpenSpec changes and deferred work are managed. These rules exist to prevent
 5. **No silent checking.** Check a task box only with evidence the work is actually done. "Done but unverifiable right now" becomes a Linear verification issue — never a checked box.
 
 **Backlog location:** Linear, Gazzola (personal) workspace, **"Az"** team, **"Vids.Tube"** project. Read open issues there before starting deferred work.
+
+# Email Template Development
+
+Supabase Auth transactional emails are built with [React Email](https://react.email). Source components live in `emails/` and use the light-mode design tokens from `app/globals.css` (mapped to email-safe hex in `emails/_theme.ts`, since email clients don't support OKLCH). Supabase template variables (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .NewEmail }}`) are written as literal strings inside the components and survive rendering.
+
+Templates: `confirmation`, `recovery`, `invite`, `magic_link`, `email_change`.
+
+## Preview
+
+```bash
+npm run email:dev   # react-email dev server at http://localhost:3000
+```
+
+## Build (compile to HTML)
+
+```bash
+npm run email:build   # renders emails/*.tsx -> supabase/templates/*.html
+```
+
+## Deploy to Supabase
+
+Template subject + `content_path` live in `config.toml` (`[auth.email.template.*]`) and deploy via the config sync system below — `npm run email:build` first, then `config:push`. SMTP (Resend) is configured in the Supabase Dashboard, not in this repo.
+
+# Supabase config sync
+
+The Management API is the real interface (the CLI and Dashboard are clients of it). `SUPABASE_ACCESS_TOKEN` lives in Doppler (`dev_personal` config) — it is an **account-wide** token, treat it like a root credential.
+
+There is no `supabase config pull`, and native `supabase config push` is all-or-nothing — it would overwrite the *entire* remote auth block with the stock local `config.toml` (reset `site_url` to `127.0.0.1`, turn confirmations off, drop SMTP). **Never run native `config push`.** Instead we sync an explicit set of managed fields via the Management API, with `config.toml` as desired state and `config.toml.remote` as observed state:
+
+```bash
+doppler run -- npm run config:pull        # read remote -> .remote-config.json + config.toml.remote
+doppler run -- npm run config:diff        # desired (config.toml) vs observed; non-zero on drift
+doppler run -- npm run config:push        # dry run: show what would change
+doppler run -- npm run config:push:apply  # apply managed fields only, then verify read-back
+```
+
+Managed fields are declared in `supabase/config-managed.ts` (currently the auth slice: site_url, redirect URLs, confirmations, the 5 email templates). Golden rule: **one writer per setting** — a managed field is owned by `config.toml`; don't also edit it in the Dashboard. Full details and the change/reconcile workflows: [docs/supabase-config-sync.md](docs/supabase-config-sync.md).

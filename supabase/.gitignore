@@ -1,6 +1,8 @@
 # Supabase
 .branches
 .temp
+.remote-config.json
+config.toml.remote
 
 # dotenvx
 .env.keys

@@ -13,7 +13,13 @@
     "rls-check": "doppler run -- tsx supabase/rls-check.ts",
     "vod-ux-check": "doppler run -- tsx supabase/vod-ux-check.ts",
     "recording-hook-check": "doppler run -- tsx supabase/recording-hook-check.ts",
-    "db:types": "npx supabase gen types typescript --linked > supabase/types.ts"
+    "db:types": "npx supabase gen types typescript --linked > supabase/types.ts",
+    "email:dev": "react-email dev --dir emails",
+    "email:build": "tsx emails/render.tsx",
+    "config:pull": "tsx supabase/config-pull.ts",
+    "config:diff": "tsx supabase/config-diff.ts",
+    "config:push": "tsx supabase/config-push.ts",
+    "config:push:apply": "tsx supabase/config-push.ts --apply"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
@@ -37,6 +43,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
+    "@react-email/components": "^1.0.12",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -45,6 +52,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "react-email": "^6.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5",
