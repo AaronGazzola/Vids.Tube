@@ -238,4 +238,4 @@ doppler run -- npm run config:push        # dry run: show what would change
 doppler run -- npm run config:push:apply  # apply managed fields only, then verify read-back
 ```
 
-Managed fields are declared in `supabase/config-managed.ts` (currently the auth slice: site_url, redirect URLs, confirmations, the 5 email templates). Golden rule: **one writer per setting** — a managed field is owned by `config.toml`; don't also edit it in the Dashboard. Full details and the change/reconcile workflows: [docs/supabase-config-sync.md](docs/supabase-config-sync.md).
+Managed fields are declared in `supabase/config-managed.ts` (currently the auth slice: site_url, redirect URLs, confirmations, SMTP sender name/email, the 5 email templates). Golden rule: **one writer per setting** — a managed field is owned by `config.toml`; don't also edit it in the Dashboard. Full details and the change/reconcile workflows: [docs/supabase-config-sync.md](docs/supabase-config-sync.md).

@@ -25,6 +25,10 @@ Currently managed (the auth slice):
 | `[auth] site_url` | `site_url` | |
 | `[auth] additional_redirect_urls` | `uri_allow_list` | array ↔ comma string; compared order-insensitively |
 | `[auth.email] enable_confirmations` | `mailer_autoconfirm` | inverted (`enable_confirmations = !mailer_autoconfirm`) |
+| `[auth.email.smtp] host` / `port` / `user` | `smtp_host` / `smtp_port` / `smtp_user` | Resend SMTP endpoint |
+| `[auth.email.smtp] pass` | `smtp_pass` | **write-only secret** — `pass = "env(RESEND_API_KEY)"`; resolved from Doppler at push, never read back or compared |
+| `[auth.email.smtp] sender_name` | `smtp_sender_name` | email "from" name |
+| `[auth.email.smtp] admin_email` | `smtp_admin_email` | email "from" address; **domain must be verified in Resend** |
 | `[auth.email.template.<key>] subject` | `mailer_subjects_<key>` | |
 | `[auth.email.template.<key>] content_path` | `mailer_templates_<key>_content` | local file is read; remote stores inline HTML; compared by full content (shown as a sha256 + byte length) |
 
@@ -75,7 +79,8 @@ The golden rule still applies: **one writer per setting.** A managed field is ow
 
 ## What this does NOT cover
 
-- **Secrets values** — write-only in the Management API, never readable. They stay in Doppler / env with `env()` substitution, never in `config.toml`.
+- **Secret values** — write-only in the Management API, never readable. The *value* lives in Doppler; `config.toml` holds only an `env(NAME)` reference. `config:push` resolves it at push time and writes it; `config:pull`/`config:diff` skip it (can't read it back). `smtp_pass` (`env(RESEND_API_KEY)`) is the worked example. A field with no resolvable env value is omitted from the patch, so an unset secret never clobbers the remote.
+- **Resend specifics** — the SMTP `pass` is a Resend **sending** API key (least privilege; that's all the app needs). `npm run email:check` queries Resend's domain-verification status, but that needs a *full-access* key, so it 401s with a sending-only key. The `admin_email` from-domain must be a verified Resend domain or sends fail.
 - **Config `config.toml` can't express** — network restrictions, SSL enforcement, custom domains, read replicas, backups. These have their own API endpoints / CLI commands; add a dedicated managed entry or script if you want them version-controlled.
 - **Schema & data** — managed by migrations (`npx supabase db push`), not this system.
 - **The non-managed parts of `config.toml`** — they remain the stock template. We never run native `supabase config push`, so those defaults are inert. Don't run native `config push` — it would push those stale defaults to remote.

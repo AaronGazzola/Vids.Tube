@@ -21,6 +21,7 @@ import type {
   AuthCredentials,
   ChatMessage,
   CreateChannelInput,
+  SignUpInput,
   UpdateChannelInput,
   ViewerCapState,
 } from "./layout.types";
@@ -87,44 +88,18 @@ export function useRequireOwner() {
   return { isPending, isOwner };
 }
 
-export function useRequireChannel() {
-  const { isPending: userPending } = useUser();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const myChannel = useMyChannel();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (userPending || !isAuthenticated || myChannel.isPending) {
-      return;
-    }
-    if (!myChannel.data) {
-      router.replace("/onboarding");
-    }
-  }, [
-    userPending,
-    isAuthenticated,
-    myChannel.isPending,
-    myChannel.data,
-    router,
-  ]);
-
-  return {
-    isPending: userPending || myChannel.isPending,
-    channel: myChannel.data ?? null,
-  };
-}
-
 export function useUserAuth() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   const signUp = useMutation({
-    mutationFn: async ({ email, password }: AuthCredentials) => {
+    mutationFn: async ({ email, password, handle }: SignUpInput) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: { pending_handle: handle },
         },
       });
 
@@ -147,6 +122,11 @@ export function useUserAuth() {
           }
 
           return { needsVerification: true };
+        }
+        if (error.message.includes("Database error saving new user")) {
+          throw new Error(
+            "Couldn't reserve that handle — it may have just been taken. Please choose another."
+          );
         }
         throw error;
       }
@@ -251,7 +231,69 @@ export function useUserAuth() {
     },
   });
 
-  return { signUp, signIn, signOut };
+  const resetPassword = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+
+      if (error) {
+        console.error(error);
+        throw new Error("Failed to send the reset email");
+      }
+    },
+    onSuccess: () => {
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Check your email"
+          message="We sent you a link to reset your password"
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't send reset email"
+          message={error.message}
+        />
+      ));
+    },
+  });
+
+  const updatePassword = useMutation({
+    mutationFn: async ({ password }: { password: string }) => {
+      const { error } = await supabase.auth.updateUser({ password });
+
+      if (error) {
+        console.error(error);
+        throw new Error(error.message || "Failed to update your password");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Password updated"
+          message="You're all set — welcome back."
+        />
+      ));
+      router.push("/");
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't update password"
+          message={error.message}
+        />
+      ));
+    },
+  });
+
+  return { signUp, signIn, signOut, resetPassword, updatePassword };
 }
 
 export function useOwnerChannel() {

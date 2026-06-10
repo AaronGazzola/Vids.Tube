@@ -228,15 +228,17 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# SMTP (Resend), managed by npm run config:push. `pass` is a write-only secret
+# resolved from Doppler via env() at push time — never stored here or readable back.
+# The admin_email domain must be a verified sending domain in the Resend account.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+sender_name = "vids.tube"
+admin_email = "noreply@vids.tube"
 
 # Email templates (managed by npm run config:push; build HTML with npm run email:build).
 [auth.email.template.confirmation]

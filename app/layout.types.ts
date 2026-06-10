@@ -11,6 +11,12 @@ export type AuthCredentials = {
   password: string;
 };
 
+export type SignUpInput = {
+  email: string;
+  password: string;
+  handle: string;
+};
+
 export type ActionResult<T> = { data: T } | { error: string };
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"];

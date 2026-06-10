@@ -21,6 +21,10 @@ function main() {
   console.error("Managed fields — config.toml (desired) vs config.toml.remote (observed):\n");
   let drift = 0;
   for (const d of desired) {
+    if (d.writeOnly) {
+      console.error(`  [----] ${d.id} (write-only — not compared)`);
+      continue;
+    }
     const o = observedById.get(d.id);
     const match = o?.value === d.value;
     if (!match) drift++;

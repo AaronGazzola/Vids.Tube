@@ -15,20 +15,34 @@ async function main() {
   console.error(`Project: ${PROJECT_REF}`);
   console.error("Comparing desired (config.toml) against live remote...\n");
 
+  const patch = buildPatch(configText);
   const before = extractRemote(await getAuthConfig());
   const beforeById = new Map(before.map((f) => [f.id, f]));
-  const drifted = desired.filter((d) => beforeById.get(d.id)?.value !== d.value);
+  const drifted = desired.filter(
+    (d) => !d.writeOnly && beforeById.get(d.id)?.value !== d.value
+  );
+  const secrets = desired.filter(
+    (d) => d.writeOnly && d.display.startsWith("(from env")
+  );
 
-  if (drifted.length === 0) {
+  if (drifted.length === 0 && secrets.length === 0) {
     console.error("Already in parity — nothing to push.");
     return;
   }
 
-  console.error(`${drifted.length} field(s) will change:`);
-  for (const d of drifted) {
-    console.error(`  ${d.id}`);
-    console.error(`    remote -> ${beforeById.get(d.id)?.display ?? "(missing)"}`);
-    console.error(`    local  -> ${d.display}`);
+  if (drifted.length > 0) {
+    console.error(`${drifted.length} field(s) will change:`);
+    for (const d of drifted) {
+      console.error(`  ${d.id}`);
+      console.error(`    remote -> ${beforeById.get(d.id)?.display ?? "(missing)"}`);
+      console.error(`    local  -> ${d.display}`);
+    }
+  }
+  if (secrets.length > 0) {
+    console.error(`${secrets.length} write-only secret(s) will be set:`);
+    for (const d of secrets) {
+      console.error(`  ${d.id} ${d.display}`);
+    }
   }
 
   if (!willApply) {
@@ -36,12 +50,16 @@ async function main() {
     return;
   }
 
-  await patchAuthConfig(buildPatch(configText));
-  console.error("\nPATCH applied. Verifying read-back...\n");
+  await patchAuthConfig(patch);
+  console.error("\nPATCH applied. Verifying read-back (write-only fields skipped)...\n");
 
   const afterById = new Map(extractRemote(await getAuthConfig()).map((f) => [f.id, f]));
   let fail = 0;
   for (const d of desired) {
+    if (d.writeOnly) {
+      console.error(`  [----] ${d.id} (write-only — not verifiable)`);
+      continue;
+    }
     const ok = afterById.get(d.id)?.value === d.value;
     if (!ok) fail++;
     console.error(`  [${ok ? "PASS" : "FAIL"}] ${d.id}`);

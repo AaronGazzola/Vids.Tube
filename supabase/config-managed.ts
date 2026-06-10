@@ -54,12 +54,22 @@ const sortedCsv = (v: string) =>
 const sha = (s: string) =>
   `sha256:${createHash("sha256").update(s).digest("hex").slice(0, 12)} (${s.length}B)`;
 
+const envName = (raw: string): string | null => {
+  const m = raw.match(/^env\((.+)\)$/);
+  return m ? m[1] : null;
+};
+const resolveEnv = (raw: string): string => {
+  const name = envName(raw);
+  return name ? (process.env[name] ?? "") : raw;
+};
+
 export interface ManagedField {
   id: string;
   local: (s: Sections) => string;
   remote: (auth: Record<string, unknown>) => string;
   patch: (s: Sections) => Record<string, unknown>;
   display?: (value: string) => string;
+  writeOnly?: boolean;
 }
 
 function templateFields(key: TemplateKey): ManagedField[] {
@@ -109,6 +119,51 @@ export const MANAGED: ManagedField[] = [
       mailer_autoconfirm: unquote(s["auth.email"]?.enable_confirmations) !== "true",
     }),
   },
+  {
+    id: "auth.email.smtp.host",
+    local: (s) => unquote(s["auth.email.smtp"]?.host),
+    remote: (a) => String(a.smtp_host ?? ""),
+    patch: (s) => ({ smtp_host: unquote(s["auth.email.smtp"]?.host) }),
+  },
+  {
+    id: "auth.email.smtp.port",
+    local: (s) => unquote(s["auth.email.smtp"]?.port),
+    remote: (a) => String(a.smtp_port ?? ""),
+    patch: (s) => ({ smtp_port: unquote(s["auth.email.smtp"]?.port) }),
+  },
+  {
+    id: "auth.email.smtp.user",
+    local: (s) => unquote(s["auth.email.smtp"]?.user),
+    remote: (a) => String(a.smtp_user ?? ""),
+    patch: (s) => ({ smtp_user: unquote(s["auth.email.smtp"]?.user) }),
+  },
+  {
+    id: "auth.email.smtp.pass",
+    writeOnly: true,
+    local: (s) => {
+      const raw = unquote(s["auth.email.smtp"]?.pass);
+      const name = envName(raw);
+      if (name) return process.env[name] ? `(from env ${name})` : `(env ${name} unset)`;
+      return raw ? "(literal)" : "(unset)";
+    },
+    remote: () => "(write-only)",
+    patch: (s) => {
+      const value = resolveEnv(unquote(s["auth.email.smtp"]?.pass));
+      return value ? { smtp_pass: value } : {};
+    },
+  },
+  {
+    id: "auth.email.smtp.sender_name",
+    local: (s) => unquote(s["auth.email.smtp"]?.sender_name),
+    remote: (a) => String(a.smtp_sender_name ?? ""),
+    patch: (s) => ({ smtp_sender_name: unquote(s["auth.email.smtp"]?.sender_name) }),
+  },
+  {
+    id: "auth.email.smtp.admin_email",
+    local: (s) => unquote(s["auth.email.smtp"]?.admin_email),
+    remote: (a) => String(a.smtp_admin_email ?? ""),
+    patch: (s) => ({ smtp_admin_email: unquote(s["auth.email.smtp"]?.admin_email) }),
+  },
   ...TEMPLATE_KEYS.flatMap(templateFields),
 ];
 
@@ -118,20 +173,21 @@ export interface FieldValue {
   id: string;
   value: string;
   display: string;
+  writeOnly: boolean;
 }
 
 export function loadLocal(configTomlText: string): FieldValue[] {
   const s = parseToml(configTomlText);
   return MANAGED.map((f) => {
     const value = f.local(s);
-    return { id: f.id, value, display: show(f, value) };
+    return { id: f.id, value, display: show(f, value), writeOnly: !!f.writeOnly };
   });
 }
 
 export function extractRemote(auth: Record<string, unknown>): FieldValue[] {
   return MANAGED.map((f) => {
     const value = f.remote(auth);
-    return { id: f.id, value, display: show(f, value) };
+    return { id: f.id, value, display: show(f, value), writeOnly: !!f.writeOnly };
   });
 }
 
