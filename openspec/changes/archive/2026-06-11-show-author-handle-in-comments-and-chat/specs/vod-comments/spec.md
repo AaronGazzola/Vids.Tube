@@ -4,17 +4,18 @@
 
 The system SHALL allow any visitor (anonymous or authenticated) to read all
 comments and their derived scores for any `ready` VOD. Each comment's author
-SHALL be presented as the author's channel identity — the channel `@handle`,
-display name, and avatar resolved from the channel whose `owner_user_id` equals
-the comment's author `user_id` — and SHALL link to that author's channel page.
-The system SHALL NOT render a raw or truncated user id as the author.
+SHALL be presented as the author's channel identity — the channel `@handle` and
+avatar resolved from the channel whose `owner_user_id` equals the comment's
+author `user_id` — and SHALL link to that author's channel page. The author's
+channel display name SHALL NOT be shown on the comment. The system SHALL NOT
+render a raw or truncated user id as the author.
 
 #### Scenario: Anonymous viewer reads comments
 
 - **WHEN** an anonymous viewer opens `/watch/<videoId>` for a `ready` VOD that
   has comments
-- **THEN** the page renders every comment with its author's channel handle, name,
-  and avatar (linked to the author's channel page), its body, its created/edited
+- **THEN** the page renders every comment with its author's channel handle and
+  avatar (linked to the author's channel page), its body, its created/edited
   timestamps, and its score (sum of votes)
 
 #### Scenario: Author has no resolvable channel

@@ -7,6 +7,7 @@ import {
   useVoteComment,
 } from "@/app/watch/[videoId]/page.hooks";
 import type { ScoredComment, VoteValue } from "@/app/watch/[videoId]/page.types";
+import { AuthorChip } from "@/components/author-chip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,10 +42,6 @@ type CommentItemProps = {
   isAuthenticated: boolean;
   onPromptSignIn: () => void;
 };
-
-function formatAuthor(userId: string): string {
-  return userId.slice(0, 8);
-}
 
 function formatRelative(value: string): string {
   const then = new Date(value).getTime();
@@ -142,10 +139,8 @@ export function CommentItem({
       </div>
       <div className="flex flex-1 flex-col gap-1">
         <header className="flex items-center justify-between gap-2">
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-sm font-medium">
-              {formatAuthor(comment.userId)}
-            </span>
+          <div className="flex items-center gap-2">
+            <AuthorChip author={comment.author} size="comment" />
             <span className="text-xs text-muted-foreground">
               {formatRelative(comment.createdAt)}
               {comment.editedAt && (

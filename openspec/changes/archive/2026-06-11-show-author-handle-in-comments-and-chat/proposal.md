@@ -9,8 +9,12 @@ opaque id. (Linear AZ-24; the blocking AZ-23 channel scaffold is implemented.)
 ## What Changes
 
 - VOD comments, live chat, and chat replay resolve each message/comment author's
-  channel from `owner_user_id` and render the channel `@handle`, display name,
-  and avatar instead of the raw uuid slice.
+  channel from `owner_user_id` and render the channel `@handle` and avatar
+  instead of the raw uuid slice. These surfaces show handle + avatar only — not
+  the channel display name — matching YouTube/Google, which renders the unique
+  `@handle` (not the non-unique channel name) in comments, Live Chat, and
+  mentions. The `channels.name` column is retained (it remains the channel-page
+  display title); it is simply not surfaced in these author chips.
 - Each author identity links to the author's channel page (`/@<handle>` /
   `[channelSlug]` route), consistent with existing channel-view presentation.
 - Author identity is resolved in a batch (one channels read per message set), not
@@ -27,14 +31,14 @@ opaque id. (Linear AZ-24; the blocking AZ-23 channel scaffold is implemented.)
 ### Modified Capabilities
 
 - `vod-comments`: the public-read requirement changes — a comment's author is
-  presented as the author's channel handle, name, and avatar (linked to the
-  channel), not a raw/derived user id.
+  presented as the author's channel handle and avatar (linked to the channel),
+  not a raw/derived user id.
 - `live-chat`: the public chat-read requirement changes — each chat message's
-  author is presented as the author's channel handle, name, and avatar, not a
+  author is presented as the author's channel handle and avatar, not a
   raw/derived user id.
 - `vod-chat-replay`: the time-synced replay requirement changes — each replayed
-  message's author is presented as the author's channel handle, name, and avatar,
-  not a raw/derived user id.
+  message's author is presented as the author's channel handle and avatar, not a
+  raw/derived user id.
 
 ## Impact
 
@@ -44,7 +48,7 @@ opaque id. (Linear AZ-24; the blocking AZ-23 channel scaffold is implemented.)
 - **Actions/queries**: comment and chat read actions (`app/watch/[videoId]/page.actions.ts`,
   `app/layout.actions.ts`) gain a batched channel lookup keyed by `owner_user_id`.
 - **Types**: `ScoredComment`, `ChatMessage`, `ReplayMessage` carry resolved author
-  identity (handle, name, avatar path) alongside `userId`.
+  identity (handle, avatar path) alongside `userId`.
 - **Storage**: avatar URLs resolved via existing `channelAssetUrl` / `lib/storage`.
 - **No DB/migration changes** — relies on the existing `channels` table and its
   identity-resolution read access.

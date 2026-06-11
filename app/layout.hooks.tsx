@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   checkHandleAvailabilityAction,
   createChannelAction,
+  getAuthorIdentityAction,
   getChatMessagesAction,
   getLiveStreamAction,
   getMyChannelAction,
@@ -20,6 +21,7 @@ import { useAuthStore } from "./layout.stores";
 import type {
   AuthCredentials,
   ChatMessage,
+  ChatMessageRow,
   CreateChannelInput,
   SignUpInput,
   UpdateChannelInput,
@@ -479,12 +481,34 @@ export function useLiveChat(streamId: string | null) {
           filter: `stream_id=eq.${streamId}`,
         },
         (payload) => {
-          const message = payload.new as ChatMessage;
+          const row = payload.new as ChatMessageRow;
+          const known = queryClient
+            .getQueryData<ChatMessage[]>(["chat", streamId])
+            ?.find((m) => m.user_id === row.user_id && m.author)?.author;
+          const message: ChatMessage = { ...row, author: known ?? null };
+
           queryClient.setQueryData<ChatMessage[]>(
             ["chat", streamId],
             (old = []) =>
               old.some((m) => m.id === message.id) ? old : [...old, message]
           );
+
+          if (!message.author) {
+            getAuthorIdentityAction(row.user_id).then((author) => {
+              if (!author) {
+                return;
+              }
+              queryClient.setQueryData<ChatMessage[]>(
+                ["chat", streamId],
+                (old = []) =>
+                  old.map((m) =>
+                    m.user_id === row.user_id && !m.author
+                      ? { ...m, author }
+                      : m
+                  )
+              );
+            });
+          }
         }
       )
       .subscribe();

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReplayMessage } from "@/app/watch/[videoId]/page.types";
+import { AuthorChip } from "@/components/author-chip";
 import { Button } from "@/components/ui/button";
 import { visibleReplayMessages } from "@/lib/chat-replay";
 import { cn } from "@/lib/utils";
@@ -69,9 +70,11 @@ export function ChatReplay({
         ) : (
           visible.map((message) => (
             <div key={message.id} className="text-sm">
-              <span className="font-medium text-muted-foreground">
-                {message.userId.slice(0, 8)}
-              </span>{" "}
+              <AuthorChip
+                author={message.author}
+                size="chat"
+                className="mr-1 align-middle"
+              />
               <span>{message.body}</span>
             </div>
           ))

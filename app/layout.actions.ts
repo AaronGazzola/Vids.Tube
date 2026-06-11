@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { STALE_MS } from "@/lib/stream";
 import {
   isReservedHandle,
@@ -10,8 +11,10 @@ import {
 } from "@/lib/handle";
 import type {
   ActionResult,
+  AuthorIdentity,
   Channel,
   ChatMessage,
+  ChatMessageRow,
   CreateChannelInput,
   HandleAvailability,
   Stream,
@@ -252,13 +255,29 @@ export async function getChatMessagesAction(
     throw new Error("Failed to fetch chat messages");
   }
 
-  return data;
+  const authorByUser = await resolveAuthorIdentities(
+    supabase,
+    data.map((m) => m.user_id)
+  );
+
+  return data.map((m) => ({
+    ...m,
+    author: authorByUser.get(m.user_id) ?? null,
+  }));
+}
+
+export async function getAuthorIdentityAction(
+  userId: string
+): Promise<AuthorIdentity> {
+  const supabase = await createClient();
+  const map = await resolveAuthorIdentities(supabase, [userId]);
+  return map.get(userId) ?? null;
 }
 
 export async function postChatMessageAction(
   streamId: string,
   body: string
-): Promise<ActionResult<ChatMessage>> {
+): Promise<ActionResult<ChatMessageRow>> {
   const supabase = await createClient();
 
   const {

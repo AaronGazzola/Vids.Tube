@@ -8,6 +8,7 @@ function row(id: string, secondsAfterStart: number, body = id) {
   return {
     id,
     user_id: `user-${id}`,
+    author: { handle: id, avatarPath: null },
     body,
     created_at: new Date(
       new Date(startedAt).getTime() + secondsAfterStart * 1000
@@ -24,6 +25,7 @@ describe("toReplayMessages", () => {
     const result = toReplayMessages(data);
     expect(result.map((m) => m.offsetMs)).toEqual([0, 5_000, 42_000]);
     expect(result[0].userId).toBe("user-a");
+    expect(result[0].author).toEqual({ handle: "a", avatarPath: null });
   });
 
   it("clamps messages before the stream start to offset 0", () => {
