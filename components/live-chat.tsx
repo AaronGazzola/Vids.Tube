@@ -2,6 +2,7 @@
 
 import { useLiveChat, usePostChatMessage } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
+import { AuthorChip } from "@/components/author-chip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -46,9 +47,11 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
         ) : (
           messages.map((message) => (
             <div key={message.id} className="text-sm">
-              <span className="font-medium text-muted-foreground">
-                {message.user_id.slice(0, 8)}
-              </span>{" "}
+              <AuthorChip
+                author={message.author}
+                size="chat"
+                className="mr-1 align-middle"
+              />
               <span>{message.body}</span>
             </div>
           ))

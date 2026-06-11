@@ -9,17 +9,20 @@ import { toast } from "sonner";
 import {
   checkHandleAvailabilityAction,
   createChannelAction,
+  getAuthorIdentityAction,
   getChatMessagesAction,
   getLiveStreamAction,
   getMyChannelAction,
   getOwnerChannelAction,
   postChatMessageAction,
+  signUpAction,
   updateChannelAction,
 } from "./layout.actions";
 import { useAuthStore } from "./layout.stores";
 import type {
   AuthCredentials,
   ChatMessage,
+  ChatMessageRow,
   CreateChannelInput,
   SignUpInput,
   UpdateChannelInput,
@@ -94,63 +97,23 @@ export function useUserAuth() {
 
   const signUp = useMutation({
     mutationFn: async ({ email, password, handle }: SignUpInput) => {
-      const { data, error } = await supabase.auth.signUp({
+      const res = await signUpAction({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { pending_handle: handle },
-        },
+        handle,
+        origin: window.location.origin,
       });
-
-      if (error) {
-        console.error(error);
-        if (
-          error.status === 400 &&
-          error.message.includes("already registered")
-        ) {
-          const { error: resendError } = await supabase.auth.resend({
-            type: "signup",
-            email,
-          });
-
-          if (resendError) {
-            console.error(resendError);
-            throw new Error(
-              "User already exists. Failed to resend verification email"
-            );
-          }
-
-          return { needsVerification: true };
-        }
-        if (error.message.includes("Database error saving new user")) {
-          throw new Error(
-            "Couldn't reserve that handle — it may have just been taken. Please choose another."
-          );
-        }
-        throw error;
-      }
-
-      return data;
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
     },
-    onSuccess: (data) => {
-      if ("needsVerification" in data) {
-        toast.custom(() => (
-          <CustomToast
-            variant="notification"
-            title="Verification email resent"
-            message="Please check your email to verify your account"
-          />
-        ));
-      } else {
-        toast.custom(() => (
-          <CustomToast
-            variant="success"
-            title="Account created"
-            message="Please check your email to verify your account"
-          />
-        ));
-      }
+    onSuccess: () => {
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Check your email"
+          message="Check your email inbox to continue."
+        />
+      ));
       router.push("/verify");
     },
     onError: (error) => {
@@ -479,12 +442,34 @@ export function useLiveChat(streamId: string | null) {
           filter: `stream_id=eq.${streamId}`,
         },
         (payload) => {
-          const message = payload.new as ChatMessage;
+          const row = payload.new as ChatMessageRow;
+          const known = queryClient
+            .getQueryData<ChatMessage[]>(["chat", streamId])
+            ?.find((m) => m.user_id === row.user_id && m.author)?.author;
+          const message: ChatMessage = { ...row, author: known ?? null };
+
           queryClient.setQueryData<ChatMessage[]>(
             ["chat", streamId],
             (old = []) =>
               old.some((m) => m.id === message.id) ? old : [...old, message]
           );
+
+          if (!message.author) {
+            getAuthorIdentityAction(row.user_id).then((author) => {
+              if (!author) {
+                return;
+              }
+              queryClient.setQueryData<ChatMessage[]>(
+                ["chat", streamId],
+                (old = []) =>
+                  old.map((m) =>
+                    m.user_id === row.user_id && !m.author
+                      ? { ...m, author }
+                      : m
+                  )
+              );
+            });
+          }
         }
       )
       .subscribe();

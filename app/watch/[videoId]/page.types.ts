@@ -1,3 +1,4 @@
+import type { AuthorIdentity } from "@/app/layout.types";
 import type { Database } from "@/supabase/types";
 
 export type Video = Database["public"]["Tables"]["videos"]["Row"];
@@ -9,6 +10,7 @@ export type VoteValue = -1 | 0 | 1;
 export type ChatReplayRow = {
   id: string;
   user_id: string;
+  author: AuthorIdentity;
   body: string;
   created_at: string;
 };
@@ -21,6 +23,7 @@ export type ChatReplay = {
 export type ReplayMessage = {
   id: string;
   userId: string;
+  author: AuthorIdentity;
   body: string;
   offsetMs: number;
 };
@@ -29,6 +32,7 @@ export type ScoredComment = {
   id: string;
   videoId: string;
   userId: string;
+  author: AuthorIdentity;
   body: string;
   createdAt: string;
   editedAt: string | null;

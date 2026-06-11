@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { resolveAuthorIdentities } from "@/lib/author-identity";
 import type { ActionResult } from "@/app/layout.types";
 import type {
   ChatReplay,
@@ -76,7 +77,18 @@ export async function getStreamChatReplayAction(
     throw new Error("Failed to fetch chat replay");
   }
 
-  return { startedAt: stream?.started_at ?? null, messages: messages ?? [] };
+  const authorByUser = await resolveAuthorIdentities(
+    supabase,
+    (messages ?? []).map((m) => m.user_id)
+  );
+
+  return {
+    startedAt: stream?.started_at ?? null,
+    messages: (messages ?? []).map((m) => ({
+      ...m,
+      author: authorByUser.get(m.user_id) ?? null,
+    })),
+  };
 }
 
 export async function listCommentsAction(
@@ -131,10 +143,16 @@ export async function listCommentsAction(
     }
   }
 
+  const authorByUser = await resolveAuthorIdentities(
+    supabase,
+    comments.map((c) => c.user_id)
+  );
+
   return comments.map((c) => ({
     id: c.id,
     videoId: c.video_id,
     userId: c.user_id,
+    author: authorByUser.get(c.user_id) ?? null,
     body: c.body,
     createdAt: c.created_at,
     editedAt: c.edited_at,

@@ -177,7 +177,7 @@ function ChannelSettingsFields({ channel }: { channel: Channel }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="channel-name">Name</Label>
+            <Label htmlFor="channel-name">Display name</Label>
             <Input
               id="channel-name"
               value={name}

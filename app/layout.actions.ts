@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { supabaseAdmin } from "@/supabase/admin-client";
+import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { STALE_MS } from "@/lib/stream";
 import {
   isReservedHandle,
@@ -10,15 +12,91 @@ import {
 } from "@/lib/handle";
 import type {
   ActionResult,
+  AuthorIdentity,
   Channel,
   ChatMessage,
+  ChatMessageRow,
   CreateChannelInput,
   HandleAvailability,
+  SignUpInput,
   Stream,
   UpdateChannelInput,
 } from "./layout.types";
 
 const UNIQUE_VIOLATION = "23505";
+
+export async function signUpAction(
+  input: SignUpInput & { origin: string }
+): Promise<ActionResult<{ success: true }>> {
+  const handle = normalizeHandle(input.handle);
+
+  if (!isValidHandle(handle)) {
+    return { error: HANDLE_REQUIREMENT };
+  }
+  if (isReservedHandle(handle)) {
+    return { error: "That handle is unavailable." };
+  }
+
+  const email = input.email.trim();
+  const emailRedirectTo = `${input.origin}/auth/callback`;
+
+  const { data: status, error: statusError } = await supabaseAdmin.rpc(
+    "email_signup_status",
+    { p_email: email }
+  );
+
+  if (statusError) {
+    console.error(statusError);
+    throw new Error("Failed to start signup");
+  }
+
+  const supabase = await createClient();
+
+  if (status === "confirmed") {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo },
+    });
+    if (error) {
+      console.error(error);
+    }
+    return { data: { success: true } };
+  }
+
+  if (status === "unconfirmed") {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo },
+    });
+    if (error) {
+      console.error(error);
+    }
+    return { data: { success: true } };
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password: input.password,
+    options: {
+      emailRedirectTo,
+      data: { pending_handle: handle },
+    },
+  });
+
+  if (error) {
+    console.error(error);
+    if (error.message.includes("Database error saving new user")) {
+      return {
+        error:
+          "Couldn't reserve that handle — it may have just been taken. Please choose another.",
+      };
+    }
+    throw new Error("Failed to create account");
+  }
+
+  return { data: { success: true } };
+}
 
 export async function getOwnerChannelAction(): Promise<Channel | null> {
   const supabase = await createClient();
@@ -113,7 +191,7 @@ export async function createChannelAction(
     return { error: "You must be signed in to create a channel." };
   }
 
-  const name = input.name?.trim() || `@${handle}`;
+  const name = input.name?.trim() || handle;
 
   const { data, error } = await supabase
     .from("channels")
@@ -252,13 +330,29 @@ export async function getChatMessagesAction(
     throw new Error("Failed to fetch chat messages");
   }
 
-  return data;
+  const authorByUser = await resolveAuthorIdentities(
+    supabase,
+    data.map((m) => m.user_id)
+  );
+
+  return data.map((m) => ({
+    ...m,
+    author: authorByUser.get(m.user_id) ?? null,
+  }));
+}
+
+export async function getAuthorIdentityAction(
+  userId: string
+): Promise<AuthorIdentity> {
+  const supabase = await createClient();
+  const map = await resolveAuthorIdentities(supabase, [userId]);
+  return map.get(userId) ?? null;
 }
 
 export async function postChatMessageAction(
   streamId: string,
   body: string
-): Promise<ActionResult<ChatMessage>> {
+): Promise<ActionResult<ChatMessageRow>> {
   const supabase = await createClient();
 
   const {

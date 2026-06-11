@@ -21,7 +21,15 @@ export type ActionResult<T> = { data: T } | { error: string };
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"];
 export type Stream = Database["public"]["Tables"]["streams"]["Row"];
-export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
+
+export type AuthorIdentity = {
+  handle: string;
+  avatarPath: string | null;
+} | null;
+
+export type ChatMessageRow =
+  Database["public"]["Tables"]["chat_messages"]["Row"];
+export type ChatMessage = ChatMessageRow & { author: AuthorIdentity };
 
 export type ViewerCapState = "connecting" | "admitted" | "full";
 
