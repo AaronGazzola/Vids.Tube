@@ -1,6 +1,6 @@
 "use client";
 
-import { useMyChannel, useRequireAuth } from "@/app/layout.hooks";
+import { useMyChannel, useOwnerChannel, useRequireAuth } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { ChannelSettingsForm } from "@/components/channel-settings-form";
 import { CustomToast } from "@/components/CustomToast";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { channelAssetUrl } from "@/lib/storage";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
 
 function stubToast(title: string) {
@@ -41,6 +42,7 @@ export default function AccountPage() {
   const { isPending, isAuthenticated } = useRequireAuth();
   const user = useAuthStore((state) => state.user);
   const { data: channel, isPending: channelPending } = useMyChannel();
+  const { data: ownerChannel } = useOwnerChannel();
 
   if (isPending || !isAuthenticated) {
     return (
@@ -53,6 +55,7 @@ export default function AccountPage() {
   const email = user?.email ?? "";
   const initials = email ? email.slice(0, 2).toUpperCase() : "?";
   const avatarUrl = channelAssetUrl(channel?.avatar_path ?? null);
+  const ownerHandle = ownerChannel?.handle;
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 p-4 md:p-6">
@@ -75,6 +78,16 @@ export default function AccountPage() {
             </p>
           )}
         </div>
+      </div>
+
+      <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <p className="text-muted-foreground">
+          For now you can watch {ownerHandle ? `@${ownerHandle}` : "the channel"}
+          &apos;s VODs and live streams, and join in by commenting and chatting.
+          Posting your own content isn&apos;t available yet — it&apos;s coming in
+          a later version of the app.
+        </p>
       </div>
 
       <ChannelSettingsForm />

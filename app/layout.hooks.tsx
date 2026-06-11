@@ -15,6 +15,7 @@ import {
   getMyChannelAction,
   getOwnerChannelAction,
   postChatMessageAction,
+  signUpAction,
   updateChannelAction,
 } from "./layout.actions";
 import { useAuthStore } from "./layout.stores";
@@ -96,63 +97,23 @@ export function useUserAuth() {
 
   const signUp = useMutation({
     mutationFn: async ({ email, password, handle }: SignUpInput) => {
-      const { data, error } = await supabase.auth.signUp({
+      const res = await signUpAction({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { pending_handle: handle },
-        },
+        handle,
+        origin: window.location.origin,
       });
-
-      if (error) {
-        console.error(error);
-        if (
-          error.status === 400 &&
-          error.message.includes("already registered")
-        ) {
-          const { error: resendError } = await supabase.auth.resend({
-            type: "signup",
-            email,
-          });
-
-          if (resendError) {
-            console.error(resendError);
-            throw new Error(
-              "User already exists. Failed to resend verification email"
-            );
-          }
-
-          return { needsVerification: true };
-        }
-        if (error.message.includes("Database error saving new user")) {
-          throw new Error(
-            "Couldn't reserve that handle — it may have just been taken. Please choose another."
-          );
-        }
-        throw error;
-      }
-
-      return data;
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
     },
-    onSuccess: (data) => {
-      if ("needsVerification" in data) {
-        toast.custom(() => (
-          <CustomToast
-            variant="notification"
-            title="Verification email resent"
-            message="Please check your email to verify your account"
-          />
-        ));
-      } else {
-        toast.custom(() => (
-          <CustomToast
-            variant="success"
-            title="Account created"
-            message="Please check your email to verify your account"
-          />
-        ));
-      }
+    onSuccess: () => {
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Check your email"
+          message="Check your email inbox to continue."
+        />
+      ));
       router.push("/verify");
     },
     onError: (error) => {
