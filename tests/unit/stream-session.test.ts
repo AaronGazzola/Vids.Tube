@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   decideGoLive,
+  isClaimableScheduled,
   isLiveAndFresh,
   isOngoingAndFresh,
+  SCHEDULED_CLAIM_GRACE_MS,
   STALE_MS,
 } from "@/lib/stream";
 
@@ -20,6 +22,14 @@ function row(
       secondsSinceLastSeen === null
         ? null
         : new Date(now - secondsSinceLastSeen * 1000).toISOString(),
+  };
+}
+
+function scheduledRow(secondsFromNow: number, id = "sched-1") {
+  return {
+    id,
+    status: "scheduled",
+    scheduled_start_at: new Date(now + secondsFromNow * 1000).toISOString(),
   };
 }
 
@@ -102,5 +112,70 @@ describe("decideGoLive", () => {
     expect(decideGoLive(row("live", STALE_MS / 1000 + 30, "s-stale"), now)).toEqual(
       { action: "new-after-stale", staleStreamId: "s-stale" }
     );
+  });
+
+  it("claims a claimable scheduled broadcast when there is no ongoing session", () => {
+    expect(
+      decideGoLive(null, now, scheduledRow(3600, "s-sched"))
+    ).toEqual({ action: "claim-scheduled", streamId: "s-sched" });
+  });
+
+  it("claims the scheduled broadcast over a prior ended row", () => {
+    expect(
+      decideGoLive(row("ended", 5), now, scheduledRow(3600, "s-sched"))
+    ).toEqual({ action: "claim-scheduled", streamId: "s-sched" });
+  });
+
+  it("prefers reconnecting to an ongoing session over claiming a scheduled broadcast", () => {
+    expect(
+      decideGoLive(row("live", 5, "s-live"), now, scheduledRow(3600, "s-sched"))
+    ).toEqual({ action: "reconnect", streamId: "s-live" });
+  });
+
+  it("does not claim a missed scheduled broadcast (past the grace window)", () => {
+    const missed = scheduledRow(
+      -(SCHEDULED_CLAIM_GRACE_MS / 1000) - 3600,
+      "s-missed"
+    );
+    expect(decideGoLive(null, now, missed)).toEqual({ action: "new" });
+  });
+
+  it("claims a scheduled broadcast started within the grace window", () => {
+    const recentlyStarted = scheduledRow(-600, "s-late");
+    expect(decideGoLive(null, now, recentlyStarted)).toEqual({
+      action: "claim-scheduled",
+      streamId: "s-late",
+    });
+  });
+});
+
+describe("isClaimableScheduled", () => {
+  it("is true for a future scheduled row", () => {
+    expect(isClaimableScheduled(scheduledRow(3600), now)).toBe(true);
+  });
+
+  it("is true within the grace window after start", () => {
+    expect(
+      isClaimableScheduled(scheduledRow(-(SCHEDULED_CLAIM_GRACE_MS / 1000) + 60), now)
+    ).toBe(true);
+  });
+
+  it("is false once past the grace window", () => {
+    expect(
+      isClaimableScheduled(scheduledRow(-(SCHEDULED_CLAIM_GRACE_MS / 1000) - 60), now)
+    ).toBe(false);
+  });
+
+  it("is false for a non-scheduled row", () => {
+    expect(
+      isClaimableScheduled(
+        { status: "preview", scheduled_start_at: null },
+        now
+      )
+    ).toBe(false);
+  });
+
+  it("is false for null", () => {
+    expect(isClaimableScheduled(null, now)).toBe(false);
   });
 });
