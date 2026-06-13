@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { decideGoLive } from "@/lib/stream";
+import { decideGoLive, SCHEDULED_CLAIM_GRACE_MS } from "@/lib/stream";
 import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
 
 export async function POST(request: Request) {
@@ -44,13 +44,47 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 500 });
   }
 
-  const decision = decideGoLive(existing, Date.now());
+  const claimCutoff = new Date(Date.now() - SCHEDULED_CLAIM_GRACE_MS).toISOString();
+  const { data: scheduled, error: scheduledError } = await supabaseAdmin
+    .from("streams")
+    .select("id, status, scheduled_start_at")
+    .eq("channel_id", channel.id)
+    .eq("status", "scheduled")
+    .gte("scheduled_start_at", claimCutoff)
+    .order("scheduled_start_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (scheduledError) {
+    console.error(scheduledError);
+    return new NextResponse(null, { status: 500 });
+  }
+
+  const decision = decideGoLive(existing, Date.now(), scheduled);
 
   if (decision.action === "reconnect") {
     const { error } = await supabaseAdmin
       .from("streams")
       .update({ hls_path: hlsPath, last_seen_at: now })
       .eq("id", decision.streamId);
+    if (error) {
+      console.error(error);
+      return new NextResponse(null, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (decision.action === "claim-scheduled") {
+    const { error } = await supabaseAdmin
+      .from("streams")
+      .update({
+        status: "preview",
+        hls_path: hlsPath,
+        started_at: now,
+        last_seen_at: now,
+      })
+      .eq("id", decision.streamId)
+      .eq("status", "scheduled");
     if (error) {
       console.error(error);
       return new NextResponse(null, { status: 500 });

@@ -496,3 +496,142 @@ test("a reconnect within the staleness window keeps the same stream id", async (
     }
   }
 });
+
+// Scheduled broadcasts (AZ-28): create-ahead → coming-soon card → encoder claims
+// the nearest upcoming scheduled row into preview (metadata intact); a missed row
+// (past the claim grace window) is not claimed. decideGoLive's pure claim logic is
+// also unit-covered in tests/unit/stream-session.test.ts.
+test("an upcoming scheduled broadcast shows a coming-soon countdown card", async ({
+  page,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const startAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const { data: scheduled } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "scheduled",
+      title: `E2E Scheduled ${stamp}`,
+      scheduled_start_at: startAt,
+    })
+    .select("id")
+    .single();
+
+  try {
+    await page.goto(`/${ownerSlug}`);
+    await expect(page.getByText("Coming soon")).toBeVisible();
+    await expect(page.getByText(`E2E Scheduled ${stamp}`)).toBeVisible();
+    await expect(
+      page.getByText("No stream scheduled right now")
+    ).toHaveCount(0);
+  } finally {
+    await admin.from("streams").delete().eq("id", scheduled!.id);
+  }
+});
+
+test("a connecting encoder claims the nearest upcoming scheduled broadcast", async ({
+  request,
+}) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const startAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const thumb = `live-thumb/${ownerChannelId}/e2e-sched-${stamp}.jpg`;
+  const { data: scheduled } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "scheduled",
+      title: `E2E Claim ${stamp}`,
+      description: `E2E claim description ${stamp}`,
+      thumbnail_path: thumb,
+      scheduled_start_at: startAt,
+    })
+    .select("id")
+    .single();
+
+  const createdIds = new Set<string>([scheduled!.id]);
+  try {
+    const res = await request.post(`/api/ingest/live`, {
+      headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    const { data: claimed } = await admin
+      .from("streams")
+      .select("id, status, hls_path, title, description, thumbnail_path")
+      .eq("id", scheduled!.id)
+      .single();
+    expect(claimed!.status, "the scheduled row is claimed into preview").toBe(
+      "preview"
+    );
+    expect(claimed!.hls_path, "hls_path is set on claim").toBeTruthy();
+    expect(claimed!.title).toBe(`E2E Claim ${stamp}`);
+    expect(claimed!.description).toBe(`E2E claim description ${stamp}`);
+    expect(claimed!.thumbnail_path, "thumbnail preserved on claim").toBe(thumb);
+
+    const { data: previews } = await admin
+      .from("streams")
+      .select("id")
+      .eq("channel_id", ownerChannelId)
+      .eq("status", "preview");
+    previews!.forEach((s) => createdIds.add(s.id));
+    expect(
+      previews,
+      "claim reuses the scheduled row rather than inserting a new one"
+    ).toHaveLength(1);
+  } finally {
+    for (const id of createdIds) {
+      await admin.from("streams").delete().eq("id", id);
+    }
+  }
+});
+
+test("a missed scheduled broadcast is not claimed", async ({ request }) => {
+  test.skip(await ownerIsLive(), "owner channel is currently live");
+
+  const startAt = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const { data: missed } = await admin
+    .from("streams")
+    .insert({
+      channel_id: ownerChannelId,
+      status: "scheduled",
+      title: `E2E Missed ${stamp}`,
+      scheduled_start_at: startAt,
+    })
+    .select("id")
+    .single();
+
+  const createdIds = new Set<string>([missed!.id]);
+  try {
+    const res = await request.post(`/api/ingest/live`, {
+      headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    const { data: stillScheduled } = await admin
+      .from("streams")
+      .select("status")
+      .eq("id", missed!.id)
+      .single();
+    expect(
+      stillScheduled!.status,
+      "a missed scheduled row is left untouched"
+    ).toBe("scheduled");
+
+    const { data: previews } = await admin
+      .from("streams")
+      .select("id")
+      .eq("channel_id", ownerChannelId)
+      .eq("status", "preview");
+    previews!.forEach((s) => createdIds.add(s.id));
+    expect(
+      previews,
+      "a fresh ad-hoc preview row is created instead of claiming the missed row"
+    ).toHaveLength(1);
+  } finally {
+    for (const id of createdIds) {
+      await admin.from("streams").delete().eq("id", id);
+    }
+  }
+});

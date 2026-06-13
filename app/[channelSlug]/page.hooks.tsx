@@ -7,6 +7,7 @@ import {
   getChannelBySlugAction,
   getChannelProcessingVideosAction,
   getChannelVideosAction,
+  getUpcomingScheduledBroadcastAction,
   uploadChannelBrandingAction,
 } from "./page.actions";
 
@@ -22,6 +23,15 @@ export function useChannelVideos(channelId: string | undefined) {
     queryKey: ["channel-videos", channelId],
     queryFn: () => getChannelVideosAction(channelId!),
     enabled: !!channelId,
+  });
+}
+
+export function useUpcomingScheduled(channelId: string | undefined) {
+  return useQuery({
+    queryKey: ["upcoming-scheduled", channelId],
+    queryFn: () => getUpcomingScheduledBroadcastAction(channelId!),
+    enabled: !!channelId,
+    refetchInterval: 30000,
   });
 }
 

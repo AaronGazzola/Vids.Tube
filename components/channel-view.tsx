@@ -3,6 +3,7 @@
 import {
   useChannel,
   useChannelVideos,
+  useUpcomingScheduled,
 } from "@/app/[channelSlug]/page.hooks";
 import {
   useIsChannelOwner,
@@ -53,6 +54,7 @@ export function ChannelView({ slug }: { slug: string }) {
   const { data: ownerChannel, isPending: ownerPending } = useOwnerChannel();
   const { data: videos } = useChannelVideos(channel?.id);
   const { data: stream } = useLiveStream(channel?.id);
+  const { data: upcomingScheduled } = useUpcomingScheduled(channel?.id);
   const isOwner = useIsChannelOwner(channel);
 
   const isPlatformOwnerChannel =
@@ -163,7 +165,7 @@ export function ChannelView({ slug }: { slug: string }) {
                 </div>
               </div>
             ) : (
-              <ScheduledCard />
+              <ScheduledCard broadcast={upcomingScheduled ?? null} />
             )}
           </section>
           <Separator className="my-8" />

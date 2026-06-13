@@ -1,8 +1,31 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
-import type { ActionResult } from "@/app/layout.types";
+import type { ActionResult, Stream } from "@/app/layout.types";
 import type { Channel, Video } from "./page.types";
+
+export async function getUpcomingScheduledBroadcastAction(
+  channelId: string
+): Promise<Stream | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("streams")
+    .select("*")
+    .eq("channel_id", channelId)
+    .eq("status", "scheduled")
+    .gte("scheduled_start_at", new Date().toISOString())
+    .order("scheduled_start_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch scheduled broadcast");
+  }
+
+  return data;
+}
 
 export async function getChannelBySlugAction(
   slug: string

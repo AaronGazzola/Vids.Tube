@@ -207,6 +207,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           max_viewers: number
+          scheduled_start_at: string | null
           started_at: string | null
           status: string
           thumbnail_path: string | null
@@ -221,6 +222,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           max_viewers?: number
+          scheduled_start_at?: string | null
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
@@ -235,6 +237,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           max_viewers?: number
+          scheduled_start_at?: string | null
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
