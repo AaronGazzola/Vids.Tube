@@ -37,22 +37,29 @@ live.
 
 ### Requirement: Offline placeholder replaces the player
 
-The system SHALL render a static offline/scheduled placeholder component,
-centered in the page's primary content area, whenever the channel is not live.
-The placeholder SHALL NOT depend on any scheduling data and SHALL NOT display a
-countdown or scheduled time.
+The system SHALL render a placeholder, centered in the page's primary content area,
+whenever the channel is not live. When the channel has an upcoming `scheduled`
+broadcast (status `scheduled` with a future `scheduled_start_at`), the placeholder
+SHALL be a coming-soon card showing that broadcast's thumbnail, title, and a countdown
+to its start time (see the `scheduled-broadcasts` capability). When the channel has no
+upcoming scheduled broadcast, the placeholder SHALL be the static offline placeholder
+and SHALL NOT display a countdown or scheduled time.
 
-#### Scenario: Offline placeholder shown
+#### Scenario: Offline placeholder shown with no upcoming broadcast
 
-- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live
+- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live and has no
+  upcoming scheduled broadcast
 - **THEN** a centered static placeholder is shown where the live player would
-  otherwise be, indicating the channel is offline
+  otherwise be, with static copy only — no future date, countdown, or schedule
+  controls
 
-#### Scenario: Placeholder carries no scheduling data
+#### Scenario: Coming-soon card shown for an upcoming broadcast
 
-- **WHEN** the offline placeholder is shown
-- **THEN** it displays static copy only, with no future date, countdown, or
-  schedule controls
+- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live but has an
+  upcoming scheduled broadcast
+- **THEN** a centered coming-soon card is shown where the live player would otherwise
+  be, displaying the broadcast's thumbnail, title, and a countdown to its
+  `scheduled_start_at`
 
 ### Requirement: Chat UI is gated to live
 

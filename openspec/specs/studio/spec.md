@@ -12,7 +12,7 @@ navigation, accessible only to the channel owner.
 
 - **WHEN** the owner opens `/studio`
 - **THEN** the Studio shell renders with a sidebar linking to Upload, Go Live,
-  Videos, and Settings
+  Broadcasts, Videos, and Settings
 
 #### Scenario: Non-owner opens Studio
 
@@ -84,4 +84,21 @@ while `live`.
 - **WHEN** the owner opens `/studio/live` while the broadcast is `live`
 - **THEN** the page shows a live indicator and an End control to stop the
   broadcast (live viewer count is tracked separately under analytics, AZ-26)
+
+### Requirement: Broadcasts tool
+
+The system SHALL provide a Broadcasts page at `/studio/broadcasts` where the owner can
+view upcoming and past broadcasts and create, edit, or cancel a scheduled broadcast
+(see the `scheduled-broadcasts` capability for the authoring behavior).
+
+#### Scenario: Owner opens Broadcasts
+
+- **WHEN** the owner opens `/studio/broadcasts`
+- **THEN** the page renders the upcoming and past broadcast lists with controls to
+  create, edit, and cancel scheduled broadcasts
+
+#### Scenario: Non-owner opens Broadcasts
+
+- **WHEN** a non-owner opens `/studio/broadcasts`
+- **THEN** they are denied access and redirected away
 
