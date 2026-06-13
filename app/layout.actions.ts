@@ -18,6 +18,7 @@ import type {
   ChatMessageRow,
   CreateChannelInput,
   HandleAvailability,
+  SignUpDecision,
   SignUpInput,
   Stream,
   UpdateChannelInput,
@@ -26,8 +27,8 @@ import type {
 const UNIQUE_VIOLATION = "23505";
 
 export async function signUpAction(
-  input: SignUpInput & { origin: string }
-): Promise<ActionResult<{ success: true }>> {
+  input: SignUpInput
+): Promise<ActionResult<SignUpDecision>> {
   const handle = normalizeHandle(input.handle);
 
   if (!isValidHandle(handle)) {
@@ -38,7 +39,6 @@ export async function signUpAction(
   }
 
   const email = input.email.trim();
-  const emailRedirectTo = `${input.origin}/auth/callback`;
 
   const { data: status, error: statusError } = await supabaseAdmin.rpc(
     "email_signup_status",
@@ -50,52 +50,14 @@ export async function signUpAction(
     throw new Error("Failed to start signup");
   }
 
-  const supabase = await createClient();
+  const action =
+    status === "confirmed"
+      ? "signin"
+      : status === "unconfirmed"
+        ? "resend"
+        : "signup";
 
-  if (status === "confirmed") {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false, emailRedirectTo },
-    });
-    if (error) {
-      console.error(error);
-    }
-    return { data: { success: true } };
-  }
-
-  if (status === "unconfirmed") {
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: { emailRedirectTo },
-    });
-    if (error) {
-      console.error(error);
-    }
-    return { data: { success: true } };
-  }
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password: input.password,
-    options: {
-      emailRedirectTo,
-      data: { pending_handle: handle },
-    },
-  });
-
-  if (error) {
-    console.error(error);
-    if (error.message.includes("Database error saving new user")) {
-      return {
-        error:
-          "Couldn't reserve that handle — it may have just been taken. Please choose another.",
-      };
-    }
-    throw new Error("Failed to create account");
-  }
-
-  return { data: { success: true } };
+  return { data: { action, handle, email } };
 }
 
 export async function getOwnerChannelAction(): Promise<Channel | null> {
