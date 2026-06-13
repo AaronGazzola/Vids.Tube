@@ -64,10 +64,12 @@ function ComingSoonCard({ broadcast }: { broadcast: Stream }) {
         {startLabel && (
           <p className="text-sm text-muted-foreground">{startLabel}</p>
         )}
-        {startMs && (
+        {startMs && now < startMs ? (
           <p className="text-2xl font-bold tabular-nums">
             {formatCountdown(startMs, now)}
           </p>
+        ) : (
+          <p className="text-2xl font-bold">Starting soon</p>
         )}
       </div>
     </div>

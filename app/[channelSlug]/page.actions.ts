@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
+import { SCHEDULED_CLAIM_GRACE_MS, STALE_MS } from "@/lib/stream";
 import type { ActionResult, Stream } from "@/app/layout.types";
 import type { Channel, Video } from "./page.types";
 
@@ -13,18 +14,42 @@ export async function getUpcomingScheduledBroadcastAction(
     .from("streams")
     .select("*")
     .eq("channel_id", channelId)
-    .eq("status", "scheduled")
-    .gte("scheduled_start_at", new Date().toISOString())
-    .order("scheduled_start_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .in("status", ["scheduled", "preview"])
+    .order("scheduled_start_at", { ascending: true });
 
   if (error) {
     console.error(error);
     throw new Error("Failed to fetch scheduled broadcast");
   }
 
-  return data;
+  const rows = data ?? [];
+  const now = Date.now();
+
+  const connectedPreview = rows
+    .filter(
+      (row) =>
+        row.status === "preview" &&
+        now - (row.last_seen_at ? new Date(row.last_seen_at).getTime() : 0) <=
+          STALE_MS
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
+
+  if (connectedPreview) {
+    return connectedPreview;
+  }
+
+  const upcoming = rows.find(
+    (row) =>
+      row.status === "scheduled" &&
+      (!row.scheduled_start_at ||
+        new Date(row.scheduled_start_at).getTime() >=
+          now - SCHEDULED_CLAIM_GRACE_MS)
+  );
+
+  return upcoming ?? null;
 }
 
 export async function getChannelBySlugAction(
