@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { FittedThumbnail } from "@/components/fitted-thumbnail";
 import type { Database } from "@/supabase/types";
 import Link from "next/link";
 import {
@@ -125,6 +125,12 @@ export function VideoCard({ video }: { video: Video }) {
     ? `${VOD_BASE_URL}/${video.thumbnail_path}`
     : null;
 
+  const durationBadge = duration ? (
+    <span className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white">
+      {duration}
+    </span>
+  ) : null;
+
   return (
     <Link
       href={`/watch/${video.id}`}
@@ -132,32 +138,32 @@ export function VideoCard({ video }: { video: Video }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
-        {posterSrc && (
-          <img
-            src={posterSrc}
-            alt={video.title ?? "Video thumbnail"}
-            className={cn(
-              "absolute inset-0 h-full w-full object-cover transition-transform duration-300",
-              !showingPreview && "group-hover:scale-105"
-            )}
-          />
-        )}
-        {previewSrc && (
-          <img
-            key={previewSrc}
-            src={previewSrc}
-            alt=""
-            aria-hidden
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-        {duration && (
-          <span className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white">
-            {duration}
-          </span>
-        )}
-      </div>
+      {posterSrc ? (
+        <FittedThumbnail
+          src={posterSrc}
+          alt={video.title ?? "Video thumbnail"}
+          width={video.width}
+          height={video.height}
+          zoomOnHover={!showingPreview}
+          className="rounded-xl"
+        >
+          {previewSrc && (
+            <FittedThumbnail
+              key={previewSrc}
+              src={previewSrc}
+              alt=""
+              width={video.width}
+              height={video.height}
+              className="absolute inset-0"
+            />
+          )}
+          {durationBadge}
+        </FittedThumbnail>
+      ) : (
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
+          {durationBadge}
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <span className="line-clamp-2 font-medium leading-snug">
           {video.title ?? "Untitled"}

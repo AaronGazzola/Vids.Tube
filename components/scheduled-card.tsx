@@ -1,6 +1,7 @@
 "use client";
 
 import type { Stream } from "@/app/layout.types";
+import { FittedThumbnail } from "@/components/fitted-thumbnail";
 import { vodAssetUrl } from "@/lib/storage";
 import { CalendarClock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,16 +45,8 @@ function ComingSoonCard({ broadcast }: { broadcast: Stream }) {
       })
     : null;
 
-  return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/40">
-      {thumbnailUrl && (
-        <img
-          src={thumbnailUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      )}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/70 p-6 text-center backdrop-blur-sm">
+  const overlay = (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/70 p-6 text-center backdrop-blur-sm">
         <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <CalendarClock className="h-3.5 w-3.5" />
           Coming soon
@@ -72,6 +65,23 @@ function ComingSoonCard({ broadcast }: { broadcast: Stream }) {
           <p className="text-2xl font-bold">Starting soon</p>
         )}
       </div>
+  );
+
+  if (thumbnailUrl) {
+    return (
+      <FittedThumbnail
+        src={thumbnailUrl}
+        alt=""
+        className="rounded-xl border bg-muted/40"
+      >
+        {overlay}
+      </FittedThumbnail>
+    );
+  }
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/40">
+      {overlay}
     </div>
   );
 }

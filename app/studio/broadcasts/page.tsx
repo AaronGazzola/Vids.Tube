@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { FittedThumbnail } from "@/components/fitted-thumbnail";
 import { vodAssetUrl } from "@/lib/storage";
 import { CalendarClock, Plus } from "lucide-react";
 import { useState } from "react";
@@ -156,10 +157,10 @@ function BroadcastDialog({
           <div className="space-y-2">
             <Label htmlFor="thumbnail">Thumbnail</Label>
             {thumbnailUrl && !file && (
-              <img
+              <FittedThumbnail
                 src={thumbnailUrl}
                 alt="Broadcast thumbnail"
-                className="aspect-video w-full rounded-md object-cover"
+                className="rounded-md"
               />
             )}
             <Input
@@ -198,19 +199,17 @@ function BroadcastRow({
 
   return (
     <div className="flex items-center gap-4 rounded-lg border p-3">
-      <div className="aspect-video w-28 shrink-0 overflow-hidden rounded-md bg-muted">
-        {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <CalendarClock className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
-      </div>
+      {thumbnailUrl ? (
+        <FittedThumbnail
+          src={thumbnailUrl}
+          alt=""
+          className="w-28 shrink-0 rounded-md"
+        />
+      ) : (
+        <div className="flex aspect-video w-28 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+          <CalendarClock className="h-5 w-5 text-muted-foreground" />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">
           {broadcast.title || "Untitled broadcast"}
