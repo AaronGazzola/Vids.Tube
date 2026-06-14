@@ -21,7 +21,7 @@ export function Nav() {
           className="flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
           <Logo className="h-6 w-6" />
-          vids.tube
+          Vids.Tube
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />

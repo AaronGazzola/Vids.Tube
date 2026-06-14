@@ -1,0 +1,46 @@
+# Paste into the target project's supabase/config.toml.
+# Replace every {{PLACEHOLDER}}. These are the ONLY lines this kit manages
+# (see files/supabase/config-managed.ts) — leave the rest of the stock config.toml as-is.
+
+[auth]
+enabled = true
+site_url = "{{SITE_URL}}"                       # e.g. https://example.com
+additional_redirect_urls = ["http://localhost:3000/**", "{{SITE_URL}}/**"]
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+# SMTP (Resend), managed by `npm run config:push`. `pass` is a write-only secret
+# resolved from Doppler via env() at push time — never stored here or readable back.
+# The admin_email domain must be a verified sending domain in the Resend account.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+sender_name = "{{APP_NAME}}"                    # e.g. Example
+admin_email = "{{FROM_EMAIL}}"                  # e.g. noreply@example.com — domain MUST be verified in Resend
+
+# Email templates (managed by config:push; build HTML with `npm run email:build`).
+[auth.email.template.confirmation]
+subject = "Confirm your email · {{APP_NAME}}"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password · {{APP_NAME}}"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "You've been invited to {{APP_NAME}}"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "Your {{APP_NAME}} login link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your email change · {{APP_NAME}}"
+content_path = "./supabase/templates/email_change.html"

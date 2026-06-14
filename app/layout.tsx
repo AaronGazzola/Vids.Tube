@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "vids.tube",
+  title: "Vids.Tube",
   description: "Community-driven video platform",
 };
 
