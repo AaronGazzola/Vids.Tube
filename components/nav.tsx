@@ -18,9 +18,9 @@ export function Nav() {
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link
           href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight"
+          className="flex items-center gap-2 font-(family-name:--font-brand) text-xl font-bold tracking-tight"
         >
-          <Logo className="h-6 w-6" />
+          <Logo className="h-9 w-9" />
           Vids.Tube
         </Link>
         <div className="flex items-center gap-2">
