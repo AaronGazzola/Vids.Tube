@@ -24,7 +24,7 @@ test.beforeAll(async () => {
 
 test("home renders the owner channel experience", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "vids.tube" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Vids.Tube" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: ownerName })
   ).toBeVisible();
