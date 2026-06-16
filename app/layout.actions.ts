@@ -10,6 +10,7 @@ import {
   normalizeHandle,
   HANDLE_REQUIREMENT,
 } from "@/lib/handle";
+import { MAX_CHAT_MESSAGE_LENGTH } from "./layout.types";
 import type {
   ActionResult,
   AuthorIdentity,
@@ -328,6 +329,12 @@ export async function postChatMessageAction(
   const trimmed = body.trim();
   if (!trimmed) {
     return { error: "Message cannot be empty." };
+  }
+
+  if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+    return {
+      error: `Message must be ${MAX_CHAT_MESSAGE_LENGTH} characters or less.`,
+    };
   }
 
   const { data, error } = await supabase

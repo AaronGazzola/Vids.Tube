@@ -37,6 +37,8 @@ export type ChatMessageRow =
   Database["public"]["Tables"]["chat_messages"]["Row"];
 export type ChatMessage = ChatMessageRow & { author: AuthorIdentity };
 
+export const MAX_CHAT_MESSAGE_LENGTH = 200;
+
 export type ViewerCapState = "connecting" | "admitted" | "full";
 
 export type CreateChannelInput = {
