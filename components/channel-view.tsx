@@ -11,6 +11,7 @@ import {
   useOwnerChannel,
 } from "@/app/layout.hooks";
 import { BrandingUploadDialog } from "@/components/branding-upload-dialog";
+import { CollapsibleDescription } from "@/components/collapsible-description";
 import { LiveChat } from "@/components/live-chat";
 import { LiveStage } from "@/components/live-stage";
 import { ScheduledCard } from "@/components/scheduled-card";
@@ -155,9 +156,7 @@ export function ChannelView({ slug }: { slug: string }) {
                     </h2>
                   )}
                   {stream?.description && (
-                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                      {stream.description}
-                    </p>
+                    <CollapsibleDescription text={stream.description} />
                   )}
                 </div>
                 <div className="lg:h-[70vh]">

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatReplay } from "@/components/chat-replay";
+import { CollapsibleDescription } from "@/components/collapsible-description";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VideoPlayer } from "@/components/video-player";
@@ -108,9 +109,7 @@ export default function WatchPage() {
           </div>
           <h1 className="text-2xl font-bold">{video.title ?? "Untitled"}</h1>
           {video.description && (
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-              {video.description}
-            </p>
+            <CollapsibleDescription text={video.description} />
           )}
           <CommentsSection videoId={video.id} />
         </div>
