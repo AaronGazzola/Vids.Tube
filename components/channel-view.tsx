@@ -3,18 +3,9 @@
 import {
   useChannel,
   useChannelVideos,
-  useUpcomingScheduled,
 } from "@/app/[channelSlug]/page.hooks";
-import {
-  useIsChannelOwner,
-  useLiveStream,
-  useOwnerChannel,
-} from "@/app/layout.hooks";
+import { useIsChannelOwner, useOwnerChannel } from "@/app/layout.hooks";
 import { BrandingUploadDialog } from "@/components/branding-upload-dialog";
-import { CollapsibleDescription } from "@/components/collapsible-description";
-import { LiveChat } from "@/components/live-chat";
-import { LiveStage } from "@/components/live-stage";
-import { ScheduledCard } from "@/components/scheduled-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -54,8 +45,6 @@ export function ChannelView({ slug }: { slug: string }) {
   const { data: channel, isPending } = useChannel(slug);
   const { data: ownerChannel, isPending: ownerPending } = useOwnerChannel();
   const { data: videos } = useChannelVideos(channel?.id);
-  const { data: stream } = useLiveStream(channel?.id);
-  const { data: upcomingScheduled } = useUpcomingScheduled(channel?.id);
   const isOwner = useIsChannelOwner(channel);
 
   const isPlatformOwnerChannel =
@@ -64,8 +53,6 @@ export function ChannelView({ slug }: { slug: string }) {
     channel.owner_user_id === ownerChannel.owner_user_id;
   const canView = isPlatformOwnerChannel || isOwner;
 
-  const isLive = stream?.status === "live" && !!stream.hls_path;
-  const streamId = isLive ? stream.id : null;
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
 
@@ -145,28 +132,6 @@ export function ChannelView({ slug }: { slug: string }) {
               )}
             </div>
           </div>
-          <section className="mt-8">
-            {isLive ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-                <div className="space-y-3">
-                  <LiveStage stream={stream} loading={false} />
-                  {stream?.title && (
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      {stream.title}
-                    </h2>
-                  )}
-                  {stream?.description && (
-                    <CollapsibleDescription text={stream.description} />
-                  )}
-                </div>
-                <div className="lg:h-[70vh]">
-                  <LiveChat streamId={streamId} />
-                </div>
-              </div>
-            ) : (
-              <ScheduledCard broadcast={upcomingScheduled ?? null} />
-            )}
-          </section>
           <Separator className="my-8" />
           <section>
             <h2 className="mb-4 text-lg font-semibold tracking-tight">
