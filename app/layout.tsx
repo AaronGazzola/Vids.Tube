@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, Zen_Dots } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Nav } from "@/components/nav";
@@ -21,6 +21,12 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["600", "700"],
 });
 
+const zenDots = Zen_Dots({
+  variable: "--font-logo",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "Vids.Tube",
   description: "Community-driven video platform",
@@ -36,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${zenDots.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
