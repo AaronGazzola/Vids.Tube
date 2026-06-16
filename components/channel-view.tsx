@@ -145,29 +145,33 @@ export function ChannelView({ slug }: { slug: string }) {
               )}
             </div>
           </div>
-          <section className="mt-8">
-            {isLive ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-                <div className="space-y-3">
-                  <LiveStage stream={stream} loading={false} />
-                  {stream?.title && (
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      {stream.title}
-                    </h2>
-                  )}
-                  {stream?.description && (
-                    <CollapsibleDescription text={stream.description} />
-                  )}
-                </div>
-                <div className="lg:h-[70vh]">
-                  <LiveChat streamId={streamId} />
-                </div>
-              </div>
-            ) : (
-              <ScheduledCard broadcast={upcomingScheduled ?? null} />
-            )}
-          </section>
-          <Separator className="my-8" />
+          {(isLive || upcomingScheduled) && (
+            <>
+              <section className="mt-8">
+                {isLive ? (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+                    <div className="space-y-3">
+                      <LiveStage stream={stream} loading={false} />
+                      {stream?.title && (
+                        <h2 className="text-xl font-semibold tracking-tight">
+                          {stream.title}
+                        </h2>
+                      )}
+                      {stream?.description && (
+                        <CollapsibleDescription text={stream.description} />
+                      )}
+                    </div>
+                    <div className="lg:h-[70vh]">
+                      <LiveChat streamId={streamId} />
+                    </div>
+                  </div>
+                ) : (
+                  <ScheduledCard broadcast={upcomingScheduled ?? null} />
+                )}
+              </section>
+              <Separator className="my-8" />
+            </>
+          )}
           <section>
             <h2 className="mb-4 text-lg font-semibold tracking-tight">
               Videos
