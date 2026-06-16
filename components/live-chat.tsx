@@ -5,19 +5,18 @@ import { useAuthStore } from "@/app/layout.stores";
 import { AuthorChip } from "@/components/author-chip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useStickyScroll } from "@/lib/use-sticky-scroll";
+import { ArrowDown } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 export function LiveChat({ streamId }: { streamId: string | null }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { data: messages = [], isPending } = useLiveChat(streamId);
   const post = usePostChatMessage(streamId);
   const [draft, setDraft] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  const { containerRef, onScroll, showJump, scrollToBottom } =
+    useStickyScroll(messages.length);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -31,7 +30,12 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
   return (
     <div className="flex h-full min-h-80 flex-col rounded-lg border">
       <div className="border-b p-3 text-sm font-medium">Live chat</div>
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={containerRef}
+          onScroll={onScroll}
+          className="h-full space-y-2 overflow-y-auto p-3"
+        >
         {!streamId ? (
           <p className="text-center text-sm text-muted-foreground">
             Chat is available during live streams.
@@ -56,7 +60,18 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
             </div>
           ))
         )}
-        <div ref={endRef} />
+        </div>
+        {showJump ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 gap-1 rounded-full shadow-md"
+          >
+            <ArrowDown className="h-4 w-4" />
+            New messages
+          </Button>
+        ) : null}
       </div>
       <div className="border-t p-3">
         {!streamId ? (

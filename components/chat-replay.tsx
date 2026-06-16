@@ -4,9 +4,10 @@ import type { ReplayMessage } from "@/app/watch/[videoId]/page.types";
 import { AuthorChip } from "@/components/author-chip";
 import { Button } from "@/components/ui/button";
 import { visibleReplayMessages } from "@/lib/chat-replay";
+import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 
 export function ChatReplay({
   messages,
@@ -21,16 +22,13 @@ export function ChatReplay({
   onToggleCollapsed: () => void;
   className?: string;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
-
   const visible = useMemo(
     () => visibleReplayMessages(messages, currentTimeMs),
     [messages, currentTimeMs]
   );
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [visible.length]);
+  const { containerRef, onScroll, showJump, scrollToBottom } =
+    useStickyScroll(visible.length);
 
   if (collapsed) {
     return (
@@ -62,24 +60,40 @@ export function ChatReplay({
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {visible.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground">
-            Chat replay will appear as the video plays.
-          </p>
-        ) : (
-          visible.map((message) => (
-            <div key={message.id} className="text-sm">
-              <AuthorChip
-                author={message.author}
-                size="chat"
-                className="mr-1 align-middle"
-              />
-              <span>{message.body}</span>
-            </div>
-          ))
-        )}
-        <div ref={endRef} />
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={containerRef}
+          onScroll={onScroll}
+          className="h-full space-y-2 overflow-y-auto p-3"
+        >
+          {visible.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Chat replay will appear as the video plays.
+            </p>
+          ) : (
+            visible.map((message) => (
+              <div key={message.id} className="text-sm">
+                <AuthorChip
+                  author={message.author}
+                  size="chat"
+                  className="mr-1 align-middle"
+                />
+                <span>{message.body}</span>
+              </div>
+            ))
+          )}
+        </div>
+        {showJump ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 gap-1 rounded-full shadow-md"
+          >
+            <ArrowDown className="h-4 w-4" />
+            New messages
+          </Button>
+        ) : null}
       </div>
     </div>
   );
