@@ -1,13 +1,26 @@
 "use client";
 
-import { useOwnerChannel } from "@/app/layout.hooks";
+import { useLiveStream, useOwnerChannel } from "@/app/layout.hooks";
 import { ChannelView } from "@/components/channel-view";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function HomePage() {
+  const router = useRouter();
   const { data: channel, isPending } = useOwnerChannel();
+  const { data: stream, isPending: streamPending } = useLiveStream(channel?.id);
 
-  if (isPending) {
+  const isLive = stream?.status === "live" && !!stream.hls_path;
+  const shouldRedirect = !isPending && !!channel && !streamPending && isLive;
+
+  useEffect(() => {
+    if (shouldRedirect && channel) {
+      router.replace(`/${channel.slug}/live`);
+    }
+  }, [shouldRedirect, channel, router]);
+
+  if (isPending || shouldRedirect) {
     return (
       <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
         <Skeleton className="aspect-[5/1] w-full rounded-xl" />
