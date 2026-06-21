@@ -170,6 +170,9 @@ server {
     location / {
         limit_conn hlscap 120;     # LL-HLS holds requests open longer; headroom
         limit_rate 1500k;           # per-response bandwidth cap (>> stream bitrate)
+        proxy_hide_header Access-Control-Allow-Origin;       # drop MediaMTX's reflected Origin
+        proxy_hide_header Access-Control-Allow-Credentials;  # drop MediaMTX's credentials flag
+        add_header Access-Control-Allow-Origin "*" always;   # serve a clean public-HLS CORS
         proxy_pass http://127.0.0.1:8888;
         proxy_buffering off;        # required so LL-HLS parts stream through
         proxy_http_version 1.1;
@@ -186,9 +189,14 @@ nginx -t && systemctl reload nginx
 ```
 
 Notes:
-- **Do not add an `Access-Control-Allow-Origin` header in nginx** — MediaMTX
-  already serves `Access-Control-Allow-Origin: *` on HLS responses; a second one
-  would break CORS.
+- **Normalize CORS in nginx (AZ-92).** MediaMTX (v1.18.x) does **not** serve a
+  plain `Access-Control-Allow-Origin: *` — it reflects the request `Origin`
+  verbatim **and** sends `Access-Control-Allow-Credentials: true`, which is an
+  invalid combination for public content. nginx therefore strips both upstream
+  headers (`proxy_hide_header`) and serves a single clean
+  `Access-Control-Allow-Origin: *` (no credentials) for this public HLS endpoint.
+  Verify: `curl -I -H "Origin: https://evil.com" https://stream.vids.tube/<path>`
+  must return `Access-Control-Allow-Origin: *` and **no** `Allow-Credentials`.
 - `limit_conn` + `limit_rate` bound worst-case egress (the cost backstop behind
   the app's soft 25-viewer cap). LL-HLS holds connections longer, hence 120.
 
@@ -201,6 +209,32 @@ ufw --force enable
 
 If your studio IP is static, restrict 1935 to it instead:
 `ufw allow from <your-ip> to any port 1935 proto tcp`.
+
+SSH hardening (AZ-93): port 22 is left open to any IP (the admin IP is dynamic),
+but brute force is mitigated by **fail2ban** and **key-only auth**:
+
+```bash
+# key-only SSH (drop-in survives sshd_config rewrites)
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' \
+  > /etc/ssh/sshd_config.d/99-hardening.conf
+sshd -t && systemctl reload ssh
+
+# fail2ban: ban after 5 failures in 10m, for 1h
+apt-get install -y fail2ban
+cat > /etc/fail2ban/jail.local <<'EOF'
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+
+[sshd]
+enabled = true
+port = ssh
+EOF
+systemctl enable --now fail2ban
+fail2ban-client status sshd
+```
 
 ## 6. OBS
 

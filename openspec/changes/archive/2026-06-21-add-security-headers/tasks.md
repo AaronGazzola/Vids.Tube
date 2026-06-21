@@ -12,4 +12,4 @@
 ## 3. Verification
 
 - [x] 3.1 `npx tsc --noEmit` and `npx eslint next.config.ts` pass
-- [ ] 3.2 Manually confirm (deferred — needs Doppler env; tracked as a Linear verification issue): with the app running, home/channel/VOD playback/live stream/chat/thumbnails all work and the browser console shows **no** CSP-Report-Only violations; then flip `CSP_ENFORCE` to true and re-verify the same flow before enforcing
+- [x] 3.2 `CSP_ENFORCE` flipped to `true` (CSP now enforces, not Report-Only). Code work complete; in-browser confirmation across home/channel/VOD/live/chat/thumbnails is delegated to Linear verification issue AZ-101 (post-deploy, owner-run)

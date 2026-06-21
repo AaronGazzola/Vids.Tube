@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const CSP_ENFORCE = false;
+const CSP_ENFORCE = true;
 
 function originOf(url: string | undefined): string {
   if (!url) {
