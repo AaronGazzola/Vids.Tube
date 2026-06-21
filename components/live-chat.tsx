@@ -3,29 +3,19 @@
 import { useLiveChat, usePostChatMessage } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { AuthorChip } from "@/components/author-chip";
+import { ChatComposer } from "@/components/chat-composer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { ArrowDown } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
 
 export function LiveChat({ streamId }: { streamId: string | null }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { data: messages = [], isPending } = useLiveChat(streamId);
   const post = usePostChatMessage(streamId);
-  const [draft, setDraft] = useState("");
   const { containerRef, onScroll, showJump, scrollToBottom } =
     useStickyScroll(messages.length);
-
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    const body = draft.trim();
-    if (!body) {
-      return;
-    }
-    post.mutate(body, { onSuccess: () => setDraft("") });
-  };
 
   return (
     <div className="flex h-full min-h-80 flex-col rounded-lg border">
@@ -56,7 +46,7 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
                 size="chat"
                 className="mr-1 align-middle"
               />
-              <span>{message.body}</span>
+              <span className="break-words">{message.body}</span>
             </div>
           ))
         )}
@@ -77,17 +67,10 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
         {!streamId ? (
           <Input placeholder="Chat is offline" disabled />
         ) : isAuthenticated ? (
-          <form onSubmit={onSubmit} className="flex gap-2">
-            <Input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Send a message"
-              maxLength={500}
-            />
-            <Button type="submit" disabled={post.isPending || !draft.trim()}>
-              Send
-            </Button>
-          </form>
+          <ChatComposer
+            onSend={(body) => post.mutateAsync(body)}
+            pending={post.isPending}
+          />
         ) : (
           <div className="flex items-center justify-between gap-2 text-sm">
             <span className="text-muted-foreground">Sign in to chat</span>

@@ -11,17 +11,16 @@ import {
   useOwnerChannel,
 } from "@/app/layout.hooks";
 import { BrandingUploadDialog } from "@/components/branding-upload-dialog";
-import { CollapsibleDescription } from "@/components/collapsible-description";
-import { LiveChat } from "@/components/live-chat";
-import { LiveStage } from "@/components/live-stage";
-import { ScheduledCard } from "@/components/scheduled-card";
+import { LiveFeatureCard } from "@/components/live-feature-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VideoGrid } from "@/components/video-grid";
 import { channelAssetUrl } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 import { Camera } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 function getInitials(name: string): string {
@@ -54,9 +53,11 @@ export function ChannelView({ slug }: { slug: string }) {
   const { data: channel, isPending } = useChannel(slug);
   const { data: ownerChannel, isPending: ownerPending } = useOwnerChannel();
   const { data: videos } = useChannelVideos(channel?.id);
-  const { data: stream } = useLiveStream(channel?.id);
-  const { data: upcomingScheduled } = useUpcomingScheduled(channel?.id);
   const isOwner = useIsChannelOwner(channel);
+  const { data: stream } = useLiveStream(channel?.id);
+  const { data: upcoming } = useUpcomingScheduled(channel?.id);
+  const isLive = stream?.status === "live" && !!stream.hls_path;
+  const featured = isLive ? stream : upcoming ?? null;
 
   const isPlatformOwnerChannel =
     !!channel &&
@@ -64,8 +65,6 @@ export function ChannelView({ slug }: { slug: string }) {
     channel.owner_user_id === ownerChannel.owner_user_id;
   const canView = isPlatformOwnerChannel || isOwner;
 
-  const isLive = stream?.status === "live" && !!stream.hls_path;
-  const streamId = isLive ? stream.id : null;
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
 
@@ -101,7 +100,13 @@ export function ChannelView({ slug }: { slug: string }) {
           </div>
           <div className="mt-6 flex flex-col items-start gap-4 px-1 sm:flex-row sm:items-center sm:gap-6">
             <div className="relative">
-              <Avatar className="h-24 w-24 border-4 border-background shadow-sm sm:h-28 sm:w-28">
+              <Avatar
+                className={cn(
+                  "h-24 w-24 border-4 border-background shadow-sm sm:h-28 sm:w-28",
+                  isLive &&
+                    "ring-4 ring-destructive ring-offset-2 ring-offset-background"
+                )}
+              >
                 {avatarUrl && (
                   <AvatarImage src={avatarUrl} alt={channel.name} />
                 )}
@@ -109,6 +114,13 @@ export function ChannelView({ slug }: { slug: string }) {
                   {getInitials(channel.name)}
                 </AvatarFallback>
               </Avatar>
+              {isLive && (
+                <Link
+                  href={`/${channel.slug}/live`}
+                  aria-label={`Watch ${channel.name} live`}
+                  className="absolute inset-0 rounded-full"
+                />
+              )}
               {isOwner && (
                 <Button
                   type="button"
@@ -145,28 +157,15 @@ export function ChannelView({ slug }: { slug: string }) {
               )}
             </div>
           </div>
-          <section className="mt-8">
-            {isLive ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-                <div className="space-y-3">
-                  <LiveStage stream={stream} loading={false} />
-                  {stream?.title && (
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      {stream.title}
-                    </h2>
-                  )}
-                  {stream?.description && (
-                    <CollapsibleDescription text={stream.description} />
-                  )}
-                </div>
-                <div className="lg:h-[70vh]">
-                  <LiveChat streamId={streamId} />
-                </div>
-              </div>
-            ) : (
-              <ScheduledCard broadcast={upcomingScheduled ?? null} />
-            )}
-          </section>
+          {featured && (
+            <div className="mt-8 max-w-xl">
+              <LiveFeatureCard
+                slug={channel.slug}
+                stream={featured}
+                isLive={isLive}
+              />
+            </div>
+          )}
           <Separator className="my-8" />
           <section>
             <h2 className="mb-4 text-lg font-semibold tracking-tight">

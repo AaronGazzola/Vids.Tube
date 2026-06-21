@@ -78,7 +78,7 @@ export function ChatReplay({
                   size="chat"
                   className="mr-1 align-middle"
                 />
-                <span>{message.body}</span>
+                <span className="break-words">{message.body}</span>
               </div>
             ))
           )}
