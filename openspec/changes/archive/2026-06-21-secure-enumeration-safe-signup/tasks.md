@@ -33,5 +33,5 @@
 
 ## 6. Close-out
 
-- [ ] 6.1 Run `openspec-verify-change` and archive once code-complete + verified
-- [ ] 6.2 Update Linear AZ-55 with implementation summary + remaining owner-run live verification
+- [x] 6.1 Run `openspec-verify-change` and archive once code-complete + verified
+- [x] 6.2 Update Linear AZ-55 with implementation summary + remaining owner-run live verification

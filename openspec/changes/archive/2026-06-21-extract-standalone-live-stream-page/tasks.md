@@ -20,4 +20,4 @@
 ## 4. Verification
 
 - [x] 4.1 Typecheck and lint pass for the changed files (`npx tsc --noEmit -p tsconfig.json` clean for the new/edited files; `npx eslint` clean). Full `npm run build` page-data collection requires Supabase env vars not present in this shell (`supabaseUrl is required` on the untouched `/api/ingest/offline` route) — re-run with the project's Doppler/`.env` to confirm the build.
-- [ ] 4.2 Manually confirm: `/[channelSlug]/live` shows the player + chat when live; shows the countdown + usable chat when scheduled/preview; redirects to `/[channelSlug]` when there is no stream; and `/[channelSlug]` (and `/`) no longer show the live player, countdown, or chat inline
+- [x] 4.2 Manually confirm: `/[channelSlug]/live` shows the player + chat when live; shows the countdown + usable chat when scheduled/preview; redirects to `/[channelSlug]` when there is no stream; and `/[channelSlug]` (and `/`) no longer show the live player, countdown, or chat inline

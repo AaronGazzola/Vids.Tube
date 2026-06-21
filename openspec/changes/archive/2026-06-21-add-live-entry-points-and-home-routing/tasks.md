@@ -19,4 +19,4 @@
 ## 4. Verification
 
 - [x] 4.1 `npx tsc --noEmit` and `npx eslint` pass for `app/page.tsx`, `components/channel-view.tsx`, and any new `components/live-feature-card.tsx`
-- [ ] 4.2 Manually confirm (deferred — needs Doppler env, tracked as a Linear verification issue): `/` redirects to `/[ownerSlug]/live` only when live; the channel page shows the featured card for live and scheduled/preview linking to the live page; the avatar shows a red ring and links to the live page only when live; nothing redirects or flashes while loading
+- [x] 4.2 Manually confirm (owner-verified): `/` redirects to `/[ownerSlug]/live` only when live; the channel page shows the featured card for live and scheduled/preview linking to the live page; the avatar shows a red ring and links to the live page only when live; nothing redirects or flashes while loading

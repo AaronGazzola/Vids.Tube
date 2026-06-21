@@ -21,4 +21,4 @@
 ## 5. Verification
 
 - [x] 5.1 Typecheck, lint, and build pass
-- [ ] 5.2 Manually confirm: the composer is a word-wrapping textarea; remaining count appears near 200; typing past 200 keeps working with the overflow characters in red, Send disabled, and an over-limit message shown; a server post of a 201+ char body is rejected with the error toast; a single 300-character word wraps with no horizontal scroll in both live chat and VOD replay
+- [x] 5.2 Manually confirm: the composer is a word-wrapping textarea; remaining count appears near 200; typing past 200 keeps working with the overflow characters in red, Send disabled, and an over-limit message shown; a server post of a 201+ char body is rejected with the error toast; a single 300-character word wraps with no horizontal scroll in both live chat and VOD replay
