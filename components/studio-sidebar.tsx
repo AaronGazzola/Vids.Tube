@@ -1,7 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CalendarClock, LayoutDashboard, Radio, Settings } from "lucide-react";
+import {
+  CalendarClock,
+  LayoutDashboard,
+  Radio,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +15,7 @@ const items = [
   { href: "/studio", label: "Overview", icon: LayoutDashboard },
   { href: "/studio/live", label: "Go Live", icon: Radio },
   { href: "/studio/broadcasts", label: "Broadcasts", icon: CalendarClock },
+  { href: "/studio/overlay", label: "Chat Overlay", icon: Sparkles },
   { href: "/studio/settings", label: "Settings", icon: Settings },
 ];
 

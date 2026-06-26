@@ -128,3 +128,32 @@
     @apply font-sans;
   }
 }
+
+@keyframes overlay-travel {
+  0% {
+    transform: translate(-30vw, 0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(0, -4vh) scale(1);
+    opacity: 1;
+  }
+  88% {
+    transform: translate(100vw, -4vh) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(130vw, 0) scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes overlay-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

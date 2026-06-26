@@ -107,6 +107,38 @@ export type Database = {
           },
         ]
       }
+      chat_scoring_state: {
+        Row: {
+          enabled: boolean
+          last_scored_at: string | null
+          locked_until: string | null
+          stream_id: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          last_scored_at?: string | null
+          locked_until?: string | null
+          stream_id: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          last_scored_at?: string | null
+          locked_until?: string | null
+          stream_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_scoring_state_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: true
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_votes: {
         Row: {
           comment_id: string
@@ -167,6 +199,95 @@ export type Database = {
             columns: ["video_id"]
             isOneToOne: false
             referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      featured_messages: {
+        Row: {
+          categories: string[]
+          chat_message_id: string
+          featured_at: string
+          id: string
+          reason: string | null
+          ring_level: number
+          score: number
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          categories?: string[]
+          chat_message_id: string
+          featured_at?: string
+          id?: string
+          reason?: string | null
+          ring_level?: number
+          score: number
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          categories?: string[]
+          chat_message_id?: string
+          featured_at?: string
+          id?: string
+          reason?: string | null
+          ring_level?: number
+          score?: number
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_messages_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: true
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "featured_messages_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      score_events: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          points: number
+          stream_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          points?: number
+          stream_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          points?: number
+          stream_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_events_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
             referencedColumns: ["id"]
           },
         ]
@@ -313,6 +434,38 @@ export type Database = {
           {
             foreignKeyName: "videos_source_stream_id_fkey"
             columns: ["source_stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      viewer_scores: {
+        Row: {
+          features_count: number
+          last_featured_at: string | null
+          stream_id: string
+          total_score: number
+          user_id: string
+        }
+        Insert: {
+          features_count?: number
+          last_featured_at?: string | null
+          stream_id: string
+          total_score?: number
+          user_id: string
+        }
+        Update: {
+          features_count?: number
+          last_featured_at?: string | null
+          stream_id?: string
+          total_score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "viewer_scores_stream_id_fkey"
+            columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
             referencedColumns: ["id"]

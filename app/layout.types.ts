@@ -41,6 +41,22 @@ export const MAX_CHAT_MESSAGE_LENGTH = 200;
 
 export type ViewerCapState = "connecting" | "admitted" | "full";
 
+export type FeaturedMessage =
+  Database["public"]["Tables"]["featured_messages"]["Row"];
+export type ViewerScore =
+  Database["public"]["Tables"]["viewer_scores"]["Row"];
+export type ScoreEvent = Database["public"]["Tables"]["score_events"]["Row"];
+export type ChatScoringState =
+  Database["public"]["Tables"]["chat_scoring_state"]["Row"];
+
+export type FeaturedMessageWithAuthor = FeaturedMessage & {
+  author: AuthorIdentity;
+};
+
+export type ViewerScoreWithAuthor = ViewerScore & {
+  author: AuthorIdentity;
+};
+
 export type CreateChannelInput = {
   handle: string;
   name?: string;

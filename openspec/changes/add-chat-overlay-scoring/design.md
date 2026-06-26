@@ -46,9 +46,13 @@ these tables — so this change contains no LLM code and no API key.
   cursor/lock. This change defines the schema, the read/display path, and the owner
   toggle — nothing that calls an LLM. Rationale: the subscription `claude -p` must
   run locally; keeping the app key-free keeps it deployable.
-- **Overlay is a display-only transparent route.** `app/(overlay)/layout.tsx` renders
-  its own `<html>/<body class="bg-transparent">` with only `<Providers>` (react-query
-  + realtime), no `<Nav>`/`<Toaster>`. `app/(overlay)/overlay/[channelSlug]/page.tsx`
+- **Overlay is a display-only transparent route.** The repo keeps its single required
+  root `app/layout.tsx` (moving every existing route into a group to get a second root
+  layout would be a broad, regression-prone refactor), so `app/(overlay)/layout.tsx` is
+  a nested client layout that sets `<html>/<body>` background transparent while mounted,
+  and the root layout's `<Nav>`/`<Toaster>` are gated off for `/overlay/*` via
+  `components/site-chrome.tsx`. `Providers` (react-query + realtime) is inherited from the
+  root layout. `app/(overlay)/overlay/[channelSlug]/page.tsx`
   resolves channel→live stream (`useChannel`+`useLiveStream`), subscribes via a new
   `useFeaturedMessages(streamId)` hook (mirrors `useLiveChat`, channel
   `featured:${streamId}`), and renders `components/overlay/featured-avatar.tsx`: the
