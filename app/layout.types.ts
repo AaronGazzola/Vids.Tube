@@ -48,6 +48,8 @@ export type ViewerScore =
 export type ScoreEvent = Database["public"]["Tables"]["score_events"]["Row"];
 export type ChatScoringState =
   Database["public"]["Tables"]["chat_scoring_state"]["Row"];
+export type TranscriptSegment =
+  Database["public"]["Tables"]["transcript_segments"]["Row"];
 
 export type FeaturedMessageWithAuthor = FeaturedMessage & {
   author: AuthorIdentity;

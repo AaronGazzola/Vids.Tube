@@ -374,6 +374,41 @@ export type Database = {
           },
         ]
       }
+      transcript_segments: {
+        Row: {
+          created_at: string
+          end_s: number
+          id: string
+          start_s: number
+          stream_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          end_s: number
+          id?: string
+          start_s: number
+          stream_id: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          end_s?: number
+          id?: string
+          start_s?: number
+          stream_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcript_segments_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       videos: {
         Row: {
           channel_id: string

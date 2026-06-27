@@ -20,7 +20,9 @@
     "config:diff": "tsx supabase/config-diff.ts",
     "config:push": "tsx supabase/config-push.ts",
     "config:push:apply": "tsx supabase/config-push.ts --apply",
-    "email:check": "tsx supabase/resend-check.ts"
+    "email:check": "tsx supabase/resend-check.ts",
+    "worker": "doppler run -- tsx worker/index.ts",
+    "worker:doctor": "doppler run -- tsx worker/doctor.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
