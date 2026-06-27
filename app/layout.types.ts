@@ -74,6 +74,27 @@ export type YouTubeChatPage = {
   pollingIntervalMillis: number;
 };
 
+export type StreamGoals = Database["public"]["Tables"]["stream_goals"]["Row"];
+
+export type GoalMetric = "subs" | "likes" | "viewers";
+
+export const GOAL_METRICS: GoalMetric[] = ["subs", "likes", "viewers"];
+
+export type MetricProgress = {
+  current: number;
+  target: number;
+  total: number;
+  goal: number;
+  pct: number;
+  reached: boolean;
+};
+
+export type GoalProgressResponse = {
+  active: boolean;
+  isLive: boolean;
+  metrics: Record<GoalMetric, MetricProgress> | null;
+};
+
 export type FeaturedAuthor = {
   name: string;
   handle: string | null;

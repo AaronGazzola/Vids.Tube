@@ -6,7 +6,7 @@ import type {
 } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { authorFromRow } from "@/lib/featured-author";
-import { fetchVideoData, parseVideoId } from "@/lib/youtube";
+import { fetchSubs, fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
 
@@ -50,6 +50,8 @@ export type OverlayContext = {
   streamStatus: string | null;
   enabled: boolean;
   youtubeVideoId: string | null;
+  goals: { subs: number; likes: number; viewers: number } | null;
+  goalsStarted: boolean;
 };
 
 export async function getOverlayContextAction(): Promise<OverlayContext> {
@@ -87,13 +89,126 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
     enabled = state?.enabled ?? false;
   }
 
+  let goals: OverlayContext["goals"] = null;
+  let goalsStarted = false;
+  if (stream) {
+    const { data: g } = await supabaseAdmin
+      .from("stream_goals")
+      .select("subs_goal, likes_goal, viewers_goal, started_at")
+      .eq("stream_id", stream.id)
+      .maybeSingle();
+    if (g) {
+      goals = { subs: g.subs_goal, likes: g.likes_goal, viewers: g.viewers_goal };
+      goalsStarted = !!g.started_at;
+    }
+  }
+
   return {
     channelSlug: channel.slug,
     streamId: stream?.id ?? null,
     streamStatus: stream?.status ?? null,
     enabled,
     youtubeVideoId: stream?.youtube_video_id ?? null,
+    goals,
+    goalsStarted,
   };
+}
+
+export async function setGoalsAction(
+  streamId: string,
+  targets: { subs: number; likes: number; viewers: number }
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  const { data: stream, error } = await supabaseAdmin
+    .from("streams")
+    .select("id, channel_id")
+    .eq("id", streamId)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load broadcast");
+  }
+  if (!stream || stream.channel_id !== channel.id) {
+    return { error: "That broadcast is not on your channel." };
+  }
+
+  const { error: upsertError } = await supabaseAdmin.from("stream_goals").upsert(
+    {
+      stream_id: streamId,
+      subs_goal: Math.max(0, Math.round(targets.subs)),
+      likes_goal: Math.max(0, Math.round(targets.likes)),
+      viewers_goal: Math.max(0, Math.round(targets.viewers)),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stream_id" }
+  );
+  if (upsertError) {
+    console.error(upsertError);
+    throw new Error("Failed to save goals");
+  }
+
+  return { data: { ok: true } };
+}
+
+export async function startGoalsAction(
+  streamId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  const { data: stream, error } = await supabaseAdmin
+    .from("streams")
+    .select("id, channel_id, youtube_video_id, youtube_channel_id")
+    .eq("id", streamId)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load broadcast");
+  }
+  if (!stream || stream.channel_id !== channel.id) {
+    return { error: "That broadcast is not on your channel." };
+  }
+  if (!stream.youtube_video_id) {
+    return { error: "Set the YouTube video first, then start goals." };
+  }
+
+  let counts: { subs: number; likes: number; viewers: number };
+  try {
+    const video = await fetchVideoData(stream.youtube_video_id);
+    const subs = await fetchSubs(stream.youtube_channel_id || video.channelId);
+    counts = { subs, likes: video.likeCount, viewers: video.concurrentViewers };
+  } catch (e) {
+    console.error(e);
+    return {
+      error: "Couldn't read the YouTube counts — check the video is public.",
+    };
+  }
+
+  const { error: upsertError } = await supabaseAdmin.from("stream_goals").upsert(
+    {
+      stream_id: streamId,
+      baseline_subs: counts.subs,
+      baseline_likes: counts.likes,
+      baseline_viewers: counts.viewers,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stream_id" }
+  );
+  if (upsertError) {
+    console.error(upsertError);
+    throw new Error("Failed to start goals");
+  }
+
+  return { data: { ok: true } };
 }
 
 export async function setStreamYoutubeVideoAction(

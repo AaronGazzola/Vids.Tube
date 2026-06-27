@@ -1,0 +1,42 @@
+{
+  "project": "Vids.Tube",
+  "mainBranch": "main",
+  "integrations": {
+    "git": {
+      "enabled": true
+    },
+    "openspec": {
+      "enabled": true
+    },
+    "linear": {
+      "enabled": true,
+      "workspace": "Gazzola",
+      "team": "Az",
+      "project": "Vids.Tube"
+    },
+    "supabase": {
+      "enabled": true,
+      "projectRef": "cqblezzhywdjerslhgho",
+      "method": "mcp"
+    },
+    "doppler": {
+      "enabled": true,
+      "project": "vids-tube",
+      "config": "dev_personal"
+    },
+    "vercel": {
+      "enabled": true,
+      "project": "vids-tube",
+      "method": "cli-or-github-deployments"
+    },
+    "sentry": {
+      "enabled": false,
+      "org": "<sentry-org>",
+      "project": "<sentry-project>"
+    },
+    "trigger": {
+      "enabled": false,
+      "project": "<trigger-project-ref>"
+    }
+  }
+}

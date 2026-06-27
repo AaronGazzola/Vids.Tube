@@ -18,8 +18,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   useOverlayContext,
+  useSetGoals,
   useSetScoringEnabled,
   useSetStreamYoutubeVideo,
+  useStartGoals,
   useViewerLeaderboard,
 } from "./page.hooks";
 
@@ -29,19 +31,36 @@ export default function StudioOverlayPage() {
   const { data: context, isPending } = useOverlayContext();
   const setEnabled = useSetScoringEnabled();
   const setYoutube = useSetStreamYoutubeVideo();
+  const setGoals = useSetGoals();
+  const startGoals = useStartGoals();
   const streamId = context?.streamId ?? null;
   const { data: leaderboard } = useViewerLeaderboard(streamId);
 
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [goalInputs, setGoalInputs] = useState<{
+    subs: string;
+    likes: string;
+    viewers: string;
+  } | null>(null);
 
-  const obsUrl =
-    context?.channelSlug && typeof window !== "undefined"
-      ? `${window.location.origin}/overlay/${context.channelSlug}`
-      : "";
+  const goals = goalInputs ?? {
+    subs: String(context?.goals?.subs ?? 1000),
+    likes: String(context?.goals?.likes ?? 500),
+    viewers: String(context?.goals?.viewers ?? 100),
+  };
 
-  const copyUrl = async () => {
-    if (!obsUrl) return;
-    await navigator.clipboard.writeText(obsUrl);
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const obsUrl = context?.channelSlug
+    ? `${origin}/overlay/${context.channelSlug}`
+    : "";
+  const goalsObsUrl = context?.channelSlug
+    ? `${origin}/overlay/${context.channelSlug}/goals`
+    : "";
+
+  const copy = async (url: string) => {
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
     toast.custom(() => (
       <CustomToast
         variant="success"
@@ -155,6 +174,85 @@ export default function StudioOverlayPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Goals (likes / subs / viewers)</CardTitle>
+          <CardDescription>
+            Targets for the goal overlay. Subs and likes count up from the
+            moment you press Start; viewers shows the live count. Needs the
+            YouTube video set above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isPending ? (
+            <Skeleton className="h-10 w-full" />
+          ) : !streamId ? (
+            <p className="text-sm text-muted-foreground">No broadcast yet.</p>
+          ) : !context?.youtubeVideoId ? (
+            <p className="text-sm text-muted-foreground">
+              Set the YouTube video above first.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {(["subs", "likes", "viewers"] as const).map((m) => (
+                  <label key={m} className="flex flex-col gap-1 text-sm">
+                    <span className="capitalize text-muted-foreground">{m}</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={goals[m]}
+                      onChange={(e) =>
+                        setGoalInputs({ ...goals, [m]: e.target.value })
+                      }
+                      aria-label={`${m} goal`}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() =>
+                    setGoals.mutate({
+                      streamId,
+                      targets: {
+                        subs: Number(goals.subs) || 0,
+                        likes: Number(goals.likes) || 0,
+                        viewers: Number(goals.viewers) || 0,
+                      },
+                    })
+                  }
+                  disabled={setGoals.isPending}
+                >
+                  Save targets
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => startGoals.mutate({ streamId })}
+                  disabled={startGoals.isPending}
+                >
+                  {context?.goalsStarted ? "Restart from now" : "Start"}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {context?.goalsStarted ? "Tracking" : "Not started"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={goalsObsUrl} aria-label="Goals overlay URL" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copy(goalsObsUrl)}
+                  aria-label="Copy goals overlay URL"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>OBS Browser Source</CardTitle>
           <CardDescription>
             Add this URL as a Browser Source in OBS over your video. It is
@@ -170,7 +268,7 @@ export default function StudioOverlayPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={copyUrl}
+                onClick={() => copy(obsUrl)}
                 aria-label="Copy overlay URL"
               >
                 <Copy className="h-4 w-4" />

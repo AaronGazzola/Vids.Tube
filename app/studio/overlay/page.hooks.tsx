@@ -6,8 +6,10 @@ import { toast } from "sonner";
 import {
   getOverlayContextAction,
   getViewerLeaderboardAction,
+  setGoalsAction,
   setScoringEnabledAction,
   setStreamYoutubeVideoAction,
+  startGoalsAction,
 } from "./page.actions";
 
 const overlayContextKey = ["overlay-context"] as const;
@@ -75,6 +77,75 @@ export function useSetStreamYoutubeVideo() {
         <CustomToast
           variant="error"
           title="Couldn't save YouTube video"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useSetGoals() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      streamId: string;
+      targets: { subs: number; likes: number; viewers: number };
+    }) => {
+      const res = await setGoalsAction(input.streamId, input.targets);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: overlayContextKey });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Goals saved"
+          message="The goal overlays will use these targets."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't save goals"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useStartGoals() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { streamId: string }) => {
+      const res = await startGoalsAction(input.streamId);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: overlayContextKey });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Goals started"
+          message="Baseline captured — subs/likes now measure from here."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't start goals"
           message={error.message}
         />
       ));

@@ -310,6 +310,50 @@ export type Database = {
           },
         ]
       }
+      stream_goals: {
+        Row: {
+          baseline_likes: number | null
+          baseline_subs: number | null
+          baseline_viewers: number | null
+          likes_goal: number
+          started_at: string | null
+          stream_id: string
+          subs_goal: number
+          updated_at: string
+          viewers_goal: number
+        }
+        Insert: {
+          baseline_likes?: number | null
+          baseline_subs?: number | null
+          baseline_viewers?: number | null
+          likes_goal?: number
+          started_at?: string | null
+          stream_id: string
+          subs_goal?: number
+          updated_at?: string
+          viewers_goal?: number
+        }
+        Update: {
+          baseline_likes?: number | null
+          baseline_subs?: number | null
+          baseline_viewers?: number | null
+          likes_goal?: number
+          started_at?: string | null
+          stream_id?: string
+          subs_goal?: number
+          updated_at?: string
+          viewers_goal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_goals_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: true
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stream_keys: {
         Row: {
           channel_id: string

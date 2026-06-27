@@ -1,0 +1,42 @@
+{
+  "project": "My Project",
+  "mainBranch": "main",
+  "integrations": {
+    "git": {
+      "enabled": true
+    },
+    "openspec": {
+      "enabled": true
+    },
+    "linear": {
+      "enabled": true,
+      "workspace": "<linear-workspace>",
+      "team": "<team-name-or-key>",
+      "project": "<linear-project-name>"
+    },
+    "supabase": {
+      "enabled": true,
+      "projectRef": "<supabase-project-ref>",
+      "method": "mcp"
+    },
+    "doppler": {
+      "enabled": true,
+      "project": "<doppler-project>",
+      "config": "<doppler-config>"
+    },
+    "vercel": {
+      "enabled": false,
+      "project": "<vercel-project>",
+      "method": "cli-or-github-deployments"
+    },
+    "sentry": {
+      "enabled": false,
+      "org": "<sentry-org>",
+      "project": "<sentry-project>"
+    },
+    "trigger": {
+      "enabled": false,
+      "project": "<trigger-project-ref>"
+    }
+  }
+}
