@@ -57,6 +57,9 @@ export default function StudioOverlayPage() {
   const goalsObsUrl = context?.channelSlug
     ? `${origin}/overlay/${context.channelSlug}/goals`
     : "";
+  const competitionObsUrl = context?.channelSlug
+    ? `${origin}/overlay/${context.channelSlug}/competition`
+    : "";
 
   const copy = async (url: string) => {
     if (!url) return;
@@ -253,27 +256,35 @@ export default function StudioOverlayPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>OBS Browser Source</CardTitle>
+          <CardTitle>OBS Browser Sources</CardTitle>
           <CardDescription>
-            Add this URL as a Browser Source in OBS over your video. It is
-            transparent.
+            Add these as transparent Browser Sources in OBS over your video.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center gap-2">
+        <CardContent className="space-y-3">
           {isPending ? (
             <Skeleton className="h-10 w-full" />
           ) : (
-            <>
-              <Input readOnly value={obsUrl} aria-label="Overlay URL" />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => copy(obsUrl)}
-                aria-label="Copy overlay URL"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </>
+            [
+              { label: "Highlights", url: obsUrl },
+              { label: "Goals", url: goalsObsUrl },
+              { label: "Competition", url: competitionObsUrl },
+            ].map(({ label, url }) => (
+              <div key={label} className="space-y-1">
+                <span className="text-sm font-medium">{label}</span>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={url} aria-label={`${label} overlay URL`} />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copy(url)}
+                    aria-label={`Copy ${label} overlay URL`}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
           )}
         </CardContent>
       </Card>
