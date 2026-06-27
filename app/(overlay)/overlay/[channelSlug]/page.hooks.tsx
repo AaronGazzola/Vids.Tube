@@ -2,9 +2,11 @@
 
 import { getAuthorIdentityAction } from "@/app/layout.actions";
 import type {
+  FeaturedAuthor,
   FeaturedMessage,
   FeaturedMessageWithAuthor,
 } from "@/app/layout.types";
+import { vidstubeAuthor, youtubeAuthor } from "@/lib/featured-author";
 import { supabase } from "@/supabase/browser-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -34,13 +36,20 @@ export function useFeaturedMessages(streamId: string | null) {
         },
         (payload) => {
           const row = payload.new as FeaturedMessage;
-          const known = queryClient
-            .getQueryData<FeaturedMessageWithAuthor[]>(["featured", streamId])
-            ?.find((m) => m.user_id === row.user_id && m.author)?.author;
-          const message: FeaturedMessageWithAuthor = {
-            ...row,
-            author: known ?? null,
-          };
+          let author: FeaturedAuthor | null = null;
+          if (row.origin === "youtube") {
+            author = youtubeAuthor(row.author_name, row.author_avatar_url);
+          } else if (row.user_id) {
+            author =
+              queryClient
+                .getQueryData<FeaturedMessageWithAuthor[]>([
+                  "featured",
+                  streamId,
+                ])
+                ?.find((m) => m.user_id === row.user_id && m.author)?.author ??
+              null;
+          }
+          const message: FeaturedMessageWithAuthor = { ...row, author };
 
           queryClient.setQueryData<FeaturedMessageWithAuthor[]>(
             ["featured", streamId],
@@ -48,14 +57,18 @@ export function useFeaturedMessages(streamId: string | null) {
               old.some((m) => m.id === message.id) ? old : [...old, message]
           );
 
-          if (!message.author) {
-            getAuthorIdentityAction(row.user_id).then((author) => {
-              if (!author) return;
+          if (!author && row.origin === "vidstube" && row.user_id) {
+            const userId = row.user_id;
+            getAuthorIdentityAction(userId).then((identity) => {
+              const resolved = vidstubeAuthor(identity);
+              if (!resolved) return;
               queryClient.setQueryData<FeaturedMessageWithAuthor[]>(
                 ["featured", streamId],
                 (old = []) =>
                   old.map((m) =>
-                    m.id === row.id && !m.author ? { ...m, author } : m
+                    m.id === row.id && !m.author
+                      ? { ...m, author: resolved }
+                      : m
                   )
               );
             });

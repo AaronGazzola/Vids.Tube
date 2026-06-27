@@ -28,7 +28,10 @@ export function FeaturedAvatar({
 }) {
   const author = featured.author;
   const handle = author?.handle ?? null;
-  const avatarUrl = channelAssetUrl(author?.avatarPath ?? null);
+  const name = author?.name ?? null;
+  const label = handle ? `@${handle}` : name;
+  const avatarUrl =
+    author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null);
   const rings = Math.max(0, featured.ring_level);
   const ringSpan = rings * RING_GAP_PX;
   const avatarSize = 96;
@@ -67,19 +70,19 @@ export function FeaturedAvatar({
             style={{ width: avatarSize, height: avatarSize }}
           >
             {avatarUrl && (
-              <AvatarImage src={avatarUrl} alt={handle ? `@${handle}` : ""} />
+              <AvatarImage src={avatarUrl} alt={label ?? ""} />
             )}
             <AvatarFallback className="text-2xl">
-              {handle ? getInitials(handle) : "?"}
+              {name ? getInitials(name) : "?"}
             </AvatarFallback>
           </Avatar>
         </div>
-        {handle && (
+        {label && (
           <span
             className="mt-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white shadow-lg"
             style={{ fontFamily: "var(--font-logo)" }}
           >
-            @{handle}
+            {label}
           </span>
         )}
       </div>

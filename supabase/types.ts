@@ -205,37 +205,49 @@ export type Database = {
       }
       featured_messages: {
         Row: {
+          author_avatar_url: string | null
+          author_name: string | null
           categories: string[]
-          chat_message_id: string
+          chat_message_id: string | null
+          external_author_id: string | null
           featured_at: string
           id: string
+          origin: string
           reason: string | null
           ring_level: number
           score: number
           stream_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           categories?: string[]
-          chat_message_id: string
+          chat_message_id?: string | null
+          external_author_id?: string | null
           featured_at?: string
           id?: string
+          origin?: string
           reason?: string | null
           ring_level?: number
           score: number
           stream_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           categories?: string[]
-          chat_message_id?: string
+          chat_message_id?: string | null
+          external_author_id?: string | null
           featured_at?: string
           id?: string
+          origin?: string
           reason?: string | null
           ring_level?: number
           score?: number
           stream_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -257,30 +269,36 @@ export type Database = {
       score_events: {
         Row: {
           created_at: string
+          external_author_id: string | null
           id: string
           metadata: Json
+          origin: string
           points: number
           stream_id: string
           type: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
+          external_author_id?: string | null
           id?: string
           metadata?: Json
+          origin?: string
           points?: number
           stream_id: string
           type: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
+          external_author_id?: string | null
           id?: string
           metadata?: Json
+          origin?: string
           points?: number
           stream_id?: string
           type?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -483,25 +501,40 @@ export type Database = {
       }
       viewer_scores: {
         Row: {
+          author_avatar_url: string | null
+          author_name: string | null
+          external_author_id: string | null
           features_count: number
           last_featured_at: string | null
+          origin: string
+          participant_key: string
           stream_id: string
           total_score: number
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          author_avatar_url?: string | null
+          author_name?: string | null
+          external_author_id?: string | null
           features_count?: number
           last_featured_at?: string | null
+          origin?: string
+          participant_key?: string
           stream_id: string
           total_score?: number
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          author_avatar_url?: string | null
+          author_name?: string | null
+          external_author_id?: string | null
           features_count?: number
           last_featured_at?: string | null
+          origin?: string
+          participant_key?: string
           stream_id?: string
           total_score?: number
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

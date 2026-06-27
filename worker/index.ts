@@ -1,4 +1,5 @@
 import { workerConfig } from "./config";
+import { runScoringJob } from "./jobs/score";
 import { runTranscriptionJob } from "./jobs/transcribe";
 import {
   releaseLock,
@@ -20,12 +21,12 @@ async function tick(): Promise<void> {
     return;
   }
 
-  console.error(`transcribing stream ${stream.id}`);
+  console.error(`engaging stream ${stream.id} (transcribe + score)`);
   try {
-    await runTranscriptionJob(stream);
+    await Promise.all([runTranscriptionJob(stream), runScoringJob(stream)]);
   } finally {
     await releaseLock(stream.id);
-    console.error(`stopped transcribing stream ${stream.id}`);
+    console.error(`stopped engaging stream ${stream.id}`);
   }
 }
 

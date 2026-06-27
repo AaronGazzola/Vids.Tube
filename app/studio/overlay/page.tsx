@@ -1,8 +1,8 @@
 "use client";
 
 import { useRequireOwner } from "@/app/layout.hooks";
-import { AuthorChip } from "@/components/author-chip";
 import { CustomToast } from "@/components/CustomToast";
+import { FeaturedAuthorChip } from "@/components/featured-author-chip";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -200,14 +200,14 @@ export default function StudioOverlayPage() {
             <ol className="space-y-2">
               {leaderboard.map((viewer, i) => (
                 <li
-                  key={viewer.user_id}
+                  key={viewer.participant_key}
                   className="flex items-center justify-between gap-3"
                 >
                   <span className="flex items-center gap-2">
                     <span className="w-5 text-right text-sm text-muted-foreground">
                       {i + 1}
                     </span>
-                    <AuthorChip author={viewer.author} size="comment" />
+                    <FeaturedAuthorChip author={viewer.author} />
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {viewer.features_count}{" "}

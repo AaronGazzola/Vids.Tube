@@ -5,6 +5,7 @@ import type {
   ViewerScoreWithAuthor,
 } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import { authorFromRow } from "@/lib/featured-author";
 import { fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
@@ -226,13 +227,17 @@ export async function getViewerLeaderboardAction(
     throw new Error("Failed to load leaderboard");
   }
 
-  const authorByUser = await resolveAuthorIdentities(
-    supabase,
-    data.map((v) => v.user_id)
-  );
+  const userIds = data
+    .map((v) => v.user_id)
+    .filter((id): id is string => !!id);
+  const authorByUser = await resolveAuthorIdentities(supabase, userIds);
 
   return data.map((v) => ({
     ...v,
-    author: authorByUser.get(v.user_id) ?? null,
+    author: authorFromRow(
+      v.origin,
+      v,
+      v.user_id ? authorByUser.get(v.user_id) ?? null : null
+    ),
   }));
 }

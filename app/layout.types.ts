@@ -74,12 +74,19 @@ export type YouTubeChatPage = {
   pollingIntervalMillis: number;
 };
 
+export type FeaturedAuthor = {
+  name: string;
+  handle: string | null;
+  avatarUrl: string | null;
+  avatarPath: string | null;
+};
+
 export type FeaturedMessageWithAuthor = FeaturedMessage & {
-  author: AuthorIdentity;
+  author: FeaturedAuthor | null;
 };
 
 export type ViewerScoreWithAuthor = ViewerScore & {
-  author: AuthorIdentity;
+  author: FeaturedAuthor | null;
 };
 
 export type CreateChannelInput = {
