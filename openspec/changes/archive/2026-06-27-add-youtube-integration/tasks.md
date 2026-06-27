@@ -28,6 +28,6 @@
 ## 5. Verification
 
 - [x] 5.1 `npx tsc --noEmit`, `npx eslint`, and `npm run build` all pass for the new files
-- [x] 5.2 `scripts/verify-youtube.ts` (`doppler run -- tsx`) verified BOTH halves with only the API key: metrics against a public video (real likes/subs/viewers), and chat against a found public live broadcast (`activeLiveChatId` resolved, a page of real messages + `pollingIntervalMillis` returned)
-- [ ] 5.3 (deferred — owner browser session) In `/studio/overlay`, set/clear a YouTube video URL on a live stream and confirm persistence; the owner guard is the proven `getOwnedChannel` pattern. **Config note:** the key is in the `dev_personal` Doppler config but the app/worker run under the active `prd` config — add `YOUTUBE_API_KEY` to `prd` (and Vercel for production) or run with `--config dev_personal`, or the studio action + worker won't see the key.
-- [ ] 5.4 (deferred — needs the owner's own live simulcast) End-to-end: the owner's live broadcast resolves `activeLiveChatId` and the poller yields its real chat (the underlying `fetchLiveChatPage` is already proven against a live broadcast in 5.2)
+- [x] 5.2 `scripts/verify-youtube.ts` (`doppler run -- tsx`) verified BOTH halves with only the API key: metrics against a public video (real likes/subs/viewers), and chat against a found public live broadcast (`activeLiveChatId` resolved, a page of real messages + avatars + `pollingIntervalMillis` returned)
+
+Owner-run verification (studio set/clear in-browser + own live simulcast, plus the `prd` vs `dev_personal` Doppler config note) is tracked in **AZ-126** — out of this change per governance (not buildable here).
