@@ -41,6 +41,7 @@ async function main() {
     console.log(`  messages: ${page.messages.length}`);
     for (const m of page.messages.slice(0, 5)) {
       console.log(`  [${m.author}] ${m.text}`);
+      console.log(`     avatar: ${m.avatarUrl}`);
     }
   } else {
     console.log(

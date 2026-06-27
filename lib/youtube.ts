@@ -102,10 +102,15 @@ export async function fetchLiveChatPage(
   const messages = (data.items ?? []).map(
     (it: {
       snippet?: { displayMessage?: string; publishedAt?: string };
-      authorDetails?: { displayName?: string; channelId?: string };
+      authorDetails?: {
+        displayName?: string;
+        channelId?: string;
+        profileImageUrl?: string;
+      };
     }) => ({
       author: it.authorDetails?.displayName ?? "",
       authorChannelId: it.authorDetails?.channelId ?? "",
+      avatarUrl: it.authorDetails?.profileImageUrl ?? "",
       text: it.snippet?.displayMessage ?? "",
       publishedAt: it.snippet?.publishedAt ?? "",
     })

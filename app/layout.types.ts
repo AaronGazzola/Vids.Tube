@@ -63,6 +63,7 @@ export type YouTubeVideoData = {
 export type YouTubeChatMessage = {
   author: string;
   authorChannelId: string;
+  avatarUrl: string;
   text: string;
   publishedAt: string;
 };
