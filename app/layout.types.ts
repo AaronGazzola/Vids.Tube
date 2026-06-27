@@ -51,6 +51,28 @@ export type ChatScoringState =
 export type TranscriptSegment =
   Database["public"]["Tables"]["transcript_segments"]["Row"];
 
+export type YouTubeVideoData = {
+  likeCount: number;
+  concurrentViewers: number;
+  channelId: string;
+  activeLiveChatId: string | null;
+  liveBroadcastContent: string;
+  title: string;
+};
+
+export type YouTubeChatMessage = {
+  author: string;
+  authorChannelId: string;
+  text: string;
+  publishedAt: string;
+};
+
+export type YouTubeChatPage = {
+  messages: YouTubeChatMessage[];
+  nextPageToken: string | null;
+  pollingIntervalMillis: number;
+};
+
 export type FeaturedMessageWithAuthor = FeaturedMessage & {
   author: AuthorIdentity;
 };

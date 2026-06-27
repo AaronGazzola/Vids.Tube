@@ -333,6 +333,8 @@ export type Database = {
           status: string
           thumbnail_path: string | null
           title: string | null
+          youtube_channel_id: string | null
+          youtube_video_id: string | null
         }
         Insert: {
           channel_id: string
@@ -348,6 +350,8 @@ export type Database = {
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          youtube_channel_id?: string | null
+          youtube_video_id?: string | null
         }
         Update: {
           channel_id?: string
@@ -363,6 +367,8 @@ export type Database = {
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          youtube_channel_id?: string | null
+          youtube_video_id?: string | null
         }
         Relationships: [
           {

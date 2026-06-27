@@ -14,10 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Copy } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   useOverlayContext,
   useSetScoringEnabled,
+  useSetStreamYoutubeVideo,
   useViewerLeaderboard,
 } from "./page.hooks";
 
@@ -26,8 +28,11 @@ export default function StudioOverlayPage() {
 
   const { data: context, isPending } = useOverlayContext();
   const setEnabled = useSetScoringEnabled();
+  const setYoutube = useSetStreamYoutubeVideo();
   const streamId = context?.streamId ?? null;
   const { data: leaderboard } = useViewerLeaderboard(streamId);
+
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   const obsUrl =
     context?.channelSlug && typeof window !== "undefined"
@@ -49,6 +54,67 @@ export default function StudioOverlayPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Chat overlay</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>YouTube broadcast</CardTitle>
+          <CardDescription>
+            Point this stream at the YouTube video you&apos;re simulcasting. The
+            scoring bot reads its live chat and the goal overlays read its
+            likes/subs/viewers. The broadcast must be public.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {isPending ? (
+            <Skeleton className="h-10 w-full" />
+          ) : !streamId ? (
+            <p className="text-sm text-muted-foreground">
+              No broadcast yet — start your encoder first.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder={
+                    context?.youtubeVideoId
+                      ? `Current: ${context.youtubeVideoId}`
+                      : "YouTube video URL or id"
+                  }
+                  aria-label="YouTube video URL"
+                />
+                <Button
+                  onClick={() =>
+                    setYoutube.mutate({ streamId, urlOrId: youtubeUrl })
+                  }
+                  disabled={setYoutube.isPending || !youtubeUrl.trim()}
+                >
+                  Save
+                </Button>
+                {context?.youtubeVideoId && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setYoutubeUrl("");
+                      setYoutube.mutate({ streamId, urlOrId: "" });
+                    }}
+                    disabled={setYoutube.isPending}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {context?.youtubeVideoId && (
+                <p className="text-sm text-muted-foreground">
+                  Linked to YouTube video{" "}
+                  <span className="font-mono">{context.youtubeVideoId}</span>
+                </p>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

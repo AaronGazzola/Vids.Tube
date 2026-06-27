@@ -7,6 +7,7 @@ import {
   getOverlayContextAction,
   getViewerLeaderboardAction,
   setScoringEnabledAction,
+  setStreamYoutubeVideoAction,
 } from "./page.actions";
 
 const overlayContextKey = ["overlay-context"] as const;
@@ -38,6 +39,42 @@ export function useSetScoringEnabled() {
         <CustomToast
           variant="error"
           title="Couldn't update featuring"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useSetStreamYoutubeVideo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { streamId: string; urlOrId: string }) => {
+      const res = await setStreamYoutubeVideoAction(
+        input.streamId,
+        input.urlOrId
+      );
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: overlayContextKey });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="YouTube video saved"
+          message="The bot and goal overlays will use this broadcast."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't save YouTube video"
           message={error.message}
         />
       ));

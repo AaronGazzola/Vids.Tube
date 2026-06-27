@@ -5,6 +5,7 @@ import type {
   ViewerScoreWithAuthor,
 } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import { fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
 
@@ -47,6 +48,7 @@ export type OverlayContext = {
   streamId: string | null;
   streamStatus: string | null;
   enabled: boolean;
+  youtubeVideoId: string | null;
 };
 
 export async function getOverlayContextAction(): Promise<OverlayContext> {
@@ -58,7 +60,7 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
 
   const { data: stream, error } = await supabaseAdmin
     .from("streams")
-    .select("id, status")
+    .select("id, status, youtube_video_id")
     .eq("channel_id", channel.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -89,7 +91,78 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
     streamId: stream?.id ?? null,
     streamStatus: stream?.status ?? null,
     enabled,
+    youtubeVideoId: stream?.youtube_video_id ?? null,
   };
+}
+
+export async function setStreamYoutubeVideoAction(
+  streamId: string,
+  urlOrId: string
+): Promise<ActionResult<{ youtubeVideoId: string | null }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  const { data: stream, error } = await supabaseAdmin
+    .from("streams")
+    .select("id, channel_id")
+    .eq("id", streamId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load broadcast");
+  }
+  if (!stream || stream.channel_id !== channel.id) {
+    return { error: "That broadcast is not on your channel." };
+  }
+
+  const trimmed = urlOrId.trim();
+  if (!trimmed) {
+    const { error: clearError } = await supabaseAdmin
+      .from("streams")
+      .update({ youtube_video_id: null, youtube_channel_id: null })
+      .eq("id", streamId);
+    if (clearError) {
+      console.error(clearError);
+      throw new Error("Failed to clear YouTube video");
+    }
+    return { data: { youtubeVideoId: null } };
+  }
+
+  const videoId = parseVideoId(trimmed);
+  if (!videoId) {
+    return { error: "Couldn't read a YouTube video id from that URL." };
+  }
+
+  let channelId = "";
+  try {
+    const video = await fetchVideoData(videoId);
+    channelId = video.channelId;
+  } catch (e) {
+    console.error(e);
+    return {
+      error:
+        "Couldn't fetch that YouTube video — check the URL and that it's public.",
+    };
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from("streams")
+    .update({
+      youtube_video_id: videoId,
+      youtube_channel_id: channelId || null,
+    })
+    .eq("id", streamId);
+
+  if (updateError) {
+    console.error(updateError);
+    throw new Error("Failed to save YouTube video");
+  }
+
+  return { data: { youtubeVideoId: videoId } };
 }
 
 export async function setScoringEnabledAction(
