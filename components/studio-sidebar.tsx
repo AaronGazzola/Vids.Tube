@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   CalendarClock,
   LayoutDashboard,
+  MonitorPlay,
   Radio,
   Settings,
   Sparkles,
@@ -16,6 +17,7 @@ const items = [
   { href: "/studio/live", label: "Go Live", icon: Radio },
   { href: "/studio/broadcasts", label: "Broadcasts", icon: CalendarClock },
   { href: "/studio/overlay", label: "Chat Overlay", icon: Sparkles },
+  { href: "/studio/demo", label: "Overlay Demo", icon: MonitorPlay },
   { href: "/studio/settings", label: "Settings", icon: Settings },
 ];
 

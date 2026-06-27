@@ -29,7 +29,8 @@ export default function OverlayPage({
   return (
     <FeaturedAvatar
       key={current.id}
-      featured={current}
+      author={current.author}
+      ringLevel={current.ring_level}
       onDone={() =>
         setDoneIds((prev) => {
           const next = new Set(prev);

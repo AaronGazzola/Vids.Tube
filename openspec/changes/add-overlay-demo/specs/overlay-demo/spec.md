@@ -19,22 +19,29 @@ the worker or YouTube.
 - **WHEN** a non-owner visits `/studio/demo`
 - **THEN** the studio owner guard redirects them away
 
-### Requirement: Reposition and resize each overlay surface
+### Requirement: Reposition and resize the fixed overlay surfaces
 
-The system SHALL let the owner drag and resize each of the three overlay surfaces
-(Highlights, Goals, Competition) independently over the video, via a reusable
+The system SHALL let the owner drag and resize the fixed-widget overlay surfaces
+(Goals and Competition) independently over the video, via a reusable
 draggable/resizable wrapper, so they can dial in the layout they will recreate as OBS
-Browser Sources. A reset-layout control SHALL restore default positions.
+Browser Sources. The Highlights surface SHALL play as a full-stage travelling
+animation (as it does live, using viewport units) rather than a repositionable box. A
+reset-layout control SHALL restore default positions.
 
-#### Scenario: Owner repositions and scales a surface
+#### Scenario: Owner repositions and scales a fixed surface
 
-- **WHEN** the owner drags a surface and drags its resize handle
-- **THEN** that surface moves and scales independently of the others
+- **WHEN** the owner drags the Goals or Competition surface and drags its resize handle
+- **THEN** that surface moves and scales independently of the other
+
+#### Scenario: Highlights travel across the stage
+
+- **WHEN** a highlight is featured in the demo
+- **THEN** the avatar travels across the full stage over the video, as it does live
 
 #### Scenario: Reset layout
 
 - **WHEN** the owner clicks reset layout
-- **THEN** the surfaces return to their default positions and scales
+- **THEN** the fixed surfaces return to their default positions and scales
 
 ### Requirement: Simulate overlay events with the real components and math
 

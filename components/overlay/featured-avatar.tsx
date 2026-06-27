@@ -1,6 +1,6 @@
 "use client";
 
-import type { FeaturedMessageWithAuthor } from "@/app/layout.types";
+import type { FeaturedAuthor } from "@/app/layout.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { channelAssetUrl } from "@/lib/storage";
 
@@ -20,19 +20,20 @@ function getInitials(handle: string): string {
 }
 
 export function FeaturedAvatar({
-  featured,
+  author,
+  ringLevel,
   onDone,
 }: {
-  featured: FeaturedMessageWithAuthor;
+  author: FeaturedAuthor | null;
+  ringLevel: number;
   onDone: () => void;
 }) {
-  const author = featured.author;
   const handle = author?.handle ?? null;
   const name = author?.name ?? null;
   const label = handle ? `@${handle}` : name;
   const avatarUrl =
     author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null);
-  const rings = Math.max(0, featured.ring_level);
+  const rings = Math.max(0, ringLevel);
   const ringSpan = rings * RING_GAP_PX;
   const avatarSize = 96;
   const boxSize = avatarSize + ringSpan * 2;
