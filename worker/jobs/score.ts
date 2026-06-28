@@ -2,6 +2,7 @@ import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { runClaude } from "../lib/claude";
 import {
   buildScoringPrompt,
+  type ModerationFlag,
   parseScoreResult,
   pointsFor,
   type ScoreResult,
@@ -55,6 +56,7 @@ async function fetchNewVidstube(
     .from("chat_messages")
     .select("id, user_id, body, created_at")
     .eq("stream_id", streamId)
+    .is("hidden_at", null)
     .gt("created_at", sinceIso)
     .order("created_at", { ascending: true })
     .limit(200);
@@ -212,15 +214,101 @@ export async function applyScoreResult(
   }
 }
 
+async function fetchBannedKeys(channelId: string): Promise<Set<string>> {
+  const { data } = await supabaseAdmin
+    .from("banned_participants")
+    .select("participant_key")
+    .eq("channel_id", channelId);
+  return new Set((data ?? []).map((r) => r.participant_key));
+}
+
+async function fetchModerationMode(streamId: string): Promise<"manual" | "auto"> {
+  const { data } = await supabaseAdmin
+    .from("chat_scoring_state")
+    .select("moderation_mode")
+    .eq("stream_id", streamId)
+    .maybeSingle();
+  return data?.moderation_mode === "auto" ? "auto" : "manual";
+}
+
+async function applyModeration(
+  streamId: string,
+  channelId: string | null,
+  batch: BufferedMessage[],
+  flags: ModerationFlag[],
+  mode: "manual" | "auto"
+): Promise<void> {
+  if (!flags.length) return;
+  const byRef = new Map(batch.map((m) => [m.ref, m]));
+  const nowIso = new Date().toISOString();
+
+  for (const f of flags) {
+    const m = byRef.get(f.ref);
+    if (!m) continue;
+    const pkey = participantKey(m);
+
+    if (mode === "auto") {
+      if (f.action === "hide" && m.chatMessageId) {
+        await supabaseAdmin
+          .from("chat_messages")
+          .update({ hidden_at: nowIso, hidden_by: "ai" })
+          .eq("id", m.chatMessageId);
+        await supabaseAdmin
+          .from("featured_messages")
+          .delete()
+          .eq("chat_message_id", m.chatMessageId);
+      }
+      if (f.action === "ban" && channelId) {
+        await supabaseAdmin.from("banned_participants").upsert(
+          {
+            channel_id: channelId,
+            participant_key: pkey,
+            origin: m.origin,
+            user_id: m.userId,
+            external_author_id: m.externalAuthorId,
+            author_name: m.authorName,
+            reason: f.reason,
+            banned_by: "ai",
+          },
+          { onConflict: "channel_id,participant_key" }
+        );
+        if (m.chatMessageId) {
+          await supabaseAdmin
+            .from("chat_messages")
+            .update({ hidden_at: nowIso, hidden_by: "ai" })
+            .eq("id", m.chatMessageId);
+        }
+      }
+    }
+
+    await supabaseAdmin.from("moderation_actions").insert({
+      stream_id: streamId,
+      target_kind: f.action === "ban" ? "participant" : "message",
+      action: f.action,
+      chat_message_id: m.chatMessageId,
+      participant_key: pkey,
+      origin: m.origin,
+      user_id: m.userId,
+      external_author_id: m.externalAuthorId,
+      author_name: m.authorName,
+      reason: f.reason,
+      source: "ai",
+      status: mode === "auto" ? "applied" : "suggested",
+      decided_at: mode === "auto" ? nowIso : null,
+    });
+  }
+}
+
 export async function runScoringJob(stream: EligibleStream): Promise<void> {
   let vidstubeCursor = new Date().toISOString();
 
   const { data: streamRow } = await supabaseAdmin
     .from("streams")
-    .select("youtube_video_id")
+    .select("youtube_video_id, channel_id")
     .eq("id", stream.id)
     .maybeSingle();
   const youtubeVideoId = streamRow?.youtube_video_id ?? null;
+  const channelId = streamRow?.channel_id ?? null;
 
   const ytBuffer: BufferedMessage[] = [];
   let stopped = false;
@@ -262,7 +350,12 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         vidstubeCursor = vid[vid.length - 1].createdAt;
       }
       const yt = ytBuffer.splice(0, ytBuffer.length);
-      const batch = [...vid, ...yt];
+      const bannedKeys = channelId
+        ? await fetchBannedKeys(channelId)
+        : new Set<string>();
+      const batch = [...vid, ...yt].filter(
+        (m) => !bannedKeys.has(participantKey(m))
+      );
 
       if (batch.length) {
         const transcript = await fetchTranscriptWindow(stream.id);
@@ -277,7 +370,16 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
           console.error("claude scoring failed:", e);
         }
         if (raw) {
-          await applyScoreResult(stream.id, batch, parseScoreResult(raw));
+          const result = parseScoreResult(raw);
+          await applyScoreResult(stream.id, batch, result);
+          const mode = await fetchModerationMode(stream.id);
+          await applyModeration(
+            stream.id,
+            channelId,
+            batch,
+            result.moderation,
+            mode
+          );
           await supabaseAdmin
             .from("chat_scoring_state")
             .update({ last_scored_at: new Date().toISOString() })

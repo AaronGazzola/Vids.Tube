@@ -30,9 +30,18 @@ export type AuthorScoreDelta = {
   contribution: number;
 };
 
+export type ModerationAction = "hide" | "ban";
+
+export type ModerationFlag = {
+  ref: string;
+  action: ModerationAction;
+  reason: string;
+};
+
 export type ScoreResult = {
   featured: FeaturedPick[];
   scores: AuthorScoreDelta[];
+  moderation: ModerationFlag[];
 };
 
 const RUBRIC = `You score live-stream chat participation. You are given the recent stream
@@ -49,7 +58,14 @@ For each message, rate three dimensions 0-100:
 Then choose the few best messages to FEATURE on the overlay (only genuinely good ones;
 feature none if nothing stands out). A featured message gets an overall score 0-100, a
 short reason, and 1-3 category tags from: engagement, humour, contribution, insight,
-hype, question.`;
+hype, question.
+
+Finally, FLAG any message that clearly breaks chat rules — spam/flooding, slurs, hate,
+harassment, threats, or explicit sexual abuse. Be conservative: flag ONLY clear abuse,
+never borderline, merely negative, critical, or off-topic messages. For each flag give an
+action ("hide" to remove the message, or "ban" for repeat/severe abuse where the author
+should be removed) and a short reason. Most batches have NO flags — return an empty list
+when nothing clearly breaks the rules.`;
 
 export function buildScoringPrompt(input: ScoringInput): string {
   const messageLines = input.messages
@@ -67,10 +83,11 @@ ${messageLines || "(none)"}
 ## Output
 Return ONLY a JSON object, no prose, of this exact shape:
 {
-  "featured": [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>" } ],
-  "scores":   [ { "ref": "<ref>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ]
+  "featured":   [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>" } ],
+  "scores":     [ { "ref": "<ref>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ],
+  "moderation": [ { "ref": "<ref>", "action": "hide"|"ban", "reason": "<short>" } ]
 }
-Use the exact id shown in [brackets] for each message as its "ref". Include every message in "scores". Keep "featured" small.`;
+Use the exact id shown in [brackets] for each message as its "ref". Include every message in "scores". Keep "featured" small and "moderation" usually empty.`;
 }
 
 function normalizeRef(raw: unknown): string {
@@ -95,11 +112,12 @@ export function parseScoreResult(raw: string): ScoreResult {
   try {
     parsed = extractJson(raw);
   } catch {
-    return { featured: [], scores: [] };
+    return { featured: [], scores: [], moderation: [] };
   }
   const obj = parsed as {
     featured?: unknown[];
     scores?: unknown[];
+    moderation?: unknown[];
   };
 
   const featured: FeaturedPick[] = Array.isArray(obj.featured)
@@ -128,7 +146,22 @@ export function parseScoreResult(raw: string): ScoreResult {
         }))
     : [];
 
-  return { featured, scores };
+  const moderation: ModerationFlag[] = Array.isArray(obj.moderation)
+    ? obj.moderation
+        .map((m) => m as Record<string, unknown>)
+        .filter(
+          (m) =>
+            typeof m.ref === "string" &&
+            (m.action === "hide" || m.action === "ban")
+        )
+        .map((m) => ({
+          ref: normalizeRef(m.ref),
+          action: m.action as ModerationAction,
+          reason: typeof m.reason === "string" ? m.reason : "",
+        }))
+    : [];
+
+  return { featured, scores, moderation };
 }
 
 export function pointsFor(delta: AuthorScoreDelta, origin: ScoringOrigin): number {

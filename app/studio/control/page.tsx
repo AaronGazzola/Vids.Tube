@@ -1,7 +1,6 @@
 "use client";
 
-import { useRequireOwner } from "@/app/layout.hooks";
-import { useLiveChat } from "@/app/layout.hooks";
+import { useLiveChat, useRequireOwner } from "@/app/layout.hooks";
 import {
   useOverlayContext,
   useViewerLeaderboard,
@@ -12,7 +11,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { type ReactNode, useState } from "react";
-import { useReadThisQueue } from "./page.hooks";
+import {
+  useApproveSuggestion,
+  useBanParticipant,
+  useDismissSuggestion,
+  useHideMessage,
+  useModerationFeed,
+  useReadThisQueue,
+  useSetModerationMode,
+  useUnbanParticipant,
+  useUnhideMessage,
+} from "./page.hooks";
 
 function initials(s: string): string {
   return s.replace(/^@/, "").slice(0, 2).toUpperCase() || "?";
@@ -40,8 +49,6 @@ function Panel({
   );
 }
 
-const MOD_SOON = "Moderation ships in AZ-135";
-
 export default function ControlRoomPage() {
   const { isPending: ownerPending, isOwner } = useRequireOwner();
   const { data: ctx, isPending: ctxPending } = useOverlayContext();
@@ -53,12 +60,24 @@ export default function ControlRoomPage() {
   const { data: readThis, isPending: readPending } = useReadThisQueue(streamId);
   const { data: leaderboard, isPending: lbPending } =
     useViewerLeaderboard(streamId);
+  const { data: feed } = useModerationFeed(streamId);
+
+  const setMode = useSetModerationMode(streamId);
+  const hide = useHideMessage(streamId);
+  const unhide = useUnhideMessage(streamId);
+  const ban = useBanParticipant(streamId);
+  const unban = useUnbanParticipant(streamId);
+  const approve = useApproveSuggestion(streamId);
+  const dismiss = useDismissSuggestion(streamId);
 
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   if (ownerPending || !isOwner) {
     return <Skeleton className="h-screen w-full" />;
   }
+
+  const mode = feed?.mode ?? "manual";
+  const actions = feed?.actions ?? [];
 
   const queue = (readThis ?? [])
     .filter((m) => !dismissed.has(m.id))
@@ -83,6 +102,28 @@ export default function ControlRoomPage() {
         <span className="ml-auto text-xs text-white/40">
           scoring {ctx?.enabled ? "on" : "off"}
         </span>
+        {streamId && (
+          <div className="flex items-center gap-1 rounded-md border border-white/15 p-0.5 text-xs">
+            <span className="px-1 text-white/40">modbot</span>
+            {(["manual", "auto"] as const).map((m) => (
+              <button
+                key={m}
+                disabled={setMode.isPending}
+                onClick={() => setMode.mutate(m)}
+                className={cn(
+                  "rounded px-2 py-0.5 font-medium capitalize",
+                  mode === m
+                    ? m === "auto"
+                      ? "bg-red-600 text-white"
+                      : "bg-white/20 text-white"
+                    : "text-white/50 hover:text-white"
+                )}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {!streamId && !ctxPending ? (
@@ -90,7 +131,7 @@ export default function ControlRoomPage() {
           No broadcast yet — go live, then this fills with chat and AI picks.
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1.1fr_1fr_0.8fr]">
+        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_1fr_0.9fr]">
           <Panel title="Read this (AI picks)">
             {readPending && streamId ? (
               <Skeleton className="h-16 w-full" />
@@ -190,8 +231,8 @@ export default function ControlRoomPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled
-                        title={MOD_SOON}
+                        disabled={hide.isPending}
+                        onClick={() => hide.mutate(m.id)}
                         className="h-5 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
                       >
                         Hide
@@ -203,53 +244,155 @@ export default function ControlRoomPage() {
             )}
           </Panel>
 
-          <Panel title="Leaderboard">
-            {lbPending && streamId ? (
-              <Skeleton className="h-16 w-full" />
-            ) : !leaderboard?.length ? (
-              <p className="px-1 py-2 text-xs text-white/40">No scores yet.</p>
-            ) : (
-              <ul className="space-y-1">
-                {leaderboard.map((v, i) => {
-                  const url =
-                    v.author?.avatarUrl ??
-                    channelAssetUrl(v.author?.avatarPath ?? null);
-                  const label = v.author?.handle
-                    ? `@${v.author.handle}`
-                    : v.author?.name ?? "viewer";
-                  return (
-                    <li
-                      key={v.participant_key}
-                      className="group flex items-center gap-2 rounded px-1 py-1 hover:bg-white/5"
-                    >
-                      <span className="w-4 text-xs text-white/40">{i + 1}</span>
-                      <Avatar className="h-5 w-5 shrink-0">
-                        {url && <AvatarImage src={url} alt={label} />}
-                        <AvatarFallback className="text-[9px]">
-                          {initials(label)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="min-w-0 flex-1 truncate text-xs">
-                        {label}
-                      </span>
-                      <span className="text-xs font-bold tabular-nums">
-                        {v.total_score}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled
-                        title={MOD_SOON}
-                        className="h-5 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
+          <div className="grid min-h-0 grid-rows-2 gap-3">
+            <Panel title="Leaderboard">
+              {lbPending && streamId ? (
+                <Skeleton className="h-16 w-full" />
+              ) : !leaderboard?.length ? (
+                <p className="px-1 py-2 text-xs text-white/40">No scores yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {leaderboard.map((v, i) => {
+                    const url =
+                      v.author?.avatarUrl ??
+                      channelAssetUrl(v.author?.avatarPath ?? null);
+                    const label = v.author?.handle
+                      ? `@${v.author.handle}`
+                      : v.author?.name ?? "viewer";
+                    return (
+                      <li
+                        key={v.participant_key}
+                        className="group flex items-center gap-2 rounded px-1 py-1 hover:bg-white/5"
                       >
-                        Ban
-                      </Button>
+                        <span className="w-4 text-xs text-white/40">
+                          {i + 1}
+                        </span>
+                        <Avatar className="h-5 w-5 shrink-0">
+                          {url && <AvatarImage src={url} alt={label} />}
+                          <AvatarFallback className="text-[9px]">
+                            {initials(label)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0 flex-1 truncate text-xs">
+                          {label}
+                        </span>
+                        <span className="text-xs font-bold tabular-nums">
+                          {v.total_score}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={ban.isPending}
+                          onClick={() =>
+                            ban.mutate({
+                              participantKey: v.participant_key,
+                              origin: v.origin,
+                              userId: v.user_id,
+                              externalAuthorId: v.external_author_id,
+                              authorName: v.author_name,
+                            })
+                          }
+                          className="h-5 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
+                        >
+                          Ban
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel
+              title="Moderation"
+              right={
+                <span className="text-[10px] text-white/40">
+                  {mode === "auto" ? "auto-applying" : "suggestions"}
+                </span>
+              }
+            >
+              {actions.length === 0 ? (
+                <p className="px-1 py-2 text-xs text-white/40">
+                  {mode === "auto"
+                    ? "The modbot will act here and log it."
+                    : "The modbot will suggest actions here."}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {actions.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex items-center gap-2 rounded border border-white/10 px-2 py-1 text-xs"
+                    >
+                      <span
+                        className={cn(
+                          "rounded px-1 font-semibold uppercase",
+                          a.action === "ban"
+                            ? "bg-red-600/30 text-red-200"
+                            : "bg-amber-500/20 text-amber-200"
+                        )}
+                      >
+                        {a.action}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-white/70">
+                        {a.author_name ?? a.participant_key ?? "message"}
+                        {a.reason ? ` — ${a.reason}` : ""}
+                      </span>
+                      {a.status === "suggested" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={approve.isPending}
+                            onClick={() => approve.mutate(a.id)}
+                            className="h-5 px-1.5 text-[10px]"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={dismiss.isPending}
+                            onClick={() => dismiss.mutate(a.id)}
+                            className="h-5 px-1.5 text-[10px]"
+                          >
+                            Dismiss
+                          </Button>
+                        </>
+                      ) : a.status === "applied" &&
+                        a.action === "hide" &&
+                        a.chat_message_id ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={unhide.isPending}
+                          onClick={() => unhide.mutate(a.chat_message_id!)}
+                          className="h-5 px-1.5 text-[10px]"
+                        >
+                          Unhide
+                        </Button>
+                      ) : a.status === "applied" &&
+                        a.action === "ban" &&
+                        a.participant_key ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={unban.isPending}
+                          onClick={() => unban.mutate(a.participant_key!)}
+                          className="h-5 px-1.5 text-[10px]"
+                        >
+                          Unban
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-white/30">
+                          {a.status}
+                        </span>
+                      )}
                     </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Panel>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </div>
         </div>
       )}
     </div>

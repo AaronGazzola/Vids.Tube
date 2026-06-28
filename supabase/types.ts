@@ -39,6 +39,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      banned_participants: {
+        Row: {
+          author_name: string | null
+          banned_by: string
+          channel_id: string
+          created_at: string
+          external_author_id: string | null
+          id: string
+          origin: string
+          participant_key: string
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          banned_by?: string
+          channel_id: string
+          created_at?: string
+          external_author_id?: string | null
+          id?: string
+          origin?: string
+          participant_key: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          banned_by?: string
+          channel_id?: string
+          created_at?: string
+          external_author_id?: string | null
+          id?: string
+          origin?: string
+          participant_key?: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banned_participants_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           avatar_path: string | null
@@ -79,6 +126,8 @@ export type Database = {
         Row: {
           body: string
           created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
           id: string
           stream_id: string
           user_id: string
@@ -86,6 +135,8 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           stream_id: string
           user_id: string
@@ -93,6 +144,8 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           stream_id?: string
           user_id?: string
@@ -112,6 +165,7 @@ export type Database = {
           enabled: boolean
           last_scored_at: string | null
           locked_until: string | null
+          moderation_mode: string
           stream_id: string
           updated_at: string
         }
@@ -119,6 +173,7 @@ export type Database = {
           enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
+          moderation_mode?: string
           stream_id: string
           updated_at?: string
         }
@@ -126,6 +181,7 @@ export type Database = {
           enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
+          moderation_mode?: string
           stream_id?: string
           updated_at?: string
         }
@@ -262,6 +318,75 @@ export type Database = {
           },
           {
             foreignKeyName: "featured_messages_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_actions: {
+        Row: {
+          action: string
+          author_name: string | null
+          chat_message_id: string | null
+          created_at: string
+          decided_at: string | null
+          external_author_id: string | null
+          id: string
+          origin: string | null
+          participant_key: string | null
+          reason: string | null
+          source: string
+          status: string
+          stream_id: string
+          target_kind: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          author_name?: string | null
+          chat_message_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          external_author_id?: string | null
+          id?: string
+          origin?: string | null
+          participant_key?: string | null
+          reason?: string | null
+          source: string
+          status?: string
+          stream_id: string
+          target_kind: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          author_name?: string | null
+          chat_message_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          external_author_id?: string | null
+          id?: string
+          origin?: string | null
+          participant_key?: string | null
+          reason?: string | null
+          source?: string
+          status?: string
+          stream_id?: string
+          target_kind?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_stream_id_fkey"
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
@@ -599,6 +724,7 @@ export type Database = {
     }
     Functions: {
       email_signup_status: { Args: { p_email: string }; Returns: string }
+      is_participant_banned: { Args: { p_user: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
