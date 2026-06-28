@@ -224,16 +224,18 @@ async function main() {
       return;
     }
 
-    const batchRefs = new Set(batch.map((m) => m.ref));
+    const validRefs = new Set([
+      ...batch.map((_, i) => `m${i}`),
+      ...batch.map((_, i) => String(i)),
+    ]);
     const unmatched = result.scores
       .map((s) => s.ref)
-      .filter((r) => !batchRefs.has(r));
+      .filter((r) => !validRefs.has(r));
     if (unmatched.length) {
       log(
         `\nWARN  ${unmatched.length} scored ref(s) did not match the batch — these get dropped:`
       );
       log(`  returned: ${result.scores.map((s) => s.ref).join("  |  ")}`);
-      log(`  expected: ${[...batchRefs].join("  |  ")}`);
     }
 
     await applyScoreResult(streamId, batch, result);

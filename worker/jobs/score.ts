@@ -104,7 +104,11 @@ export async function applyScoreResult(
   batch: BufferedMessage[],
   result: ScoreResult
 ): Promise<void> {
-  const byRef = new Map(batch.map((m) => [m.ref, m]));
+  const byRef = new Map<string, BufferedMessage>();
+  batch.forEach((m, i) => {
+    byRef.set(`m${i}`, m);
+    byRef.set(String(i), m);
+  });
 
   type Participant = {
     sample: BufferedMessage;
@@ -240,7 +244,11 @@ export async function applyModeration(
   mode: "manual" | "auto"
 ): Promise<void> {
   if (!flags.length) return;
-  const byRef = new Map(batch.map((m) => [m.ref, m]));
+  const byRef = new Map<string, BufferedMessage>();
+  batch.forEach((m, i) => {
+    byRef.set(`m${i}`, m);
+    byRef.set(String(i), m);
+  });
   const nowIso = new Date().toISOString();
 
   for (const f of flags) {

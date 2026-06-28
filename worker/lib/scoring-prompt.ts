@@ -69,7 +69,7 @@ when nothing clearly breaks the rules.`;
 
 export function buildScoringPrompt(input: ScoringInput): string {
   const messageLines = input.messages
-    .map((m) => `[${m.ref}] (${m.origin}) ${m.author}: ${m.text}`)
+    .map((m, i) => `[m${i}] (${m.origin}) ${m.author}: ${m.text}`)
     .join("\n");
 
   return `${RUBRIC}
@@ -87,7 +87,7 @@ Return ONLY a JSON object, no prose, of this exact shape:
   "scores":     [ { "ref": "<ref>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ],
   "moderation": [ { "ref": "<ref>", "action": "hide"|"ban", "reason": "<short>" } ]
 }
-Use the exact id shown in [brackets] for each message as its "ref". Include every message in "scores". Keep "featured" small and "moderation" usually empty.`;
+Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "m3"). Include every message in "scores". Keep "featured" small and "moderation" usually empty.`;
 }
 
 function normalizeRef(raw: unknown): string {
