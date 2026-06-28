@@ -145,12 +145,11 @@ export function GoalBar({
 
   if (metric === "subs") {
     return (
-      <div
-        className="inline-flex items-start gap-2 rounded-2xl p-1 text-white"
-        style={{ boxShadow: glow }}
-      >
+      <div className="inline-flex items-start gap-2 rounded-2xl p-1 text-white">
         <div
-          className="relative mt-1 h-1.5 overflow-hidden rounded-full border border-white"
+          className={`relative mt-1 h-1.5 overflow-hidden rounded-full border ${
+            data.reached ? "border-transparent" : "border-white"
+          }`}
           style={{ width: height * 1.6 }}
         >
           <div
@@ -171,16 +170,15 @@ export function GoalBar({
   }
 
   return (
-    <div
-      className="inline-flex flex-col items-center rounded-2xl px-2 py-2 text-center text-white"
-      style={{ boxShadow: glow }}
-    >
+    <div className="inline-flex flex-col items-center rounded-2xl px-2 py-2 text-center text-white">
       <span className="-translate-x-1.5">{icon}</span>
       <span className="mt-0.5 -translate-x-1.5 text-sm font-bold leading-none tabular-nums">
         {fmt(data.current)}
       </span>
       <div
-        className="relative my-2 w-1.5 self-end overflow-hidden rounded-full border border-white"
+        className={`relative my-2 w-1.5 self-end overflow-hidden rounded-full border ${
+          data.reached ? "border-transparent" : "border-white"
+        }`}
         style={{ height: height * 2.25 }}
       >
         <div
