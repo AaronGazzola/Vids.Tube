@@ -32,3 +32,21 @@ export async function getFeaturedMessagesAction(
     author: authorFromRow(m.origin, m, m.user_id ? authorByUser.get(m.user_id) ?? null : null),
   }));
 }
+
+export async function getStreamStandingsAction(
+  streamId: string
+): Promise<{ participant_key: string; total_score: number }[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("viewer_scores")
+    .select("participant_key, total_score")
+    .eq("stream_id", streamId);
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch stream standings");
+  }
+
+  return data;
+}

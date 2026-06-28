@@ -10,7 +10,10 @@ import { vidstubeAuthor, youtubeAuthor } from "@/lib/featured-author";
 import { supabase } from "@/supabase/browser-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { getFeaturedMessagesAction } from "./page.actions";
+import {
+  getFeaturedMessagesAction,
+  getStreamStandingsAction,
+} from "./page.actions";
 
 export function useFeaturedMessages(streamId: string | null) {
   const queryClient = useQueryClient();
@@ -83,4 +86,13 @@ export function useFeaturedMessages(streamId: string | null) {
   }, [streamId, queryClient]);
 
   return query;
+}
+
+export function useStreamStandings(streamId: string | null) {
+  return useQuery({
+    queryKey: ["standings", streamId],
+    queryFn: () => getStreamStandingsAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 10_000,
+  });
 }

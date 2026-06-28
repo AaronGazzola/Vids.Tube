@@ -190,6 +190,7 @@ export async function applyScoreResult(
         external_author_id: f.m.externalAuthorId,
         author_name: f.m.authorName,
         author_avatar_url: f.m.authorAvatarUrl,
+        body: f.m.text,
         score: f.score,
         categories: f.categories,
         reason: f.reason,

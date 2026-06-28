@@ -2,9 +2,10 @@
 
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
-import { FeaturedAvatar } from "@/components/overlay/featured-avatar";
+import { HighlightedMessage } from "@/components/overlay/highlighted-message";
+import { computeStandings } from "@/lib/standings";
 import { use, useState } from "react";
-import { useFeaturedMessages } from "./page.hooks";
+import { useFeaturedMessages, useStreamStandings } from "./page.hooks";
 
 export default function OverlayPage({
   params,
@@ -17,6 +18,7 @@ export default function OverlayPage({
 
   const streamId = stream?.status === "live" ? stream.id : null;
   const { data: featured } = useFeaturedMessages(streamId);
+  const { data: standings } = useStreamStandings(streamId);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
@@ -26,11 +28,20 @@ export default function OverlayPage({
 
   if (!current) return null;
 
+  const standingMap = computeStandings(
+    (standings ?? []).map((s) => ({ id: s.participant_key, score: s.total_score }))
+  );
+  const participantKey =
+    current.user_id ?? `${current.origin}:${current.external_author_id}`;
+  const standing = standingMap.get(participantKey) ?? { rank: 99, progress: 0 };
+
   return (
-    <FeaturedAvatar
+    <HighlightedMessage
       key={current.id}
       author={current.author}
-      ringLevel={current.ring_level}
+      text={current.body ?? ""}
+      rank={standing.rank}
+      progress={standing.progress}
       onDone={() =>
         setDoneIds((prev) => {
           const next = new Set(prev);

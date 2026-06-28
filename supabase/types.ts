@@ -207,6 +207,7 @@ export type Database = {
         Row: {
           author_avatar_url: string | null
           author_name: string | null
+          body: string | null
           categories: string[]
           chat_message_id: string | null
           external_author_id: string | null
@@ -222,6 +223,7 @@ export type Database = {
         Insert: {
           author_avatar_url?: string | null
           author_name?: string | null
+          body?: string | null
           categories?: string[]
           chat_message_id?: string | null
           external_author_id?: string | null
@@ -237,6 +239,7 @@ export type Database = {
         Update: {
           author_avatar_url?: string | null
           author_name?: string | null
+          body?: string | null
           categories?: string[]
           chat_message_id?: string | null
           external_author_id?: string | null
