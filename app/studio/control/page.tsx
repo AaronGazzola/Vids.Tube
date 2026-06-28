@@ -7,6 +7,7 @@ import {
 } from "@/app/studio/overlay/page.hooks";
 import { ChatAuthor } from "@/components/chat-author";
 import { ChatText } from "@/components/chat-text";
+import { OriginBadge } from "@/components/origin-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -381,6 +382,7 @@ export default function ControlRoomPage() {
                         {a.action}
                       </span>
                       <div className="min-w-0 flex-1">
+                        <OriginBadge origin={a.origin} className="mr-1" />
                         <span className="font-semibold text-white/80">
                           {a.sender}
                         </span>
