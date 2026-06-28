@@ -486,10 +486,12 @@ export function useLiveChat(streamId: string | null) {
         },
         (payload) => {
           const row = payload.new as ChatMessageRow;
-          const known = queryClient
-            .getQueryData<ChatMessage[]>(["chat", streamId])
-            ?.find((m) => m.user_id === row.user_id && m.author)?.author;
-          const message: ChatMessage = { ...row, author: known ?? null };
+          const known =
+            row.user_id &&
+            queryClient
+              .getQueryData<ChatMessage[]>(["chat", streamId])
+              ?.find((m) => m.user_id === row.user_id && m.author)?.author;
+          const message: ChatMessage = { ...row, author: known || null };
 
           queryClient.setQueryData<ChatMessage[]>(
             ["chat", streamId],
@@ -497,7 +499,7 @@ export function useLiveChat(streamId: string | null) {
               old.some((m) => m.id === message.id) ? old : [...old, message]
           );
 
-          if (!message.author) {
+          if (!message.author && row.user_id) {
             getAuthorIdentityAction(row.user_id).then((author) => {
               if (!author) {
                 return;

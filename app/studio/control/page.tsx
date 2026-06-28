@@ -5,6 +5,7 @@ import {
   useOverlayContext,
   useViewerLeaderboard,
 } from "@/app/studio/overlay/page.hooks";
+import { ChatAuthor } from "@/components/chat-author";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -206,40 +207,26 @@ export default function ControlRoomPage() {
               <p className="px-1 py-2 text-xs text-white/40">No messages yet.</p>
             ) : (
               <ul className="space-y-1">
-                {chat.map((m) => {
-                  const url = channelAssetUrl(m.author?.avatarPath ?? null);
-                  const label = m.author?.handle
-                    ? `@${m.author.handle}`
-                    : "viewer";
-                  return (
-                    <li
-                      key={m.id}
-                      className="group flex items-start gap-2 rounded px-1 py-1 hover:bg-white/5"
+                {chat.map((m) => (
+                  <li
+                    key={m.id}
+                    className="group flex items-start gap-2 rounded px-1 py-1 hover:bg-white/5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <ChatAuthor message={m} size="chat" className="mr-1" />
+                      <span className="text-sm">{m.body}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={hide.isPending}
+                      onClick={() => hide.mutate(m.id)}
+                      className="h-5 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
                     >
-                      <Avatar className="mt-0.5 h-5 w-5 shrink-0">
-                        {url && <AvatarImage src={url} alt={label} />}
-                        <AvatarFallback className="text-[9px]">
-                          {initials(label)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-white/70">
-                          {label}
-                        </span>{" "}
-                        <span className="text-sm">{m.body}</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={hide.isPending}
-                        onClick={() => hide.mutate(m.id)}
-                        className="h-5 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
-                      >
-                        Hide
-                      </Button>
-                    </li>
-                  );
-                })}
+                      Hide
+                    </Button>
+                  </li>
+                ))}
               </ul>
             )}
           </Panel>

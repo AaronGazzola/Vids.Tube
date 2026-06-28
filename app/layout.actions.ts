@@ -295,12 +295,12 @@ export async function getChatMessagesAction(
 
   const authorByUser = await resolveAuthorIdentities(
     supabase,
-    data.map((m) => m.user_id)
+    data.map((m) => m.user_id).filter((id): id is string => !!id)
   );
 
   return data.map((m) => ({
     ...m,
-    author: authorByUser.get(m.user_id) ?? null,
+    author: m.user_id ? authorByUser.get(m.user_id) ?? null : null,
   }));
 }
 

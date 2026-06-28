@@ -171,6 +171,7 @@ async function main() {
       .from("chat_messages")
       .select("id, user_id, body, created_at")
       .eq("stream_id", streamId)
+      .eq("origin", "vidstube")
       .is("hidden_at", null)
       .gt("created_at", cursor)
       .order("created_at", { ascending: true })
@@ -196,6 +197,20 @@ async function main() {
       if (tick % 4 === 0) batchPool.push(pick(ABUSIVE, 1)[0]);
       for (let i = 0; i < batchPool.length; i++) {
         const s = batchPool[i];
+        const avatar = `https://i.pravatar.cc/150?u=${s.ext}`;
+        const { data: row } = await admin
+          .from("chat_messages")
+          .insert({
+            stream_id: streamId!,
+            origin: "youtube",
+            external_author_id: s.ext,
+            author_name: s.author,
+            author_avatar_url: avatar,
+            external_message_id: `${s.ext}:${tick}-${i}`,
+            body: s.text,
+          })
+          .select("id")
+          .maybeSingle();
         synth.push({
           ref: `youtube:${s.ext}:${tick}-${i}`,
           origin: "youtube",
@@ -204,8 +219,8 @@ async function main() {
           userId: null,
           externalAuthorId: s.ext,
           authorName: s.author,
-          authorAvatarUrl: `https://i.pravatar.cc/150?u=${s.ext}`,
-          chatMessageId: null,
+          authorAvatarUrl: avatar,
+          chatMessageId: row?.id ?? null,
           createdAt: new Date().toISOString(),
         });
       }

@@ -124,31 +124,46 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          author_avatar_url: string | null
+          author_name: string | null
           body: string
           created_at: string
+          external_author_id: string | null
+          external_message_id: string | null
           hidden_at: string | null
           hidden_by: string | null
           id: string
+          origin: string
           stream_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           body: string
           created_at?: string
+          external_author_id?: string | null
+          external_message_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
           id?: string
+          origin?: string
           stream_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           body?: string
           created_at?: string
+          external_author_id?: string | null
+          external_message_id?: string | null
           hidden_at?: string | null
           hidden_by?: string | null
           id?: string
+          origin?: string
           stream_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

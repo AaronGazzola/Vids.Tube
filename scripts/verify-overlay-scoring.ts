@@ -119,7 +119,7 @@ async function main() {
   console.log("\n=== 6. Cleanup test rows ===");
   if (fm?.id) await admin.from("featured_messages").delete().eq("id", fm.id);
   await admin.from("score_events").delete().eq("stream_id", chat.stream_id).eq("type", "feature").eq("points", 88);
-  await admin.from("viewer_scores").delete().eq("stream_id", chat.stream_id).eq("user_id", chat.user_id);
+  await admin.from("viewer_scores").delete().eq("stream_id", chat.stream_id).eq("user_id", chat.user_id!);
   await admin.from("chat_scoring_state").delete().eq("stream_id", chat.stream_id);
   console.log("  cleaned up ✓");
 }

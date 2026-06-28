@@ -56,6 +56,7 @@ async function fetchNewVidstube(
     .from("chat_messages")
     .select("id, user_id, body, created_at")
     .eq("stream_id", streamId)
+    .eq("origin", "vidstube")
     .is("hidden_at", null)
     .gt("created_at", sinceIso)
     .order("created_at", { ascending: true })
@@ -65,12 +66,12 @@ async function fetchNewVidstube(
   }
   const identities = await resolveAuthorIdentities(
     supabaseAdmin,
-    data.map((m) => m.user_id)
+    data.map((m) => m.user_id).filter((id): id is string => !!id)
   );
   return data.map((m) => ({
     ref: `vidstube:${m.id}`,
     origin: "vidstube" as const,
-    author: identities.get(m.user_id)?.handle ?? "viewer",
+    author: (m.user_id ? identities.get(m.user_id)?.handle : null) ?? "viewer",
     text: m.body,
     userId: m.user_id,
     externalAuthorId: null,
@@ -322,6 +323,25 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       if (stopped) {
         return;
       }
+      const extMsgId = `${m.authorChannelId}:${m.publishedAt}`;
+      let chatMessageId: string | null = null;
+      const { data: row, error } = await supabaseAdmin
+        .from("chat_messages")
+        .insert({
+          stream_id: stream.id,
+          origin: "youtube",
+          external_author_id: m.authorChannelId,
+          author_name: m.author,
+          author_avatar_url: m.avatarUrl,
+          external_message_id: extMsgId,
+          body: m.text,
+        })
+        .select("id")
+        .maybeSingle();
+      if (error && error.code !== "23505") {
+        console.error("persist youtube chat failed:", error.message);
+      }
+      chatMessageId = row?.id ?? null;
       ytBuffer.push({
         ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,
         origin: "youtube",
@@ -331,7 +351,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         externalAuthorId: m.authorChannelId,
         authorName: m.author,
         authorAvatarUrl: m.avatarUrl,
-        chatMessageId: null,
+        chatMessageId,
         createdAt: m.publishedAt,
       });
     }
