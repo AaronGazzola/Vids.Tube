@@ -49,6 +49,17 @@ const ABUSIVE: { author: string; text: string; ext: string }[] = [
   { author: "troll", text: "you're garbage at this and everyone watching is an idiot", ext: "UC_DRY_troll" },
 ];
 
+// Vids.Tube-origin sim: posted as the owner account (the only real auth user), so
+// these render with the owner's @handle (no YT badge) and get the 1.5x weighting.
+const VIDSTUBE = [
+  "loving the new overlay layout, the leaderboard is a great touch",
+  "quick q — how are you weighting vids.tube vs youtube in the scoring?",
+  "this is exactly the community feature youtube is missing imo",
+  "the avatar bubbles racing each other is so satisfying lol",
+  "been here since the start — the bot picks are genuinely good",
+  "can you show the OBS source layout at some point?",
+];
+
 function pick<T>(arr: T[], n: number): T[] {
   const out: T[] = [];
   for (let i = 0; i < n; i++) out.push(arr[Math.floor(Math.random() * arr.length)]);
@@ -223,6 +234,15 @@ async function main() {
           createdAt: new Date().toISOString(),
         });
       }
+    }
+
+    if (!QUIET && tick % 2 === 1) {
+      await admin.from("chat_messages").insert({
+        stream_id: streamId!,
+        origin: "vidstube",
+        user_id: channel.owner_user_id,
+        body: VIDSTUBE[Math.floor((tick - 1) / 2) % VIDSTUBE.length],
+      });
     }
 
     const batch = [...vid, ...synth];
