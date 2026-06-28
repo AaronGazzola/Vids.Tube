@@ -45,11 +45,25 @@ export function HighlightedMessage({
           </span>
         </div>
         <div
-          className="relative flex-1 self-start rounded-3xl border border-white bg-black px-4 py-3 text-white"
-          style={{ boxShadow: "0 0 18px 3px rgba(255,255,255,0.45)" }}
+          className="relative flex-1 self-start rounded-xl border border-white bg-black px-4 py-3 text-base leading-relaxed text-white"
+          style={{ boxShadow: "0 0 18px 3px rgba(255,255,255,0.4)" }}
         >
-          <span className="absolute -left-2 top-4 h-4 w-4 rotate-45 border-b border-l border-white bg-black" />
-          <p className="text-base leading-snug">{text}</p>
+          <svg
+            aria-hidden
+            className="absolute -left-2 top-3.5 overflow-visible"
+            width="8"
+            height="14"
+            viewBox="0 0 8 14"
+          >
+            <polygon points="8,0 0,7 8,14" fill="black" />
+            <polyline
+              points="8,0 0,7 8,14"
+              fill="none"
+              stroke="white"
+              strokeWidth="1"
+            />
+          </svg>
+          <p className="whitespace-pre-wrap">{text}</p>
         </div>
       </div>
     </div>

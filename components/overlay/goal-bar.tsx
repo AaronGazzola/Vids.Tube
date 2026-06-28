@@ -92,42 +92,52 @@ export function GoalBar({
 
   if (metric === "viewers") {
     const d = Math.max(48, Math.round(height * 0.2));
-    const t = Math.max(5, Math.round(d * 0.05));
-    const inner = d - 2 * (t + 2);
-    const deg = Math.max(0, Math.min(100, data.pct)) * 3.6;
-    const donut = `radial-gradient(farthest-side, transparent calc(100% - ${t}px), #000 calc(100% - ${t}px))`;
-    const arc = `conic-gradient(#000 ${deg}deg, transparent 0)`;
+    const stroke = Math.max(5, Math.round(d * 0.09));
+    const r = (d - stroke) / 2;
+    const circ = 2 * Math.PI * r;
+    const pct = Math.max(0, Math.min(100, data.pct));
+    const dash = (pct / 100) * circ;
+    const inner = d - 2 * (stroke + 2);
     return (
       <div
-        className="inline-flex rounded-2xl p-1 text-white"
-        style={{ boxShadow: glow }}
+        className="relative inline-flex items-center justify-center rounded-full text-white"
+        style={{ width: d, height: d, boxShadow: glow }}
       >
-        <div className="relative" style={{ width: d, height: d }}>
+        {data.reached ? (
           <div
             className="absolute inset-0 overflow-hidden rounded-full"
             style={{
-              WebkitMaskImage: `${arc}, ${donut}`,
-              maskImage: `${arc}, ${donut}`,
-              WebkitMaskComposite: "source-in",
-              maskComposite: "intersect",
+              WebkitMaskImage: `radial-gradient(farthest-side, transparent calc(100% - ${stroke}px), #000 calc(100% - ${stroke}px))`,
+              maskImage: `radial-gradient(farthest-side, transparent calc(100% - ${stroke}px), #000 calc(100% - ${stroke}px))`,
             }}
           >
-            <div
-              className={`absolute inset-0 ${data.reached ? "rainbow-ring" : "bg-white"}`}
+            <div className="rainbow-ring absolute inset-0" />
+          </div>
+        ) : (
+          <svg className="absolute inset-0 -rotate-90" width={d} height={d}>
+            <circle
+              cx={d / 2}
+              cy={d / 2}
+              r={r}
+              fill="none"
+              stroke="white"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${circ}`}
             />
-          </div>
-          <div
-            className="absolute flex flex-col items-center justify-center rounded-full leading-none"
-            style={{ top: t + 2, right: t + 2, bottom: t + 2, left: t + 2 }}
+          </svg>
+        )}
+        <div
+          className="absolute flex flex-col items-center justify-center leading-none"
+          style={{ inset: stroke + 4 }}
+        >
+          <Icon metric="viewers" reached={data.reached} size={inner * 0.5} />
+          <span
+            className="font-bold tabular-nums"
+            style={{ fontSize: inner * 0.32, lineHeight: 1 }}
           >
-            <Icon metric="viewers" reached={data.reached} size={inner * 0.54} />
-            <span
-              className="font-bold tabular-nums"
-              style={{ fontSize: inner * 0.36, lineHeight: 1 }}
-            >
-              {fmt(data.current)}
-            </span>
-          </div>
+            {fmt(data.current)}
+          </span>
         </div>
       </div>
     );
@@ -141,7 +151,7 @@ export function GoalBar({
       >
         <div
           className="relative mt-1 h-1.5 overflow-hidden rounded-full border border-white"
-          style={{ width: height * 1.2 }}
+          style={{ width: height * 1.6 }}
         >
           <div
             className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-700 ease-out ${

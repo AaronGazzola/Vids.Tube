@@ -65,10 +65,19 @@ export default function DemoPage() {
   const [queue, setQueue] = useState<{ id: string; author: FeaturedAuthor; text: string; rank: number; progress: number }[]>([]);
   const [boxes, setBoxes] = useState(DEFAULT_BOXES);
   const [bubbleOpacity, setBubbleOpacity] = useState(0.7);
+  const [goalsComplete, setGoalsComplete] = useState(false);
 
   const selected = videos?.find((v) => v.id === videoId) ?? videos?.[0];
   const src = vodAssetUrl(selected?.mp4_path ?? null);
   const metrics = computeGoalProgress(counts, baseline, goals);
+  const shownMetrics = goalsComplete
+    ? (Object.fromEntries(
+        GOALS.map((m) => [
+          m,
+          { current: goals[m], target: goals[m], total: goals[m], goal: goals[m], pct: 100, reached: true },
+        ])
+      ) as typeof metrics)
+    : metrics;
   const standings = computeStandings(viewers.map((v) => ({ id: v.id, score: v.score })));
   const current = queue[0] ?? null;
 
@@ -182,13 +191,13 @@ export default function DemoPage() {
           </DraggableResizable>
 
           <DraggableResizable box={boxes.subs} onChange={setBox("subs")}>
-            <GoalBar metric="subs" data={metrics.subs} height={140} />
+            <GoalBar metric="subs" data={shownMetrics.subs} height={140} />
           </DraggableResizable>
           <DraggableResizable box={boxes.likes} onChange={setBox("likes")}>
-            <GoalBar metric="likes" data={metrics.likes} height={140} />
+            <GoalBar metric="likes" data={shownMetrics.likes} height={140} />
           </DraggableResizable>
           <DraggableResizable box={boxes.viewers} onChange={setBox("viewers")}>
-            <GoalBar metric="viewers" data={metrics.viewers} height={160} />
+            <GoalBar metric="viewers" data={shownMetrics.viewers} height={160} />
           </DraggableResizable>
 
           <DraggableResizable box={boxes.bubbles} onChange={setBox("bubbles")}>
@@ -273,7 +282,16 @@ export default function DemoPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Goals (now / target)</CardTitle>
+                <CardTitle className="flex items-center justify-between gap-2 text-base">
+                  Goals (now / target)
+                  <Button
+                    size="sm"
+                    variant={goalsComplete ? "default" : "outline"}
+                    onClick={() => setGoalsComplete((v) => !v)}
+                  >
+                    {goalsComplete ? "Complete" : "In progress"}
+                  </Button>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {GOALS.map((m) => (

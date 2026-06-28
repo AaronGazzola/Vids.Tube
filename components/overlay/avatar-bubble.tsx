@@ -21,7 +21,7 @@ export function AvatarBubble({
   const url = author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null);
   const name = author?.name ?? "viewer";
   const color = rankColor(rank);
-  const stroke = Math.max(3, Math.round(size * 0.06));
+  const stroke = 1;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = Math.max(0, Math.min(1, progress)) * circ;
