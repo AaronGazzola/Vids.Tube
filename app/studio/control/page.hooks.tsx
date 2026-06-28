@@ -29,7 +29,7 @@ export function useModerationFeed(streamId: string | null) {
     queryKey: ["moderation-feed", streamId],
     queryFn: () => getModerationFeedAction(streamId!),
     enabled: !!streamId,
-    refetchInterval: 8000,
+    refetchInterval: 4000,
   });
 }
 

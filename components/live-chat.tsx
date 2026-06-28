@@ -3,6 +3,7 @@
 import { useLiveChat, usePostChatMessage } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { ChatAuthor } from "@/components/chat-author";
+import { ChatText } from "@/components/chat-text";
 import { ChatComposer } from "@/components/chat-composer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,7 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
                 size="chat"
                 className="mr-1 align-middle"
               />
-              <span className="break-words">{message.body}</span>
+              <ChatText text={message.body} />
             </div>
           ))
         )}

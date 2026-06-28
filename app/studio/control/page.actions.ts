@@ -1,6 +1,7 @@
 "use server";
 
 import type { ActionResult } from "@/app/layout.types";
+import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
 
@@ -315,6 +316,8 @@ export type ModerationActionRow = {
   source: string;
   status: string;
   created_at: string;
+  sender: string;
+  body: string | null;
 };
 
 export type ModerationFeed = {
@@ -338,7 +341,7 @@ export async function getModerationFeedAction(
   const { data, error } = await supabaseAdmin
     .from("moderation_actions")
     .select(
-      "id, action, target_kind, chat_message_id, participant_key, author_name, origin, reason, source, status, created_at"
+      "id, action, target_kind, chat_message_id, participant_key, author_name, origin, reason, source, status, created_at, user_id"
     )
     .eq("stream_id", streamId)
     .order("created_at", { ascending: false })
@@ -347,5 +350,46 @@ export async function getModerationFeedAction(
     console.error(error);
     throw new Error("Failed to load moderation feed");
   }
-  return { mode, actions: data as ModerationActionRow[] };
+
+  const rows = data ?? [];
+  const userIds = rows
+    .map((r) => r.user_id)
+    .filter((id): id is string => !!id);
+  const idByUser = await resolveAuthorIdentities(supabaseAdmin, userIds);
+
+  const msgIds = rows
+    .map((r) => r.chat_message_id)
+    .filter((id): id is string => !!id);
+  const bodyByMsg = new Map<string, string>();
+  if (msgIds.length) {
+    const { data: msgs } = await supabaseAdmin
+      .from("chat_messages")
+      .select("id, body")
+      .in("id", msgIds);
+    for (const m of msgs ?? []) bodyByMsg.set(m.id, m.body);
+  }
+
+  const actions: ModerationActionRow[] = rows.map((r) => {
+    const handle = r.user_id ? idByUser.get(r.user_id)?.handle : null;
+    const sender = handle
+      ? `@${handle}`
+      : r.author_name ?? r.participant_key ?? "viewer";
+    return {
+      id: r.id,
+      action: r.action as "hide" | "ban",
+      target_kind: r.target_kind,
+      chat_message_id: r.chat_message_id,
+      participant_key: r.participant_key,
+      author_name: r.author_name,
+      origin: r.origin,
+      reason: r.reason,
+      source: r.source,
+      status: r.status,
+      created_at: r.created_at,
+      sender,
+      body: r.chat_message_id ? bodyByMsg.get(r.chat_message_id) ?? null : null,
+    };
+  });
+
+  return { mode, actions };
 }

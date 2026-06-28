@@ -6,13 +6,49 @@ import {
   useViewerLeaderboard,
 } from "@/app/studio/overlay/page.hooks";
 import { ChatAuthor } from "@/components/chat-author";
+import { ChatText } from "@/components/chat-text";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
 import { type ReactNode, useState } from "react";
+
+const POPOUT_SIZES: Record<string, string> = {
+  all: "width=440,height=940",
+  suggestions: "width=440,height=380",
+  chat: "width=440,height=620",
+  leaderboard: "width=380,height=560",
+};
+
+function openPopout(slug: string | undefined, panel: string) {
+  if (!slug) return;
+  window.open(
+    `/popout/${slug}?panel=${panel}`,
+    `vt-popout-${panel}`,
+    POPOUT_SIZES[panel] ?? POPOUT_SIZES.all
+  );
+}
+
+function PopoutButton({
+  slug,
+  panel,
+}: {
+  slug: string | undefined;
+  panel: string;
+}) {
+  return (
+    <button
+      title="Pop out into its own window"
+      onClick={() => openPopout(slug, panel)}
+      className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white"
+    >
+      <ExternalLink className="h-3.5 w-3.5" />
+    </button>
+  );
+}
 import {
   useApproveSuggestion,
   useBanParticipant,
@@ -105,6 +141,17 @@ export default function ControlRoomPage() {
           scoring {ctx?.enabled ? "on" : "off"}
         </span>
         {streamId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={() => openPopout(ctx?.channelSlug, "all")}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Pop out
+          </Button>
+        )}
+        {streamId && (
           <div className="flex items-center gap-1 rounded-md border border-white/15 p-0.5 text-xs">
             <span className="px-1 text-white/40">modbot</span>
             {(["manual", "auto"] as const).map((m) => (
@@ -134,7 +181,10 @@ export default function ControlRoomPage() {
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_1fr_0.9fr]">
-          <Panel title="Read this (AI picks)">
+          <Panel
+            title="Read this (AI picks)"
+            right={<PopoutButton slug={ctx?.channelSlug} panel="suggestions" />}
+          >
             {readPending && streamId ? (
               <Skeleton className="h-16 w-full" />
             ) : queue.length === 0 ? (
@@ -202,7 +252,10 @@ export default function ControlRoomPage() {
             )}
           </Panel>
 
-          <Panel title="Live chat">
+          <Panel
+            title="Live chat"
+            right={<PopoutButton slug={ctx?.channelSlug} panel="chat" />}
+          >
             {chatPending && streamId ? (
               <Skeleton className="h-16 w-full" />
             ) : !chat?.length ? (
@@ -216,7 +269,7 @@ export default function ControlRoomPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <ChatAuthor message={m} size="chat" className="mr-1" />
-                      <span className="text-sm">{m.body}</span>
+                      <ChatText text={m.body} className="text-sm" />
                     </div>
                     <Button
                       variant="outline"
@@ -234,7 +287,10 @@ export default function ControlRoomPage() {
           </Panel>
 
           <div className="grid min-h-0 grid-rows-2 gap-3">
-            <Panel title="Leaderboard">
+            <Panel
+              title="Leaderboard"
+              right={<PopoutButton slug={ctx?.channelSlug} panel="leaderboard" />}
+            >
               {lbPending && streamId ? (
                 <Skeleton className="h-16 w-full" />
               ) : !leaderboard?.length ? (
@@ -312,11 +368,11 @@ export default function ControlRoomPage() {
                   {actions.map((a) => (
                     <li
                       key={a.id}
-                      className="flex items-center gap-2 rounded border border-white/10 px-2 py-1 text-xs"
+                      className="flex items-start gap-2 rounded border border-white/10 px-2 py-1.5 text-xs"
                     >
                       <span
                         className={cn(
-                          "rounded px-1 font-semibold uppercase",
+                          "mt-0.5 rounded px-1 font-semibold uppercase",
                           a.action === "ban"
                             ? "bg-red-600/30 text-red-200"
                             : "bg-amber-500/20 text-amber-200"
@@ -324,10 +380,19 @@ export default function ControlRoomPage() {
                       >
                         {a.action}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-white/70">
-                        {a.author_name ?? a.participant_key ?? "message"}
-                        {a.reason ? ` — ${a.reason}` : ""}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className="font-semibold text-white/80">
+                          {a.sender}
+                        </span>
+                        {a.body && (
+                          <span className="text-white/70"> “{a.body}”</span>
+                        )}
+                        {a.reason && (
+                          <span className="block text-[10px] italic text-white/40">
+                            {a.reason}
+                          </span>
+                        )}
+                      </div>
                       {a.status === "suggested" ? (
                         <>
                           <Button
