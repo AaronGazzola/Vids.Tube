@@ -15,6 +15,7 @@ export default function CompetitionOverlayPage({
   const sp = useSearchParams();
   const max = Number(sp.get("max")) || 24;
   const size = Number(sp.get("size")) || 72;
+  const opacity = sp.get("opacity") != null ? Number(sp.get("opacity")) : 0.6;
 
   const { data: scores } = useCompetition(channelSlug, 5);
   if (!scores) {
@@ -41,10 +42,11 @@ export default function CompetitionOverlayPage({
         return (
           <div
             key={s.participant_key}
-            className="absolute opacity-60"
+            className="absolute"
             style={{
               left: `${left}%`,
               bottom: `${bottom}%`,
+              opacity,
               animation: `bubble-float ${dur}s ease-in-out ${delay}s infinite`,
             }}
           >

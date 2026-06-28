@@ -39,14 +39,6 @@ export function AvatarBubble({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(255,255,255,0.15)"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
           stroke={color}
           strokeWidth={stroke}
           strokeLinecap="round"
@@ -61,13 +53,13 @@ export function AvatarBubble({
       </div>
       {rank <= 3 && (
         <span
-          className="absolute -right-1 -top-1 flex items-center justify-center rounded-full font-bold text-black"
+          className="absolute -right-1 -top-1 flex items-center justify-center rounded-full font-bold text-white"
           style={{
             width: badge,
             height: badge,
             fontSize: badge * 0.6,
-            background: color,
-            border: "2px solid white",
+            background: "#000",
+            border: `2px solid ${color}`,
           }}
         >
           {rank}

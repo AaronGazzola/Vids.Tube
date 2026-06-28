@@ -31,22 +31,23 @@ type Viewer = {
   message: string;
 };
 
-const dice = (seed: string, style: string) =>
-  `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+const photo = (seed: string) =>
+  `https://i.pravatar.cc/150?u=${encodeURIComponent(seed)}`;
 
 const INITIAL_VIEWERS: Viewer[] = [
-  { id: "1", author: { name: "pixelpup", handle: "pixelpup", avatarUrl: dice("pixelpup", "bottts"), avatarPath: null }, score: 8, message: "this stream is unreal lol" },
-  { id: "2", author: { name: "nightowl", handle: "nightowl", avatarUrl: dice("nightowl", "bottts"), avatarPath: null }, score: 5, message: "how did you do that?!" },
-  { id: "3", author: { name: "GamerGodX", handle: null, avatarUrl: dice("GamerGodX", "funEmoji"), avatarPath: null }, score: 12, message: "first try?? insane" },
-  { id: "4", author: { name: "chatlegend", handle: null, avatarUrl: dice("chatlegend", "funEmoji"), avatarPath: null }, score: 3, message: "W stream" },
-  { id: "5", author: { name: "sunny_dev", handle: "sunny_dev", avatarUrl: dice("sunny", "bottts"), avatarPath: null }, score: 6, message: "the goal is so close!" },
-  { id: "6", author: { name: "QuietViewer", handle: null, avatarUrl: dice("Quiet", "funEmoji"), avatarPath: null }, score: 1, message: "hi everyone" },
+  { id: "1", author: { name: "pixelpup", handle: "pixelpup", avatarUrl: photo("pixelpup"), avatarPath: null }, score: 8, message: "this stream is unreal lol" },
+  { id: "2", author: { name: "nightowl", handle: "nightowl", avatarUrl: photo("nightowl"), avatarPath: null }, score: 5, message: "how did you do that?!" },
+  { id: "3", author: { name: "GamerGodX", handle: null, avatarUrl: photo("gamergodx"), avatarPath: null }, score: 12, message: "first try?? insane" },
+  { id: "4", author: { name: "chatlegend", handle: null, avatarUrl: photo("chatlegend"), avatarPath: null }, score: 3, message: "W stream" },
+  { id: "5", author: { name: "sunny_dev", handle: "sunny_dev", avatarUrl: photo("sunnydev"), avatarPath: null }, score: 6, message: "the goal is so close!" },
+  { id: "6", author: { name: "QuietViewer", handle: null, avatarUrl: photo("quietviewer"), avatarPath: null }, score: 1, message: "hi everyone" },
 ];
 
 const DEFAULT_BOXES: Record<string, Box> = {
   subs: { x: 12, y: 12, scale: 1 },
   likes: { x: 12, y: 70, scale: 1 },
   viewers: { x: 300, y: 12, scale: 1 },
+  highlight: { x: 12, y: 250, scale: 1 },
   bubbles: { x: 16, y: 470, scale: 1 },
 };
 
@@ -63,6 +64,7 @@ export default function DemoPage() {
   const [baseline, setBaseline] = useState<Counts | null>(null);
   const [queue, setQueue] = useState<{ id: string; author: FeaturedAuthor; text: string; rank: number; progress: number }[]>([]);
   const [boxes, setBoxes] = useState(DEFAULT_BOXES);
+  const [bubbleOpacity, setBubbleOpacity] = useState(0.7);
 
   const selected = videos?.find((v) => v.id === videoId) ?? videos?.[0];
   const src = vodAssetUrl(selected?.mp4_path ?? null);
@@ -85,7 +87,7 @@ export default function DemoPage() {
   }
 
   if (isPending || !isOwner) {
-    return <Skeleton className="h-[720px] w-full" />;
+    return <Skeleton className="h-180 w-full" />;
   }
 
   const labelOf = (a: FeaturedAuthor) => (a.handle ? `@${a.handle}` : a.name);
@@ -122,6 +124,17 @@ export default function DemoPage() {
         >
           Reset sim
         </Button>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          Bubble opacity
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={bubbleOpacity}
+            onChange={(e) => setBubbleOpacity(Number(e.target.value))}
+          />
+        </label>
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -148,16 +161,25 @@ export default function DemoPage() {
             </div>
           )}
 
-          {current && (
-            <HighlightedMessage
-              key={current.id}
-              author={current.author}
-              text={current.text}
-              rank={current.rank}
-              progress={current.progress}
-              onDone={() => setQueue((q) => q.slice(1))}
-            />
-          )}
+          <DraggableResizable box={boxes.highlight} onChange={setBox("highlight")}>
+            <div style={{ width: 381 }}>
+              {current ? (
+                <HighlightedMessage
+                  key={current.id}
+                  author={current.author}
+                  text={current.text}
+                  rank={current.rank}
+                  progress={current.progress}
+                  size={56}
+                  onDone={() => setQueue((q) => q.slice(1))}
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/40 px-3 py-5 text-center text-xs text-white/50">
+                  Highlighted message appears here
+                </div>
+              )}
+            </div>
+          </DraggableResizable>
 
           <DraggableResizable box={boxes.subs} onChange={setBox("subs")}>
             <GoalBar metric="subs" data={metrics.subs} height={140} />
@@ -170,13 +192,16 @@ export default function DemoPage() {
           </DraggableResizable>
 
           <DraggableResizable box={boxes.bubbles} onChange={setBox("bubbles")}>
-            <div className="relative" style={{ width: 360, height: 200 }}>
+            <div
+              className="relative"
+              style={{ width: 360, height: 200, opacity: bubbleOpacity }}
+            >
               {active.map((v, i) => {
                 const st = standings.get(v.id) ?? { rank: i + 1, progress: 0 };
                 return (
                   <div
                     key={v.id}
-                    className="absolute opacity-70"
+                    className="absolute"
                     style={{
                       left: `${4 + ((i * 37) % 80)}%`,
                       bottom: `${6 + ((i * 53) % 60)}%`,

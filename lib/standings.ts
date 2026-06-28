@@ -16,8 +16,8 @@ export function computeStandings(
 }
 
 export function rankColor(rank: number): string {
-  if (rank === 1) return "#ffd700";
-  if (rank === 2) return "#c0c0c0";
-  if (rank === 3) return "#cd7f32";
-  return "rgba(255,255,255,0.35)";
+  if (rank === 1) return "#facc15"; // yellow
+  if (rank === 2) return "#c0c0c0"; // silver
+  if (rank === 3) return "#ff8c00"; // dark orange
+  return "#9ca3af"; // gray
 }
