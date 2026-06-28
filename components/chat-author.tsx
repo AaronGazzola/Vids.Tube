@@ -2,9 +2,21 @@
 
 import type { ChatMessage } from "@/app/layout.types";
 import { AuthorChip } from "@/components/author-chip";
+import { Logo } from "@/components/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { cn } from "@/lib/utils";
+
+function VidsTubeBadge() {
+  return (
+    <span
+      title="Vids.Tube"
+      className="inline-flex items-center justify-center rounded bg-neutral-900 px-0.75 py-0.5 align-middle"
+    >
+      <Logo className="h-3 w-3.5 text-white dark:text-white" />
+    </span>
+  );
+}
 
 export function ChatAuthor({
   message,
@@ -43,5 +55,10 @@ export function ChatAuthor({
       </span>
     );
   }
-  return <AuthorChip author={message.author} size={size} className={className} />;
+  return (
+    <span className={cn("inline-flex items-center gap-1 align-middle", className)}>
+      <AuthorChip author={message.author} size={size} />
+      <VidsTubeBadge />
+    </span>
+  );
 }
