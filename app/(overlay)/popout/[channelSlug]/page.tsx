@@ -49,7 +49,7 @@ function Suggestions({
   className?: string;
 }) {
   const { data } = useReadThisQueue(streamId);
-  const queue = (data ?? []).slice().reverse();
+  const queue = (data ?? []).filter((m) => !m.promoted_at).slice().reverse();
   return (
     <PanelShell title="Read this (AI picks)" className={className}>
       {queue.length === 0 ? (

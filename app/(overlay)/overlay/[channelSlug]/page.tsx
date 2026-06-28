@@ -5,7 +5,7 @@ import { useLiveStream } from "@/app/layout.hooks";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { computeStandings } from "@/lib/standings";
 import { use, useState } from "react";
-import { useFeaturedMessages, useStreamStandings } from "./page.hooks";
+import { usePromotedMessages, useStreamStandings } from "./page.hooks";
 
 export default function OverlayPage({
   params,
@@ -17,13 +17,13 @@ export default function OverlayPage({
   const { data: stream } = useLiveStream(channel?.id);
 
   const streamId = stream?.status === "live" ? stream.id : null;
-  const { data: featured } = useFeaturedMessages(streamId);
+  const { data: promoted } = usePromotedMessages(streamId);
   const { data: standings } = useStreamStandings(streamId);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
   const current = streamId
-    ? featured?.find((m) => !doneIds.has(m.id)) ?? null
+    ? promoted?.find((m) => !doneIds.has(m.id)) ?? null
     : null;
 
   if (!current) return null;

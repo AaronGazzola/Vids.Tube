@@ -33,6 +33,35 @@ export async function getFeaturedMessagesAction(
   }));
 }
 
+export async function getPromotedMessagesAction(
+  streamId: string
+): Promise<FeaturedMessageWithAuthor[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("featured_messages")
+    .select("*")
+    .eq("stream_id", streamId)
+    .not("promoted_at", "is", null)
+    .order("promoted_at", { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch promoted messages");
+  }
+
+  const userIds = data
+    .map((m) => m.user_id)
+    .filter((id): id is string => !!id);
+  const authorByUser = await resolveAuthorIdentities(supabase, userIds);
+
+  return data.map((m) => ({
+    ...m,
+    author: authorFromRow(m.origin, m, m.user_id ? authorByUser.get(m.user_id) ?? null : null),
+  }));
+}
+
 export async function getStreamStandingsAction(
   streamId: string
 ): Promise<{ participant_key: string; total_score: number }[]> {

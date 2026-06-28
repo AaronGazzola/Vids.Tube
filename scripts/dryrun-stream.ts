@@ -121,7 +121,7 @@ async function main() {
 
   await admin
     .from("chat_scoring_state")
-    .insert({ stream_id: streamId, enabled: true, moderation_mode: "manual" });
+    .insert({ stream_id: streamId, enabled: true });
 
   await admin.from("transcript_segments").insert(
     TRANSCRIPT.map((text, i) => ({

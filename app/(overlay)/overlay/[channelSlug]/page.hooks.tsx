@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
   getFeaturedMessagesAction,
+  getPromotedMessagesAction,
   getStreamStandingsAction,
 } from "./page.actions";
 
@@ -86,6 +87,15 @@ export function useFeaturedMessages(streamId: string | null) {
   }, [streamId, queryClient]);
 
   return query;
+}
+
+export function usePromotedMessages(streamId: string | null) {
+  return useQuery({
+    queryKey: ["promoted", streamId],
+    queryFn: () => getPromotedMessagesAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 2000,
+  });
 }
 
 export function useStreamStandings(streamId: string | null) {

@@ -85,6 +85,32 @@ async function logAction(input: {
   });
 }
 
+export async function promoteHighlightAction(
+  featuredMessageId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) return { error: owned.error };
+
+  const { data: fm } = await supabaseAdmin
+    .from("featured_messages")
+    .select("id, stream_id")
+    .eq("id", featuredMessageId)
+    .maybeSingle();
+  if (!fm) return { error: "That message no longer exists." };
+  const ok = await assertStreamOwned(fm.stream_id, owned.data.id);
+  if ("error" in ok) return { error: ok.error };
+
+  const { error } = await supabaseAdmin
+    .from("featured_messages")
+    .update({ promoted_at: new Date().toISOString() })
+    .eq("id", featuredMessageId);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to show highlight on overlay");
+  }
+  return { data: { ok: true } };
+}
+
 export async function setModerationModeAction(
   streamId: string,
   mode: "manual" | "auto"

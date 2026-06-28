@@ -10,6 +10,7 @@ import {
   dismissSuggestionAction,
   getModerationFeedAction,
   hideMessageAction,
+  promoteHighlightAction,
   setModerationModeAction,
   unbanParticipantAction,
   unhideMessageAction,
@@ -53,6 +54,17 @@ function useModerationInvalidator() {
     queryClient.invalidateQueries({ queryKey: ["read-this", streamId] });
     queryClient.invalidateQueries({ queryKey: ["viewer-leaderboard", streamId] });
   };
+}
+
+export function usePromoteHighlight(streamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (featuredMessageId: string) =>
+      unwrap(await promoteHighlightAction(featuredMessageId)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["read-this", streamId] }),
+    onError: errorToast("Couldn't show on overlay"),
+  });
 }
 
 export function useSetModerationMode(streamId: string | null) {

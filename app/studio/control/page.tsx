@@ -56,6 +56,7 @@ import {
   useDismissSuggestion,
   useHideMessage,
   useModerationFeed,
+  usePromoteHighlight,
   useReadThisQueue,
   useSetModerationMode,
   useUnbanParticipant,
@@ -101,6 +102,7 @@ export default function ControlRoomPage() {
     useViewerLeaderboard(streamId);
   const { data: feed } = useModerationFeed(streamId);
 
+  const promote = usePromoteHighlight(streamId);
   const setMode = useSetModerationMode(streamId);
   const hide = useHideMessage(streamId);
   const unhide = useUnhideMessage(streamId);
@@ -119,7 +121,7 @@ export default function ControlRoomPage() {
   const actions = feed?.actions ?? [];
 
   const queue = (readThis ?? [])
-    .filter((m) => !dismissed.has(m.id))
+    .filter((m) => !m.promoted_at && !dismissed.has(m.id))
     .slice()
     .reverse();
 
@@ -216,14 +218,23 @@ export default function ControlRoomPage() {
                         </Avatar>
                         <span className="text-xs font-semibold">{label}</span>
                         <Button
+                          size="sm"
+                          disabled={promote.isPending}
+                          className="ml-auto h-6 px-2 text-xs"
+                          onClick={() => promote.mutate(m.id)}
+                        >
+                          Show on overlay
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="sm"
-                          className="ml-auto h-6 px-2 text-xs text-white/60"
+                          title="Dismiss"
+                          className="h-6 px-1.5 text-xs text-white/40"
                           onClick={() =>
                             setDismissed((prev) => new Set(prev).add(m.id))
                           }
                         >
-                          Read ✓
+                          ✕
                         </Button>
                       </div>
                       <p className="mt-1 whitespace-pre-wrap text-sm">

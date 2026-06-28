@@ -285,6 +285,7 @@ export type Database = {
           featured_at: string
           id: string
           origin: string
+          promoted_at: string | null
           reason: string | null
           ring_level: number
           score: number
@@ -301,6 +302,7 @@ export type Database = {
           featured_at?: string
           id?: string
           origin?: string
+          promoted_at?: string | null
           reason?: string | null
           ring_level?: number
           score: number
@@ -317,6 +319,7 @@ export type Database = {
           featured_at?: string
           id?: string
           origin?: string
+          promoted_at?: string | null
           reason?: string | null
           ring_level?: number
           score?: number
