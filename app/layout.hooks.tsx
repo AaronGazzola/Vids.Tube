@@ -78,9 +78,11 @@ export function useRequireAuth() {
 }
 
 export function useRequireOwner() {
-  const { isPending } = useUser();
+  const { isPending: userPending } = useUser();
+  const { isPending: channelPending } = useOwnerChannel();
   const isOwner = useIsOwner();
   const router = useRouter();
+  const isPending = userPending || channelPending;
 
   useEffect(() => {
     if (!isPending && !isOwner) {
