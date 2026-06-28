@@ -20,7 +20,7 @@ import { supabaseAdmin } from "../supabase";
 const SCORE_INTERVAL_MS = 10_000;
 const TRANSCRIPT_WINDOW_SEGMENTS = 40;
 
-type BufferedMessage = {
+export type BufferedMessage = {
   ref: string;
   origin: ScoringOrigin;
   author: string;
@@ -96,7 +96,7 @@ async function fetchTranscriptWindow(streamId: string): Promise<string> {
     .join(" ");
 }
 
-async function applyScoreResult(
+export async function applyScoreResult(
   streamId: string,
   batch: BufferedMessage[],
   result: ScoreResult

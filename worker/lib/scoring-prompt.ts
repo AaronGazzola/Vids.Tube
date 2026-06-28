@@ -53,7 +53,7 @@ hype, question.`;
 
 export function buildScoringPrompt(input: ScoringInput): string {
   const messageLines = input.messages
-    .map((m) => `[ref:${m.ref}] (${m.origin}) ${m.author}: ${m.text}`)
+    .map((m) => `[${m.ref}] (${m.origin}) ${m.author}: ${m.text}`)
     .join("\n");
 
   return `${RUBRIC}
@@ -70,7 +70,16 @@ Return ONLY a JSON object, no prose, of this exact shape:
   "featured": [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>" } ],
   "scores":   [ { "ref": "<ref>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ]
 }
-Use the exact "ref" values given. Include every message in "scores". Keep "featured" small.`;
+Use the exact id shown in [brackets] for each message as its "ref". Include every message in "scores". Keep "featured" small.`;
+}
+
+function normalizeRef(raw: unknown): string {
+  return String(raw)
+    .trim()
+    .replace(/^\[+/, "")
+    .replace(/\]+$/, "")
+    .replace(/^ref:/i, "")
+    .trim();
 }
 
 function clampScore(n: unknown): number {
@@ -98,7 +107,7 @@ export function parseScoreResult(raw: string): ScoreResult {
         .map((f) => f as Record<string, unknown>)
         .filter((f) => typeof f.ref === "string")
         .map((f) => ({
-          ref: f.ref as string,
+          ref: normalizeRef(f.ref),
           score: clampScore(f.score),
           categories: Array.isArray(f.categories)
             ? (f.categories as unknown[]).map(String)
@@ -112,7 +121,7 @@ export function parseScoreResult(raw: string): ScoreResult {
         .map((s) => s as Record<string, unknown>)
         .filter((s) => typeof s.ref === "string")
         .map((s) => ({
-          ref: s.ref as string,
+          ref: normalizeRef(s.ref),
           engagement: clampScore(s.engagement),
           humour: clampScore(s.humour),
           contribution: clampScore(s.contribution),
