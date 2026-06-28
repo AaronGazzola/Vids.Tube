@@ -231,7 +231,7 @@ async function fetchModerationMode(streamId: string): Promise<"manual" | "auto">
   return data?.moderation_mode === "auto" ? "auto" : "manual";
 }
 
-async function applyModeration(
+export async function applyModeration(
   streamId: string,
   channelId: string | null,
   batch: BufferedMessage[],

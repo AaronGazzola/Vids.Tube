@@ -23,7 +23,8 @@
     "email:check": "tsx supabase/resend-check.ts",
     "worker": "doppler run -- tsx worker/index.ts",
     "worker:doctor": "doppler run -- tsx worker/doctor.ts",
-    "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts"
+    "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts",
+    "dryrun": "doppler run -- tsx scripts/dryrun-stream.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
