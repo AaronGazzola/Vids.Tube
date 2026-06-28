@@ -3,6 +3,7 @@
 import type { ChatMessage } from "@/app/layout.types";
 import { AuthorChip } from "@/components/author-chip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { cn } from "@/lib/utils";
 
 export function ChatAuthor({
@@ -19,7 +20,7 @@ export function ChatAuthor({
 }) {
   if (message.origin === "youtube") {
     const name = message.author_name ?? "YouTube viewer";
-    const url = message.author_avatar_url;
+    const url = message.author_avatar_url || placeholderAvatar(name);
     return (
       <span
         className={cn(

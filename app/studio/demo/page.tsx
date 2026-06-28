@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type Counts, computeGoalProgress } from "@/lib/goals";
+import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { computeStandings } from "@/lib/standings";
 import { vodAssetUrl } from "@/lib/storage";
 import { useState } from "react";
@@ -31,8 +32,7 @@ type Viewer = {
   message: string;
 };
 
-const photo = (seed: string) =>
-  `https://i.pravatar.cc/150?u=${encodeURIComponent(seed)}`;
+const photo = (seed: string) => placeholderAvatar(seed);
 
 const INITIAL_VIEWERS: Viewer[] = [
   { id: "1", author: { name: "pixelpup", handle: "pixelpup", avatarUrl: photo("pixelpup"), avatarPath: null }, score: 8, message: "this stream is unreal lol" },

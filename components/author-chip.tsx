@@ -1,5 +1,6 @@
 import type { AuthorIdentity } from "@/app/layout.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -40,7 +41,8 @@ export function AuthorChip({
     );
   }
 
-  const avatarUrl = channelAssetUrl(author.avatarPath);
+  const avatarUrl =
+    channelAssetUrl(author.avatarPath) || placeholderAvatar(author.handle);
 
   return (
     <Link

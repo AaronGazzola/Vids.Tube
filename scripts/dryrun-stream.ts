@@ -197,7 +197,6 @@ async function main() {
       if (tick % 4 === 0) batchPool.push(pick(ABUSIVE, 1)[0]);
       for (let i = 0; i < batchPool.length; i++) {
         const s = batchPool[i];
-        const avatar = `https://i.pravatar.cc/150?u=${s.ext}`;
         const { data: row } = await admin
           .from("chat_messages")
           .insert({
@@ -205,7 +204,7 @@ async function main() {
             origin: "youtube",
             external_author_id: s.ext,
             author_name: s.author,
-            author_avatar_url: avatar,
+            author_avatar_url: null,
             external_message_id: `${s.ext}:${tick}-${i}`,
             body: s.text,
           })
@@ -219,7 +218,7 @@ async function main() {
           userId: null,
           externalAuthorId: s.ext,
           authorName: s.author,
-          authorAvatarUrl: avatar,
+          authorAvatarUrl: null,
           chatMessageId: row?.id ?? null,
           createdAt: new Date().toISOString(),
         });

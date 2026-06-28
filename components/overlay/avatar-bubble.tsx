@@ -1,5 +1,6 @@
 import type { FeaturedAuthor } from "@/app/layout.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { rankColor } from "@/lib/standings";
 import { channelAssetUrl } from "@/lib/storage";
 
@@ -18,8 +19,10 @@ export function AvatarBubble({
   rank: number;
   size?: number;
 }) {
-  const url = author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null);
   const name = author?.name ?? "viewer";
+  const url =
+    (author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null)) ||
+    placeholderAvatar(author?.handle ?? name);
   const color = rankColor(rank);
   const stroke = 1;
   const r = (size - stroke) / 2;

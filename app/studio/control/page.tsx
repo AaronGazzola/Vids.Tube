@@ -9,6 +9,7 @@ import { ChatAuthor } from "@/components/chat-author";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { type ReactNode, useState } from "react";
@@ -143,12 +144,13 @@ export default function ControlRoomPage() {
             ) : (
               <ul className="space-y-2">
                 {queue.map((m) => {
-                  const url =
-                    m.author?.avatarUrl ??
-                    channelAssetUrl(m.author?.avatarPath ?? null);
                   const label = m.author?.handle
                     ? `@${m.author.handle}`
                     : m.author?.name ?? "viewer";
+                  const url =
+                    (m.author?.avatarUrl ??
+                      channelAssetUrl(m.author?.avatarPath ?? null)) ||
+                    placeholderAvatar(m.author?.handle ?? m.author?.name);
                   return (
                     <li
                       key={m.id}
@@ -240,12 +242,13 @@ export default function ControlRoomPage() {
               ) : (
                 <ul className="space-y-1">
                   {leaderboard.map((v, i) => {
-                    const url =
-                      v.author?.avatarUrl ??
-                      channelAssetUrl(v.author?.avatarPath ?? null);
                     const label = v.author?.handle
                       ? `@${v.author.handle}`
                       : v.author?.name ?? "viewer";
+                    const url =
+                      (v.author?.avatarUrl ??
+                        channelAssetUrl(v.author?.avatarPath ?? null)) ||
+                      placeholderAvatar(v.author?.handle ?? v.author?.name);
                     return (
                       <li
                         key={v.participant_key}
