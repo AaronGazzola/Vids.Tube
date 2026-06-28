@@ -53,7 +53,7 @@ export function AvatarBubble({
       </div>
       {rank <= 3 && (
         <span
-          className="absolute -right-1 -top-1 flex items-center justify-center rounded-full font-bold text-white"
+          className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-full font-bold text-white"
           style={{
             width: badge,
             height: badge,
