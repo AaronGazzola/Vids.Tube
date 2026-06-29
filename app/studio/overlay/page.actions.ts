@@ -48,6 +48,7 @@ export type OverlayContext = {
   channelSlug: string;
   streamId: string | null;
   streamStatus: string | null;
+  streamTitle: string | null;
   enabled: boolean;
   youtubeVideoId: string | null;
   goals: { subs: number; likes: number; viewers: number } | null;
@@ -63,7 +64,7 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
 
   const { data: stream, error } = await supabaseAdmin
     .from("streams")
-    .select("id, status, youtube_video_id")
+    .select("id, status, title, youtube_video_id")
     .eq("channel_id", channel.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -107,6 +108,7 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
     channelSlug: channel.slug,
     streamId: stream?.id ?? null,
     streamStatus: stream?.status ?? null,
+    streamTitle: stream?.title ?? null,
     enabled,
     youtubeVideoId: stream?.youtube_video_id ?? null,
     goals,

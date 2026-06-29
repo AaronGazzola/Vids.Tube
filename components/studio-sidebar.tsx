@@ -4,11 +4,9 @@ import { cn } from "@/lib/utils";
 import {
   CalendarClock,
   LayoutDashboard,
-  MonitorPlay,
   Radio,
   Settings,
   SlidersHorizontal,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,8 +16,6 @@ const items = [
   { href: "/studio/live", label: "Go Live", icon: Radio },
   { href: "/studio/control", label: "Control room", icon: SlidersHorizontal },
   { href: "/studio/broadcasts", label: "Broadcasts", icon: CalendarClock },
-  { href: "/studio/overlay", label: "Chat Overlay", icon: Sparkles },
-  { href: "/studio/demo", label: "Overlay Demo", icon: MonitorPlay },
   { href: "/studio/settings", label: "Settings", icon: Settings },
 ];
 
