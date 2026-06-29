@@ -351,6 +351,91 @@ export type ModerationFeed = {
   actions: ModerationActionRow[];
 };
 
+export type ReasoningItem = {
+  text: string;
+  engagement: number;
+  humour: number;
+  contribution: number;
+  points: number;
+  createdAt: string;
+};
+
+export type ViewerReasoning = {
+  items: ReasoningItem[];
+  featureReasons: string[];
+  totalPoints: number;
+};
+
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function getViewerReasoningAction(input: {
+  streamId: string;
+  userId: string | null;
+  origin: string;
+  externalAuthorId: string | null;
+}): Promise<ViewerReasoning> {
+  const empty: ViewerReasoning = { items: [], featureReasons: [], totalPoints: 0 };
+  const owned = await getOwnedChannel();
+  if ("error" in owned) return empty;
+  const ok = await assertStreamOwned(input.streamId, owned.data.id);
+  if ("error" in ok) return empty;
+
+  let query = supabaseAdmin
+    .from("score_events")
+    .select("metadata, points, created_at")
+    .eq("stream_id", input.streamId)
+    .eq("type", "score");
+
+  if (input.userId) {
+    query = query.eq("user_id", input.userId);
+  } else if (input.externalAuthorId) {
+    query = query
+      .eq("origin", input.origin)
+      .eq("external_author_id", input.externalAuthorId);
+  } else {
+    return empty;
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load scoring reasoning");
+  }
+
+  const items: ReasoningItem[] = [];
+  const featureReasons: string[] = [];
+  let totalPoints = 0;
+
+  for (const row of data ?? []) {
+    totalPoints += num(row.points);
+    const meta = (row.metadata ?? {}) as {
+      items?: unknown[];
+      reasons?: unknown[];
+    };
+    for (const raw of Array.isArray(meta.items) ? meta.items : []) {
+      const it = raw as Record<string, unknown>;
+      items.push({
+        text: typeof it.text === "string" ? it.text : "",
+        engagement: num(it.engagement),
+        humour: num(it.humour),
+        contribution: num(it.contribution),
+        points: num(it.points),
+        createdAt: row.created_at,
+      });
+    }
+    for (const r of Array.isArray(meta.reasons) ? meta.reasons : []) {
+      if (typeof r === "string" && r) featureReasons.push(r);
+    }
+  }
+
+  return { items, featureReasons, totalPoints };
+}
+
 export async function getModerationFeedAction(
   streamId: string
 ): Promise<ModerationFeed> {

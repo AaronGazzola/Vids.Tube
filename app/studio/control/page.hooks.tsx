@@ -9,12 +9,39 @@ import {
   banParticipantAction,
   dismissSuggestionAction,
   getModerationFeedAction,
+  getViewerReasoningAction,
   hideMessageAction,
   promoteHighlightAction,
   setModerationModeAction,
   unbanParticipantAction,
   unhideMessageAction,
 } from "./page.actions";
+
+export type ReasoningIdentity = {
+  participantKey: string;
+  userId: string | null;
+  origin: string;
+  externalAuthorId: string | null;
+};
+
+export function useViewerReasoning(
+  streamId: string | null,
+  identity: ReasoningIdentity | null,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: ["viewer-reasoning", streamId, identity?.participantKey],
+    queryFn: () =>
+      getViewerReasoningAction({
+        streamId: streamId!,
+        userId: identity!.userId,
+        origin: identity!.origin,
+        externalAuthorId: identity!.externalAuthorId,
+      }),
+    enabled: enabled && !!streamId && !!identity,
+    refetchInterval: enabled ? 8000 : false,
+  });
+}
 
 export function useReadThisQueue(streamId: string | null) {
   return useQuery({

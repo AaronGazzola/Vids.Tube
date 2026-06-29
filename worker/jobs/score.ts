@@ -110,9 +110,17 @@ export async function applyScoreResult(
     byRef.set(String(i), m);
   });
 
+  type BreakdownItem = {
+    text: string;
+    engagement: number;
+    humour: number;
+    contribution: number;
+    points: number;
+  };
   type Participant = {
     sample: BufferedMessage;
     points: number;
+    items: BreakdownItem[];
     features: { m: BufferedMessage; score: number; categories: string[]; reason: string }[];
   };
   const participants = new Map<string, Participant>();
@@ -121,7 +129,7 @@ export async function applyScoreResult(
     const k = participantKey(m);
     let p = participants.get(k);
     if (!p) {
-      p = { sample: m, points: 0, features: [] };
+      p = { sample: m, points: 0, items: [], features: [] };
       participants.set(k, p);
     }
     return p;
@@ -130,7 +138,16 @@ export async function applyScoreResult(
   for (const s of result.scores) {
     const m = byRef.get(s.ref);
     if (!m) continue;
-    ensure(m).points += pointsFor(s, m.origin);
+    const points = pointsFor(s, m.origin);
+    const p = ensure(m);
+    p.points += points;
+    p.items.push({
+      text: m.text.slice(0, 200),
+      engagement: s.engagement,
+      humour: s.humour,
+      contribution: s.contribution,
+      points,
+    });
   }
   for (const f of result.featured) {
     const m = byRef.get(f.ref);
@@ -213,7 +230,7 @@ export async function applyScoreResult(
         external_author_id: p.sample.externalAuthorId,
         type: "score",
         points: p.points,
-        metadata: { reasons: p.features.map((f) => f.reason) },
+        metadata: { reasons: p.features.map((f) => f.reason), items: p.items },
       });
     }
   }
