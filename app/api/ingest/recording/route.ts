@@ -1,8 +1,14 @@
 import type { Database } from "@/supabase/types";
 import { NextResponse } from "next/server";
-import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
+import {
+  hasValidIngestSecret,
+  resolveIngestChannel,
+  supabaseAdmin,
+} from "../_shared";
 
 type VideoUpdate = Database["public"]["Tables"]["videos"]["Update"];
+
+type TargetVideo = { id: string; thumbnail_path: string | null };
 
 type RecordingPayload = {
   mp4Path?: string;
@@ -11,7 +17,71 @@ type RecordingPayload = {
   width?: number;
   height?: number;
   previewPaths?: string[];
+  recordedAt?: string;
 };
+
+const ISO_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+
+// Find the processing VOD row this recording belongs to. Preferred path: match
+// the stream session whose start time bounds the recording's start (`recordedAt`
+// from the VM), then that stream's `source_stream_id` VOD — correct even with
+// multiple channels or back-to-back sessions. Falls back to the newest
+// processing row for the channel when `recordedAt` is absent (legacy VM) or no
+// session matches.
+async function findTargetVideo(
+  channelId: string,
+  recordedAt: string | null
+): Promise<TargetVideo | null> {
+  if (recordedAt && ISO_RE.test(recordedAt)) {
+    const { data: stream, error: streamError } = await supabaseAdmin
+      .from("streams")
+      .select("id")
+      .eq("channel_id", channelId)
+      .lte("started_at", recordedAt)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (streamError) {
+      console.error(streamError);
+      throw new Error("Failed to resolve recording stream");
+    }
+    if (stream) {
+      const { data: byStream, error: byStreamError } = await supabaseAdmin
+        .from("videos")
+        .select("id, thumbnail_path, mp4_path")
+        .eq("source_stream_id", stream.id)
+        .eq("status", "processing")
+        .maybeSingle();
+      if (byStreamError) {
+        console.error(byStreamError);
+        throw new Error("Failed to resolve recording VOD");
+      }
+      if (byStream) {
+        return byStream.mp4_path
+          ? null
+          : { id: byStream.id, thumbnail_path: byStream.thumbnail_path };
+      }
+    }
+    console.warn(
+      `recording: no processing VOD for recordedAt ${recordedAt} on channel ${channelId}; falling back to newest processing`
+    );
+  }
+
+  const { data: newest, error: newestError } = await supabaseAdmin
+    .from("videos")
+    .select("id, thumbnail_path")
+    .eq("channel_id", channelId)
+    .eq("status", "processing")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (newestError) {
+    console.error(newestError);
+    throw new Error("Failed to resolve recording VOD");
+  }
+  return newest ?? null;
+}
 
 function sanitizePreviewPaths(value: unknown): string[] | null {
   if (!Array.isArray(value)) {
@@ -49,7 +119,8 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const INGEST_CHANNEL_SLUG = "azanything";
+  const { searchParams } = new URL(request.url);
+  const mtxPath = searchParams.get("path") ?? searchParams.get("channel");
 
   const body = (await request
     .json()
@@ -59,33 +130,12 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const { data: channel, error: channelError } = await supabaseAdmin
-    .from("channels")
-    .select("id")
-    .eq("slug", INGEST_CHANNEL_SLUG)
-    .maybeSingle();
-
-  if (channelError) {
-    console.error(channelError);
-    return new NextResponse(null, { status: 500 });
-  }
+  const channel = await resolveIngestChannel(mtxPath);
   if (!channel) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const { data: pending, error: pendingError } = await supabaseAdmin
-    .from("videos")
-    .select("id, thumbnail_path")
-    .eq("channel_id", channel.id)
-    .eq("status", "processing")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (pendingError) {
-    console.error(pendingError);
-    return new NextResponse(null, { status: 500 });
-  }
+  const pending = await findTargetVideo(channel.id, body.recordedAt ?? null);
   if (!pending) {
     return new NextResponse(null, { status: 404 });
   }

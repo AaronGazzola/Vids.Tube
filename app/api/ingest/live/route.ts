@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { decideGoLive, SCHEDULED_CLAIM_GRACE_MS } from "@/lib/stream";
-import { hasValidIngestSecret, supabaseAdmin } from "../_shared";
+import { hasValidIngestSecret, resolveIngestChannel, supabaseAdmin } from "../_shared";
 
 export async function POST(request: Request) {
   if (!hasValidIngestSecret(request)) {
@@ -11,18 +11,7 @@ export async function POST(request: Request) {
   const mtxPath =
     searchParams.get("path") ?? searchParams.get("channel") ?? "owner";
 
-  const INGEST_CHANNEL_SLUG = "azanything";
-
-  const { data: channel, error: channelError } = await supabaseAdmin
-    .from("channels")
-    .select("id, slug")
-    .eq("slug", INGEST_CHANNEL_SLUG)
-    .maybeSingle();
-
-  if (channelError) {
-    console.error(channelError);
-    return new NextResponse(null, { status: 500 });
-  }
+  const channel = await resolveIngestChannel(mtxPath);
   if (!channel) {
     return new NextResponse(null, { status: 404 });
   }

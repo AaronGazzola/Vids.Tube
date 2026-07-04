@@ -33,6 +33,20 @@ if [ -z "${SRC:-}" ]; then
   exit 0
 fi
 
+# Session start time. The app uses this to bind the recording to the exact
+# stream session (correct even with multiple channels or back-to-back streams),
+# instead of guessing the newest processing VOD. Use the oldest segment's birth
+# time (fall back to mtime) — when MediaMTX began writing this session.
+OLDEST="$(ls -tr ${REC_DIR}/*.mp4 2>/dev/null | head -1 || true)"
+REC_EPOCH="$(stat -c %W "$OLDEST" 2>/dev/null || echo 0)"
+if [ -z "${REC_EPOCH:-}" ] || [ "${REC_EPOCH}" -le 0 ]; then
+  REC_EPOCH="$(stat -c %Y "$OLDEST" 2>/dev/null || echo 0)"
+fi
+RECORDED_AT=""
+if [ "${REC_EPOCH:-0}" -gt 0 ]; then
+  RECORDED_AT="$(date -u -d "@${REC_EPOCH}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+fi
+
 TS="$(date +%s)"
 OUT="/var/lib/vids-tube/out/${SLUG}"
 mkdir -p "$OUT"
@@ -140,6 +154,7 @@ PAYLOAD="$(jq -nc \
   --argjson dur "${DUR}" \
   --arg w "${WIDTH}" \
   --arg h "${HEIGHT}" \
+  --arg recordedAt "${RECORDED_AT}" \
   --argjson previews "${PREVIEW_KEYS_JSON}" \
   '{
      mp4Path: $mp4,
@@ -148,7 +163,9 @@ PAYLOAD="$(jq -nc \
      previewPaths: $previews
    }
    + ( ($w | length) > 0 and ($h | length) > 0
-       | if . then { width: ($w|tonumber), height: ($h|tonumber) } else {} end )')"
+       | if . then { width: ($w|tonumber), height: ($h|tonumber) } else {} end )
+   + ( ($recordedAt | length) > 0
+       | if . then { recordedAt: $recordedAt } else {} end )')"
 
 curl -fsS -o /dev/null -X POST \
   -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
