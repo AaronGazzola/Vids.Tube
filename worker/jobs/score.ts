@@ -367,6 +367,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         console.error("persist youtube chat failed:", error.message);
       }
       chatMessageId = row?.id ?? null;
+      console.error(`[chat:yt] ${m.author}: ${m.text}`);
       ytBuffer.push({
         ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,
         origin: "youtube",
@@ -404,6 +405,10 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
 
       if (batch.length) {
         const transcript = await fetchTranscriptWindow(stream.id);
+        console.error(
+          `[score] scoring ${batch.length} msg(s): ${vid.length} vidstube + ${yt.length} youtube` +
+            (transcript ? ` (with ${transcript.length} chars transcript)` : " (no transcript)")
+        );
         const prompt = buildScoringPrompt({
           transcript,
           messages: batch.map(toScoringMessage),
@@ -416,6 +421,15 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         }
         if (raw) {
           const result = parseScoreResult(raw);
+          console.error(
+            `[score] result: ${result.scores.length} scored, ${result.featured.length} featured, ${result.moderation.length} flagged`
+          );
+          for (const f of result.featured) {
+            const m = batch[Number(f.ref.replace(/^m/, ""))];
+            console.error(
+              `[score]   ★ featured (${f.score}) ${m ? `"${m.text.slice(0, 60)}"` : f.ref}${f.reason ? ` — ${f.reason}` : ""}`
+            );
+          }
           await applyScoreResult(stream.id, batch, result);
           const mode = await fetchModerationMode(stream.id);
           await applyModeration(

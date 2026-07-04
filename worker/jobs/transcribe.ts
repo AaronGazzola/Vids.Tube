@@ -65,6 +65,10 @@ async function transcribeChunk(
       .insert(rows);
     if (error) {
       console.error(`insert failed for chunk ${index}:`, error);
+    } else {
+      console.error(
+        `[transcribe] chunk ${index}: ${rows.map((r) => r.text).join(" ").slice(0, 80)}`
+      );
     }
   }
 
@@ -83,10 +87,27 @@ export async function runTranscriptionJob(
   const baseFromClock = Math.max(0, (Date.now() - stream.startedAtMs) / 1000);
   const baseline = Math.max(baseFromClock, await existingMaxEndS(stream.id));
 
-  const seg = startHlsAudioSegmenter(workerConfig.hlsUrl(), outPattern, CHUNK);
+  const pullUrl = workerConfig.pullUrl();
+  console.error(
+    `[transcribe] segmenting audio from ${pullUrl} every ${CHUNK}s`
+  );
+  const seg = startHlsAudioSegmenter(pullUrl, outPattern, CHUNK);
   let segExited = false;
-  seg.on("close", () => {
+  let segErr = "";
+  seg.stderr?.on("data", (d: Buffer) => {
+    segErr = (segErr + d.toString()).slice(-2000);
+  });
+  seg.on("error", (e) => {
+    console.error(`[transcribe] segmenter spawn error: ${e.message}`);
     segExited = true;
+  });
+  seg.on("close", (code) => {
+    segExited = true;
+    if (code) {
+      console.error(
+        `[transcribe] segmenter exited (code ${code}): ${segErr.slice(-300)}`
+      );
+    }
   });
 
   let processedIndex = -1;

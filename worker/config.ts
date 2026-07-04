@@ -44,4 +44,14 @@ export const workerConfig = {
   hlsUrl(): string {
     return `${this.streamHost.replace(/\/$/, "")}/${this.mtxPath}/index.m3u8`;
   },
+  pullUrl(): string {
+    const explicit = process.env.WORKER_PULL_URL;
+    if (explicit) {
+      return explicit;
+    }
+    const host = this.streamHost
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
+    return `rtmp://${host}:1935/${this.mtxPath}`;
+  },
 };
