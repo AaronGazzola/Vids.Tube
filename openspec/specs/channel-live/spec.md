@@ -5,97 +5,78 @@ TBD - created by archiving change fix-live-vod-experience. Update Purpose after 
 ## Requirements
 ### Requirement: Channel page reflects live state
 
-The system SHALL render the live experience on the channel page
-`/[channelSlug]`: when the channel's current stream is publicly `live`, the page
-SHALL show the live video player, the live broadcast's title (and its description
-when present), and the live chat panel in place of the page's primary content
-area; when the channel is not publicly live, the page SHALL show its normal
-content (banner, avatar, video grid). A stream in `preview` SHALL NOT be treated
-as live for the channel page — viewers see the offline state until the owner goes
-live.
+The system SHALL NOT embed the live video player on the channel page
+`/[channelSlug]`; the live/scheduled/preview watch experience lives exclusively
+on the standalone `/[channelSlug]/live` page. The channel page SHALL render its
+normal content (banner, avatar, channel identity, video grid) and, in addition,
+SHALL surface entry points to the live page based on the channel's stream state:
+
+- When the channel's stream is `live` (status `live` with an `hls_path`) OR has a
+  `scheduled`/`preview` stream (via `getUpcomingScheduledBroadcastAction`), the
+  page SHALL render a featured card above the video grid that links to
+  `/[channelSlug]/live`. The card SHALL show a red **LIVE** badge when live, and a
+  **Scheduled**/**Upcoming** badge with the broadcast's date/time when
+  scheduled/preview. `live` SHALL take precedence over scheduled/preview.
+- When the channel is `live`, the channel avatar SHALL display a red ring and SHALL
+  link to `/[channelSlug]/live`. When the channel is not live, the avatar SHALL
+  have no ring and SHALL NOT link to the live page.
 
 #### Scenario: Channel is live
 
 - **WHEN** a viewer opens `/[channelSlug]` while the channel's stream `status`
   is `live` and an `hls_path` is present
-- **THEN** the page renders the live player, the broadcast's title (and
-  description when present), and the live chat panel for that stream alongside the
-  channel's identity (name, avatar)
+- **THEN** the page renders the banner, avatar, identity, and video grid with no
+  embedded live player, a featured card with a red **LIVE** badge linking to
+  `/[channelSlug]/live`, and a red ring around the avatar that links to
+  `/[channelSlug]/live`
 
-#### Scenario: Channel is in preview only
+#### Scenario: Channel is scheduled or in preview
 
-- **WHEN** a viewer opens `/[channelSlug]` while the channel's most-recent stream
-  is `preview` (the owner has not gone live yet)
-- **THEN** the page renders the offline state with no live player and no chat
+- **WHEN** a viewer opens `/[channelSlug]` while the channel is not live but has a
+  `scheduled` or connected `preview` stream
+- **THEN** the page renders a featured card with a **Scheduled**/**Upcoming** badge
+  and the broadcast's date/time linking to `/[channelSlug]/live`, with no embedded
+  player and no avatar ring
 
 #### Scenario: Channel is not live
 
-- **WHEN** a viewer opens `/[channelSlug]` while the channel has no `live`
-  stream
-- **THEN** the page renders the channel banner, avatar, and video grid with no
-  live player
-
-### Requirement: Offline placeholder replaces the player
-
-The system SHALL render a placeholder, centered in the page's primary content area,
-whenever the channel is not live. When the channel has an upcoming `scheduled`
-broadcast (status `scheduled` with a future `scheduled_start_at`), the placeholder
-SHALL be a coming-soon card showing that broadcast's thumbnail, title, and a countdown
-to its start time (see the `scheduled-broadcasts` capability). When the channel has no
-upcoming scheduled broadcast, the placeholder SHALL be the static offline placeholder
-and SHALL NOT display a countdown or scheduled time.
-
-#### Scenario: Offline placeholder shown with no upcoming broadcast
-
-- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live and has no
-  upcoming scheduled broadcast
-- **THEN** a centered static placeholder is shown where the live player would
-  otherwise be, with static copy only — no future date, countdown, or schedule
-  controls
-
-#### Scenario: Coming-soon card shown for an upcoming broadcast
-
-- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live but has an
-  upcoming scheduled broadcast
-- **THEN** a centered coming-soon card is shown where the live player would otherwise
-  be, displaying the broadcast's thumbnail, title, and a countdown to its
-  `scheduled_start_at`
-
-### Requirement: Chat UI is gated to live
-
-The system SHALL render the chat UI on the channel page only while the channel
-is live. When the channel is not live, no chat panel, no message list, and no
-composer SHALL be rendered.
-
-#### Scenario: No chat when offline
-
-- **WHEN** a viewer opens `/[channelSlug]` and the channel is not live
-- **THEN** no chat panel, message list, or composer is present in the DOM
-
-#### Scenario: Chat appears when live
-
-- **WHEN** the channel transitions to `live`
-- **THEN** the chat panel appears and behaves per the live-chat capability
-  (anonymous read, authenticated post)
+- **WHEN** a viewer opens `/[channelSlug]` while the channel has no `live`,
+  `preview`, or upcoming `scheduled` stream
+- **THEN** the page renders the banner, avatar, and video grid with no featured
+  card, no avatar ring, and no live player
 
 ### Requirement: Standalone live page is superseded
 
-The system SHALL no longer expose a separate `/live` viewing destination as the
-live home; the channel page is the canonical live location. Any remaining
-`/live` entry point SHALL redirect to the channel page experience, and the root
-home `/` SHALL render the owner channel experience, so that no duplicate,
-always-on chat surface remains anywhere.
+The system SHALL continue to redirect the root `/live` path to the owner
+channel's page `/[ownerSlug]`. The root home `/` SHALL redirect to the owner
+channel's live page `/[ownerSlug]/live` when (and only when) the owner channel's
+stream is `live` (status `live` with an `hls_path`); otherwise `/` SHALL render
+the owner channel page (which itself surfaces the live-page entry points per the
+"Channel page reflects live state" requirement). The redirect SHALL NOT fire
+while the stream state is still loading.
 
 #### Scenario: Visiting the old live path
 
 - **WHEN** a viewer navigates to `/live`
-- **THEN** they are redirected to the owner channel's page rather than a
-  standalone page with an always-present chat panel
+- **THEN** they are redirected to the owner channel's page `/[ownerSlug]`
 
-#### Scenario: Root home shows the channel experience
+#### Scenario: Home redirects to the live page when live
 
-- **WHEN** a viewer opens `/`
-- **THEN** the owner channel experience is rendered (live player + chat when
-  live, otherwise the offline placeholder with no chat) — not a separate
-  always-on chat surface
+- **WHEN** a viewer opens `/` while the owner channel's stream is `live` with an
+  `hls_path` present
+- **THEN** they are redirected to `/[ownerSlug]/live`
+
+#### Scenario: Home shows the channel page when not live
+
+- **WHEN** a viewer opens `/` while the owner channel is scheduled/preview or has
+  no stream
+- **THEN** the owner channel page is rendered (banner, avatar, identity, video
+  grid, and any featured live/upcoming card) with no redirect
+
+#### Scenario: Home does not redirect before stream state resolves
+
+- **WHEN** a viewer opens `/` and the owner channel or its stream state is still
+  loading
+- **THEN** a loading skeleton is shown and no redirect occurs until the state has
+  settled
 
