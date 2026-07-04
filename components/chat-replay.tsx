@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReplayMessage } from "@/app/watch/[videoId]/page.types";
-import { AuthorChip } from "@/components/author-chip";
+import { ChatAuthor } from "@/components/chat-author";
+import { ChatText } from "@/components/chat-text";
 import { Button } from "@/components/ui/button";
 import { visibleReplayMessages } from "@/lib/chat-replay";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
@@ -73,12 +74,12 @@ export function ChatReplay({
           ) : (
             visible.map((message) => (
               <div key={message.id} className="text-sm">
-                <AuthorChip
-                  author={message.author}
+                <ChatAuthor
+                  message={message}
                   size="chat"
                   className="mr-1 align-middle"
                 />
-                <span className="break-words">{message.body}</span>
+                <ChatText text={message.body} className="wrap-break-word" />
               </div>
             ))
           )}

@@ -8,7 +8,25 @@ function row(id: string, secondsAfterStart: number, body = id) {
   return {
     id,
     user_id: `user-${id}`,
+    origin: "vidstube",
     author: { handle: id, avatarPath: null },
+    author_name: null,
+    author_avatar_url: null,
+    body,
+    created_at: new Date(
+      new Date(startedAt).getTime() + secondsAfterStart * 1000
+    ).toISOString(),
+  };
+}
+
+function youtubeRow(id: string, secondsAfterStart: number, body = id) {
+  return {
+    id,
+    user_id: null,
+    origin: "youtube",
+    author: null,
+    author_name: `yt-${id}`,
+    author_avatar_url: null,
     body,
     created_at: new Date(
       new Date(startedAt).getTime() + secondsAfterStart * 1000
@@ -26,6 +44,19 @@ describe("toReplayMessages", () => {
     expect(result.map((m) => m.offsetMs)).toEqual([0, 5_000, 42_000]);
     expect(result[0].userId).toBe("user-a");
     expect(result[0].author).toEqual({ handle: "a", avatarPath: null });
+  });
+
+  it("carries origin and youtube author fields through for both origins", () => {
+    const data: ChatReplay = {
+      startedAt,
+      messages: [row("vt", 0), youtubeRow("yt", 5)],
+    };
+    const result = toReplayMessages(data);
+    expect(result[0].origin).toBe("vidstube");
+    expect(result[1].origin).toBe("youtube");
+    expect(result[1].userId).toBeNull();
+    expect(result[1].author).toBeNull();
+    expect(result[1].author_name).toBe("yt-yt");
   });
 
   it("clamps messages before the stream start to offset 0", () => {

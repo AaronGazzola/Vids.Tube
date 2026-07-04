@@ -9,8 +9,11 @@ export type VoteValue = -1 | 0 | 1;
 
 export type ChatReplayRow = {
   id: string;
-  user_id: string;
-  author: AuthorIdentity;
+  user_id: string | null;
+  origin: string;
+  author: AuthorIdentity | null;
+  author_name: string | null;
+  author_avatar_url: string | null;
   body: string;
   created_at: string;
 };
@@ -22,8 +25,11 @@ export type ChatReplay = {
 
 export type ReplayMessage = {
   id: string;
-  userId: string;
-  author: AuthorIdentity;
+  userId: string | null;
+  origin: string;
+  author: AuthorIdentity | null;
+  author_name: string | null;
+  author_avatar_url: string | null;
   body: string;
   offsetMs: number;
 };

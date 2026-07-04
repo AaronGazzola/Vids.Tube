@@ -14,7 +14,10 @@ export function toReplayMessages(data: ChatReplay): ReplayMessage[] {
   return data.messages.map((m) => ({
     id: m.id,
     userId: m.user_id,
+    origin: m.origin,
     author: m.author,
+    author_name: m.author_name,
+    author_avatar_url: m.author_avatar_url,
     body: m.body,
     offsetMs: Math.max(0, new Date(m.created_at).getTime() - baseMs),
   }));

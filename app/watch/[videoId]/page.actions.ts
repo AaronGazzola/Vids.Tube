@@ -68,9 +68,11 @@ export async function getStreamChatReplayAction(
 
   const { data: messages, error } = await supabase
     .from("chat_messages")
-    .select("id, user_id, body, created_at")
+    .select(
+      "id, user_id, origin, author_name, author_avatar_url, body, created_at"
+    )
     .eq("stream_id", streamId)
-    .eq("origin", "vidstube")
+    .is("hidden_at", null)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -78,19 +80,23 @@ export async function getStreamChatReplayAction(
     throw new Error("Failed to fetch chat replay");
   }
 
-  const rows = (messages ?? []).filter(
-    (m): m is typeof m & { user_id: string } => !!m.user_id
-  );
+  const rows = messages ?? [];
   const authorByUser = await resolveAuthorIdentities(
     supabase,
-    rows.map((m) => m.user_id)
+    rows.map((m) => m.user_id).filter((id): id is string => !!id)
   );
 
   return {
     startedAt: stream?.started_at ?? null,
     messages: rows.map((m) => ({
-      ...m,
-      author: authorByUser.get(m.user_id) ?? null,
+      id: m.id,
+      user_id: m.user_id,
+      origin: m.origin,
+      author: m.user_id ? authorByUser.get(m.user_id) ?? null : null,
+      author_name: m.author_name,
+      author_avatar_url: m.author_avatar_url,
+      body: m.body,
+      created_at: m.created_at,
     })),
   };
 }
