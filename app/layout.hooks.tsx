@@ -99,55 +99,14 @@ export function useUserAuth() {
 
   const signUp = useMutation({
     mutationFn: async ({ email, password, handle }: SignUpInput) => {
-      const res = await signUpAction({ email, password, handle });
-      if ("error" in res) throw new Error(res.error);
-
-      const decision = res.data;
-      const emailRedirectTo = `${window.location.origin}/auth/callback`;
-
-      if (decision.action === "signin") {
-        const { error } = await supabase.auth.signInWithOtp({
-          email: decision.email,
-          options: { shouldCreateUser: false, emailRedirectTo },
-        });
-        if (error) {
-          console.error(error);
-          throw new Error("Failed to send sign-in link");
-        }
-        return { success: true } as const;
-      }
-
-      if (decision.action === "resend") {
-        const { error } = await supabase.auth.resend({
-          type: "signup",
-          email: decision.email,
-          options: { emailRedirectTo },
-        });
-        if (error) {
-          console.error(error);
-          throw new Error("Failed to resend verification email");
-        }
-        return { success: true } as const;
-      }
-
-      const { error } = await supabase.auth.signUp({
-        email: decision.email,
+      const res = await signUpAction({
+        email,
         password,
-        options: {
-          emailRedirectTo,
-          data: { pending_handle: decision.handle },
-        },
+        handle,
+        origin: window.location.origin,
       });
-      if (error) {
-        console.error(error);
-        if (error.message.includes("Database error saving new user")) {
-          throw new Error(
-            "Couldn't reserve that handle — it may have just been taken. Please choose another."
-          );
-        }
-        throw new Error("Failed to create account");
-      }
-      return { success: true } as const;
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
     },
     onSuccess: () => {
       toast.custom(() => (

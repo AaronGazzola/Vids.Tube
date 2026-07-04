@@ -5,7 +5,7 @@ Live chat has no real length cap (the composer's `maxLength={500}` is wrong vers
 ## What Changes
 
 - Cap chat messages at **200 characters** (YouTube parity), enforced in two places:
-  - Client: the composer input `maxLength` becomes `200`.
+  - Client: the composer is a word-wrapping textarea that does not block typing past the limit; instead it shows the remaining count near 200, marks the over-limit characters in red, disables Send, and shows an over-limit message.
   - Server: `postChatMessageAction` returns an expected-error `ActionResult` (`{ error }`) when the trimmed body exceeds 200 characters, so the cap holds regardless of the client.
 - Break long words in rendered message bodies so the chat window **never** scrolls horizontally — applied to both the live chat list and the VOD chat-replay list.
 

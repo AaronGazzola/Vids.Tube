@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tv } from "lucide-react";
 import Link from "next/link";
 
 export function Nav() {
@@ -24,6 +25,12 @@ export function Nav() {
           Vids.Tube
         </Link>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" asChild>
+            <Link href="/azanything" aria-label="View channel">
+              <Tv className="h-5 w-5" />
+              <span className="hidden sm:inline">View channel</span>
+            </Link>
+          </Button>
           <ThemeToggle />
           {isPending ? (
             <Skeleton className="h-8 w-20" />

@@ -33,5 +33,10 @@
 
 ## 6. Close-out
 
+<<<<<<<< HEAD:openspec/changes/archive/2026-07-04-secure-enumeration-safe-signup/tasks.md
 
 > Reconciliation (2026-07-04): removed 2 manual/live verification task(s) per governance rule 2; tracked in Linear (AZ-146 for UI/routing + chat-length; signup live email verify + AZ-55; live-entry verification issue).
+========
+- [x] 6.1 Run `openspec-verify-change` and archive once code-complete + verified
+- [x] 6.2 Update Linear AZ-55 with implementation summary + remaining owner-run live verification
+>>>>>>>> origin/main:openspec/changes/archive/2026-06-21-secure-enumeration-safe-signup/tasks.md

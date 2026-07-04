@@ -19,5 +19,9 @@
 ## 4. Verification
 
 - [x] 4.1 `npx tsc --noEmit` and `npx eslint` pass for `app/page.tsx`, `components/channel-view.tsx`, and any new `components/live-feature-card.tsx`
+<<<<<<<< HEAD:openspec/changes/archive/2026-07-04-add-live-entry-points-and-home-routing/tasks.md
 
 > Reconciliation (2026-07-04): removed 1 manual/live verification task(s) per governance rule 2; tracked in Linear (AZ-146 for UI/routing + chat-length; signup live email verify + AZ-55; live-entry verification issue).
+========
+- [x] 4.2 Manually confirm (owner-verified): `/` redirects to `/[ownerSlug]/live` only when live; the channel page shows the featured card for live and scheduled/preview linking to the live page; the avatar shows a red ring and links to the live page only when live; nothing redirects or flashes while loading
+>>>>>>>> origin/main:openspec/changes/archive/2026-06-21-add-live-entry-points-and-home-routing/tasks.md

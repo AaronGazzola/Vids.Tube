@@ -21,5 +21,9 @@
 ## 5. Verification
 
 - [x] 5.1 Typecheck, lint, and build pass
+<<<<<<<< HEAD:openspec/changes/archive/2026-07-04-cap-chat-message-length-and-wrap/tasks.md
 
 > Reconciliation (2026-07-04): removed 1 manual/live verification task(s) per governance rule 2; tracked in Linear (AZ-146 for UI/routing + chat-length; signup live email verify + AZ-55; live-entry verification issue).
+========
+- [x] 5.2 Manually confirm: the composer is a word-wrapping textarea; remaining count appears near 200; typing past 200 keeps working with the overflow characters in red, Send disabled, and an over-limit message shown; a server post of a 201+ char body is rejected with the error toast; a single 300-character word wraps with no horizontal scroll in both live chat and VOD replay
+>>>>>>>> origin/main:openspec/changes/archive/2026-06-21-cap-chat-message-length-and-wrap/tasks.md

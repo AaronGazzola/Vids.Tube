@@ -17,12 +17,6 @@ export type SignUpInput = {
   handle: string;
 };
 
-export type SignUpDecision = {
-  action: "signup" | "resend" | "signin";
-  handle: string;
-  email: string;
-};
-
 export type ActionResult<T> = { data: T } | { error: string };
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"];
