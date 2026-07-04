@@ -4,6 +4,7 @@ import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { computeStandings } from "@/lib/standings";
+import { useSearchParams } from "next/navigation";
 import { use, useState } from "react";
 import { usePromotedMessages, useStreamStandings } from "./page.hooks";
 
@@ -13,6 +14,8 @@ export default function OverlayPage({
   params: Promise<{ channelSlug: string }>;
 }) {
   const { channelSlug } = use(params);
+  const sp = useSearchParams();
+  const width = Number(sp.get("width")) || 420;
   const { data: channel } = useChannel(channelSlug);
   const { data: stream } = useLiveStream(channel?.id);
 
@@ -36,19 +39,21 @@ export default function OverlayPage({
   const standing = standingMap.get(participantKey) ?? { rank: 99, progress: 0 };
 
   return (
-    <HighlightedMessage
-      key={current.id}
-      author={current.author}
-      text={current.body ?? ""}
-      rank={standing.rank}
-      progress={standing.progress}
-      onDone={() =>
-        setDoneIds((prev) => {
-          const next = new Set(prev);
-          next.add(current.id);
-          return next;
-        })
-      }
-    />
+    <div style={{ width }}>
+      <HighlightedMessage
+        key={current.id}
+        author={current.author}
+        text={current.body ?? ""}
+        rank={standing.rank}
+        progress={standing.progress}
+        onDone={() =>
+          setDoneIds((prev) => {
+            const next = new Set(prev);
+            next.add(current.id);
+            return next;
+          })
+        }
+      />
+    </div>
   );
 }

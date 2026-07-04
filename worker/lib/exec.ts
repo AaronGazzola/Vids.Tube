@@ -12,6 +12,7 @@ export interface ExecOptions {
   input?: string;
   timeout?: number;
   onStderr?: (chunk: string) => void;
+  shell?: boolean;
 }
 
 export function exec(
@@ -23,6 +24,7 @@ export function exec(
     const child = spawn(command, args, {
       cwd: opts.cwd,
       env: opts.env ? { ...process.env, ...opts.env } : process.env,
+      shell: opts.shell ?? /\.(cmd|bat)$/i.test(command),
     });
 
     let stdout = "";

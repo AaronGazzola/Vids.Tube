@@ -22,6 +22,10 @@ const supabaseWs = supabaseOrigin.replace(/^https:/, "wss:");
 const vodBase = originOf(process.env.NEXT_PUBLIC_VOD_BASE_URL);
 const streamHost = originOf(process.env.NEXT_PUBLIC_STREAM_HOST);
 const imageCdns = ["https://picsum.photos", "https://fastly.picsum.photos"];
+const youtubeAvatarHosts = [
+  "https://*.ggpht.com",
+  "https://*.googleusercontent.com",
+];
 
 const contentSecurityPolicy = [
   directive("default-src", "'self'"),
@@ -34,7 +38,8 @@ const contentSecurityPolicy = [
     "blob:",
     supabaseOrigin,
     vodBase,
-    ...imageCdns
+    ...imageCdns,
+    ...youtubeAvatarHosts
   ),
   directive("media-src", "'self'", "blob:", streamHost, vodBase),
   directive(

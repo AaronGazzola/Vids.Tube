@@ -13,8 +13,10 @@ export default function CompetitionOverlayPage({
 }) {
   const { channelSlug } = use(params);
   const sp = useSearchParams();
-  const max = Number(sp.get("max")) || 24;
-  const size = Number(sp.get("size")) || 72;
+  const max = Number(sp.get("max")) || 8;
+  const size = Number(sp.get("size")) || 56;
+  const width = Number(sp.get("width")) || 360;
+  const height = Number(sp.get("height")) || 140;
   const opacity = sp.get("opacity") != null ? Number(sp.get("opacity")) : 0.6;
 
   const { data: scores } = useCompetition(channelSlug, 5);
@@ -32,10 +34,10 @@ export default function CompetitionOverlayPage({
   );
 
   return (
-    <div className="absolute inset-x-0 bottom-0 h-1/3">
+    <div className="absolute bottom-0 left-0" style={{ width, height }}>
       {active.map((s, i) => {
         const st = standings.get(s.participant_key) ?? { rank: i + 1, progress: 0 };
-        const left = 4 + ((i * 37) % 92);
+        const left = 4 + ((i * 37) % 80);
         const bottom = 6 + ((i * 53) % 60);
         const dur = 6 + (i % 5);
         const delay = (i % 7) * 0.6;

@@ -146,7 +146,15 @@ function TestModeBanner() {
   );
 }
 
-function CopyRow({ label, url }: { label: string; url: string }) {
+function CopyRow({
+  label,
+  url,
+  dimensions,
+}: {
+  label: string;
+  url: string;
+  dimensions: string;
+}) {
   const copy = async () => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
@@ -178,6 +186,9 @@ function CopyRow({ label, url }: { label: string; url: string }) {
           <Copy className="h-4 w-4" />
         </Button>
       </div>
+      <span className="block text-[10px] text-white/40">
+        Add in OBS at {dimensions}
+      </span>
     </div>
   );
 }
@@ -195,6 +206,7 @@ function ControlSetup({
   const startGoals = useStartGoals();
 
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [opacityPct, setOpacityPct] = useState(90);
   const [goalInputs, setGoalInputs] = useState<{
     subs: string;
     likes: string;
@@ -337,9 +349,50 @@ function ControlSetup({
         <span className="text-xs font-semibold text-white/70">
           OBS Browser Sources
         </span>
-        <CopyRow label="Highlights" url={base} />
-        <CopyRow label="Goals" url={`${base}/goals`} />
-        <CopyRow label="Competition" url={`${base}/competition`} />
+        <CopyRow label="Highlights" url={base} dimensions="460 × 400" />
+        <CopyRow
+          label="Goal · Subs"
+          url={`${base}/goals/subs`}
+          dimensions="600 × 160"
+        />
+        <CopyRow
+          label="Goal · Likes"
+          url={`${base}/goals/likes`}
+          dimensions="200 × 820"
+        />
+        <CopyRow
+          label="Goal · Viewers"
+          url={`${base}/goals/viewers`}
+          dimensions="160 × 160"
+        />
+        <CopyRow
+          label="Competition"
+          url={`${base}/competition?opacity=${(opacityPct / 100).toFixed(2)}`}
+          dimensions="380 × 180"
+        />
+        <div className="space-y-1 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white/60">
+              Competition opacity
+            </span>
+            <span className="text-xs tabular-nums text-white/60">
+              {opacityPct}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={opacityPct}
+            onChange={(e) => setOpacityPct(Number(e.target.value))}
+            aria-label="Competition overlay opacity"
+            className="w-full accent-white"
+          />
+          <span className="block text-[10px] text-white/40">
+            Sets the opacity on the Competition URL above. Re-copy it and update
+            the OBS source to apply a new value.
+          </span>
+        </div>
       </div>
     </div>
   );

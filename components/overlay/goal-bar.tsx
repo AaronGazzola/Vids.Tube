@@ -150,7 +150,7 @@ export function GoalBar({
           className={`relative mt-1 h-1.5 overflow-hidden rounded-full border ${
             data.reached ? "border-transparent" : "border-white"
           }`}
-          style={{ width: height * 1.6 }}
+          style={{ width: height * 0.96 }}
         >
           <div
             className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-700 ease-out ${
@@ -179,7 +179,7 @@ export function GoalBar({
         className={`relative my-2 w-1.5 self-end overflow-hidden rounded-full border ${
           data.reached ? "border-transparent" : "border-white"
         }`}
-        style={{ height: height * 2.25 }}
+        style={{ height: height * 1.35 }}
       >
         <div
           className={`absolute bottom-0 left-0 w-full rounded-full transition-[height] duration-700 ease-out ${
