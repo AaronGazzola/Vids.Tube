@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const CSP_ENFORCE = true;
+const isDev = process.env.NODE_ENV !== "production";
 
 function originOf(url: string | undefined): string {
   if (!url) {
@@ -29,7 +30,12 @@ const youtubeAvatarHosts = [
 
 const contentSecurityPolicy = [
   directive("default-src", "'self'"),
-  directive("script-src", "'self'", "'unsafe-inline'"),
+  directive(
+    "script-src",
+    "'self'",
+    "'unsafe-inline'",
+    isDev ? "'unsafe-eval'" : ""
+  ),
   directive("style-src", "'self'", "'unsafe-inline'"),
   directive(
     "img-src",

@@ -4,7 +4,7 @@ import { useGoalProgress } from "@/app/(overlay)/overlay/[channelSlug]/goals/pag
 import { usePromotedMessages } from "@/app/(overlay)/overlay/[channelSlug]/page.hooks";
 import { useLiveChat, useRequireOwner } from "@/app/layout.hooks";
 import type { ViewerScoreWithAuthor } from "@/app/layout.types";
-import type { OverlayContext } from "@/app/studio/overlay/page.actions";
+import type { OverlayContext } from "./overlay.actions";
 import {
   useOverlayContext,
   useSetGoals,
@@ -12,7 +12,7 @@ import {
   useSetStreamYoutubeVideo,
   useStartGoals,
   useViewerLeaderboard,
-} from "@/app/studio/overlay/page.hooks";
+} from "./overlay.hooks";
 import { ChatAuthor } from "@/components/chat-author";
 import { ChatText } from "@/components/chat-text";
 import { type Box, DraggableResizable } from "@/components/draggable-resizable";

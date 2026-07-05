@@ -2,8 +2,8 @@
 
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveChat, useLiveStream } from "@/app/layout.hooks";
-import { useReadThisQueue } from "@/app/studio/control/page.hooks";
-import { useViewerLeaderboard } from "@/app/studio/overlay/page.hooks";
+import { useReadThisQueue } from "@/app/(app)/control/page.hooks";
+import { useViewerLeaderboard } from "@/app/(app)/control/overlay.hooks";
 import { ChatAuthor } from "@/components/chat-author";
 import { ChatText } from "@/components/chat-text";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

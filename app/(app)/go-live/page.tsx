@@ -1,5 +1,6 @@
 "use client";
 
+import { useRequireOwner } from "@/app/layout.hooks";
 import { CustomToast } from "@/components/CustomToast";
 import { LivePlayer } from "@/components/live-player";
 import {
@@ -281,14 +282,23 @@ function LiveManage() {
 }
 
 export default function StudioLivePage() {
+  const { isPending: ownerPending, isOwner } = useRequireOwner();
   const { data: broadcast, isPending } = useCurrentBroadcast();
+
+  if (ownerPending || !isOwner) {
+    return (
+      <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
 
   const status = broadcast?.status;
   const isPreview = status === "preview";
   const isLive = status === "live";
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Go Live</h1>
         <Badge

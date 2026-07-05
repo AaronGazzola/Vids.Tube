@@ -10,7 +10,7 @@ import {
   setScoringEnabledAction,
   setStreamYoutubeVideoAction,
   startGoalsAction,
-} from "./page.actions";
+} from "./overlay.actions";
 
 const overlayContextKey = ["overlay-context"] as const;
 

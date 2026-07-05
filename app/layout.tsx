@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Zen_Dots } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { SiteNav, SiteToaster } from "@/components/site-chrome";
+import { AppShell } from "@/components/app-shell";
+import { SiteToaster } from "@/components/site-chrome";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,10 +42,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="h-full">
         <Providers>
-          <SiteNav />
-          {children}
+          <AppShell>{children}</AppShell>
           <SiteToaster />
         </Providers>
       </body>

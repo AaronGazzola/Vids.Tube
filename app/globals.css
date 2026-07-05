@@ -127,6 +127,9 @@
   html {
     @apply font-sans;
   }
+  :root {
+    --sidebar-width: 14rem;
+  }
 }
 
 @keyframes overlay-travel {

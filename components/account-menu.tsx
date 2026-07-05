@@ -1,6 +1,6 @@
 "use client";
 
-import { useIsOwner, useUserAuth } from "@/app/layout.hooks";
+import { useUserAuth } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 
 function initials(email: string | undefined) {
@@ -24,7 +24,6 @@ function initials(email: string | undefined) {
 
 export function AccountMenu() {
   const user = useAuthStore((state) => state.user);
-  const isOwner = useIsOwner();
   const { signOut } = useUserAuth();
 
   return (
@@ -52,14 +51,6 @@ export function AccountMenu() {
             Account
           </Link>
         </DropdownMenuItem>
-        {isOwner && (
-          <DropdownMenuItem asChild>
-            <Link href="/studio">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Studio
-            </Link>
-          </DropdownMenuItem>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => signOut.mutate()}>
           <LogOut className="mr-2 h-4 w-4" />

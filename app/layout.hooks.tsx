@@ -144,7 +144,7 @@ export function useUserAuth() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user"] });
+      queryClient.clear();
       toast.custom(() => (
         <CustomToast
           variant="success"
@@ -175,7 +175,8 @@ export function useUserAuth() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user"] });
+      useAuthStore.getState().setUser(null);
+      queryClient.clear();
       toast.custom(() => (
         <CustomToast
           variant="success"
