@@ -99,10 +99,17 @@ async function fetchTranscriptWindow(streamId: string): Promise<string> {
     .join(" ");
 }
 
+export type ScoringSettings = {
+  mode: "manual" | "auto";
+  highlighting: boolean;
+  autoDisplay: boolean;
+};
+
 export async function applyScoreResult(
   streamId: string,
   batch: BufferedMessage[],
-  result: ScoreResult
+  result: ScoreResult,
+  settings: ScoringSettings
 ): Promise<void> {
   const byRef = new Map<string, BufferedMessage>();
   batch.forEach((m, i) => {
@@ -149,15 +156,19 @@ export async function applyScoreResult(
       points,
     });
   }
-  for (const f of result.featured) {
-    const m = byRef.get(f.ref);
-    if (!m) continue;
-    ensure(m).features.push({
-      m,
-      score: f.score,
-      categories: f.categories,
-      reason: f.reason,
-    });
+  // Featured highlighting can be switched off — when off, score/leaderboard still
+  // run but no messages are featured (no overlay highlights, no "Read this").
+  if (settings.highlighting) {
+    for (const f of result.featured) {
+      const m = byRef.get(f.ref);
+      if (!m) continue;
+      ensure(m).features.push({
+        m,
+        score: f.score,
+        categories: f.categories,
+        reason: f.reason,
+      });
+    }
   }
 
   const nowIso = new Date().toISOString();
@@ -219,6 +230,9 @@ export async function applyScoreResult(
         categories: f.categories,
         reason: f.reason,
         ring_level: ring,
+        // Auto-display promotes featured messages straight to the overlay;
+        // otherwise the owner promotes them manually with "Highlight".
+        promoted_at: settings.autoDisplay ? nowIso : null,
       });
     }
 
@@ -244,13 +258,17 @@ async function fetchBannedKeys(channelId: string): Promise<Set<string>> {
   return new Set((data ?? []).map((r) => r.participant_key));
 }
 
-async function fetchModerationMode(streamId: string): Promise<"manual" | "auto"> {
+async function fetchScoringSettings(streamId: string): Promise<ScoringSettings> {
   const { data } = await supabaseAdmin
     .from("chat_scoring_state")
-    .select("moderation_mode")
+    .select("moderation_mode, highlighting_enabled, auto_display_featured")
     .eq("stream_id", streamId)
     .maybeSingle();
-  return data?.moderation_mode === "auto" ? "auto" : "manual";
+  return {
+    mode: data?.moderation_mode === "auto" ? "auto" : "manual",
+    highlighting: data?.highlighting_enabled ?? true,
+    autoDisplay: data?.auto_display_featured ?? false,
+  };
 }
 
 export async function applyModeration(
@@ -273,8 +291,11 @@ export async function applyModeration(
     if (!m) continue;
     const pkey = participantKey(m);
 
-    if (mode === "auto") {
-      if (f.action === "hide" && m.chatMessageId) {
+    // Auto-hide is always on: a hide flag is always applied immediately. Bans
+    // follow the ban-mode setting — auto-ban applies, suggest only records it.
+    let applied = false;
+    if (f.action === "hide") {
+      if (m.chatMessageId) {
         await supabaseAdmin
           .from("chat_messages")
           .update({ hidden_at: nowIso, hidden_by: "ai" })
@@ -284,27 +305,28 @@ export async function applyModeration(
           .delete()
           .eq("chat_message_id", m.chatMessageId);
       }
-      if (f.action === "ban" && channelId) {
-        await supabaseAdmin.from("banned_participants").upsert(
-          {
-            channel_id: channelId,
-            participant_key: pkey,
-            origin: m.origin,
-            user_id: m.userId,
-            external_author_id: m.externalAuthorId,
-            author_name: m.authorName,
-            reason: f.reason,
-            banned_by: "ai",
-          },
-          { onConflict: "channel_id,participant_key" }
-        );
-        if (m.chatMessageId) {
-          await supabaseAdmin
-            .from("chat_messages")
-            .update({ hidden_at: nowIso, hidden_by: "ai" })
-            .eq("id", m.chatMessageId);
-        }
+      applied = true;
+    } else if (f.action === "ban" && mode === "auto" && channelId) {
+      await supabaseAdmin.from("banned_participants").upsert(
+        {
+          channel_id: channelId,
+          participant_key: pkey,
+          origin: m.origin,
+          user_id: m.userId,
+          external_author_id: m.externalAuthorId,
+          author_name: m.authorName,
+          reason: f.reason,
+          banned_by: "ai",
+        },
+        { onConflict: "channel_id,participant_key" }
+      );
+      if (m.chatMessageId) {
+        await supabaseAdmin
+          .from("chat_messages")
+          .update({ hidden_at: nowIso, hidden_by: "ai" })
+          .eq("id", m.chatMessageId);
       }
+      applied = true;
     }
 
     await supabaseAdmin.from("moderation_actions").insert({
@@ -319,8 +341,8 @@ export async function applyModeration(
       author_name: m.authorName,
       reason: f.reason,
       source: "ai",
-      status: mode === "auto" ? "applied" : "suggested",
-      decided_at: mode === "auto" ? nowIso : null,
+      status: applied ? "applied" : "suggested",
+      decided_at: applied ? nowIso : null,
     });
   }
 }
@@ -430,14 +452,14 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
               `[score]   ★ featured (${f.score}) ${m ? `"${m.text.slice(0, 60)}"` : f.ref}${f.reason ? ` — ${f.reason}` : ""}`
             );
           }
-          await applyScoreResult(stream.id, batch, result);
-          const mode = await fetchModerationMode(stream.id);
+          const settings = await fetchScoringSettings(stream.id);
+          await applyScoreResult(stream.id, batch, result, settings);
           await applyModeration(
             stream.id,
             channelId,
             batch,
             result.moderation,
-            mode
+            settings.mode
           );
           await supabaseAdmin
             .from("chat_scoring_state")

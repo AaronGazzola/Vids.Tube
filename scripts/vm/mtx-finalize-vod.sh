@@ -27,17 +27,20 @@ SLUG="$1"
 set -a; . /etc/vids-tube/r2.env; set +a
 
 REC_DIR="/var/lib/vids-tube/rec/${SLUG}"
-SRC="$(ls -t ${REC_DIR}/*.mp4 2>/dev/null | head -1 || true)"
-if [ -z "${SRC:-}" ]; then
+# All segments of this broadcast, oldest first. A broadcast that disconnected and
+# reconnected leaves several files; they are concatenated into one VOD (jump cuts,
+# no black). MediaMTX writes one file per publish (encoder) session.
+mapfile -t SEGMENTS < <(ls -tr ${REC_DIR}/*.mp4 2>/dev/null || true)
+if [ "${#SEGMENTS[@]}" -eq 0 ]; then
   echo "no recording for ${SLUG}"
   exit 0
 fi
+OLDEST="${SEGMENTS[0]}"
 
 # Session start time. The app uses this to bind the recording to the exact
 # stream session (correct even with multiple channels or back-to-back streams),
 # instead of guessing the newest processing VOD. Use the oldest segment's birth
 # time (fall back to mtime) — when MediaMTX began writing this session.
-OLDEST="$(ls -tr ${REC_DIR}/*.mp4 2>/dev/null | head -1 || true)"
 REC_EPOCH="$(stat -c %W "$OLDEST" 2>/dev/null || echo 0)"
 if [ -z "${REC_EPOCH:-}" ] || [ "${REC_EPOCH}" -le 0 ]; then
   REC_EPOCH="$(stat -c %Y "$OLDEST" 2>/dev/null || echo 0)"
@@ -55,7 +58,63 @@ JPG="${OUT}/${TS}.jpg"
 PREVIEW_DIR="${OUT}/${TS}-previews"
 mkdir -p "$PREVIEW_DIR"
 
-ffmpeg -y -i "$SRC" -c copy -movflags +faststart "$MP4"
+# Ask the app where the public (live) portion starts and whether the broadcast has
+# ended. The recording captures from RTMP connect (preview onward), but the VOD
+# must exclude everything before go-live. TRIM = live_at - session start of the
+# FIRST segment, clamped to >= 0. A missing live_at means the broadcast never went
+# live, so there is no VOD to build.
+LIVE_AT=""
+ENDED="false"
+if [ -n "${RECORDED_AT:-}" ]; then
+  BOUNDS="$(curl -fsS -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
+    "https://vids.tube/api/ingest/recording?path=${SLUG}&recordedAt=${RECORDED_AT}" \
+    2>/dev/null || true)"
+  LIVE_AT="$(printf '%s' "$BOUNDS" | jq -r '.liveAt // empty' 2>/dev/null || true)"
+  ENDED="$(printf '%s' "$BOUNDS" | jq -r '.ended // false' 2>/dev/null || echo false)"
+fi
+
+if [ -z "${LIVE_AT:-}" ]; then
+  echo "no live_at for ${SLUG}; broadcast never went live — no VOD"
+  exit 0
+fi
+
+TRIM=0
+LIVE_EPOCH="$(date -u -d "$LIVE_AT" +%s 2>/dev/null || echo 0)"
+if [ "${LIVE_EPOCH:-0}" -gt 0 ] && [ "${REC_EPOCH:-0}" -gt 0 ]; then
+  DELTA=$(( LIVE_EPOCH - REC_EPOCH ))
+  if [ "$DELTA" -gt 0 ]; then
+    TRIM="$DELTA"
+  fi
+fi
+
+# Build a concat list: the first segment trimmed to start at go-live, then every
+# later reconnect segment whole. Trimming the first needs a keyframe-safe remux to
+# a temp file; the rest are concatenated with -c copy.
+CONCAT_DIR="${OUT}/${TS}-parts"
+mkdir -p "$CONCAT_DIR"
+CONCAT_LIST="${CONCAT_DIR}/list.txt"
+: > "$CONCAT_LIST"
+
+FIRST="${SEGMENTS[0]}"
+FIRST_PART="${CONCAT_DIR}/part-00000.mp4"
+if [ "$TRIM" -gt 0 ]; then
+  echo "trimming ${TRIM}s of pre-live footage from the first segment"
+  ffmpeg -y -ss "$TRIM" -i "$FIRST" -c copy -movflags +faststart "$FIRST_PART"
+else
+  ffmpeg -y -i "$FIRST" -c copy -movflags +faststart "$FIRST_PART"
+fi
+echo "file '${FIRST_PART}'" >> "$CONCAT_LIST"
+
+for i in "${!SEGMENTS[@]}"; do
+  [ "$i" -eq 0 ] && continue
+  echo "file '${SEGMENTS[$i]}'" >> "$CONCAT_LIST"
+done
+
+if [ "${#SEGMENTS[@]}" -gt 1 ]; then
+  echo "concatenating ${#SEGMENTS[@]} segments (${#SEGMENTS[@]} - 1 reconnect jump cuts)"
+fi
+ffmpeg -y -f concat -safe 0 -i "$CONCAT_LIST" -c copy -movflags +faststart "$MP4"
+rm -rf "$CONCAT_DIR"
 
 DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$MP4" | cut -d. -f1 || true)"
 if [ -z "${DUR:-}" ]; then DUR=0; fi
@@ -111,9 +170,9 @@ ffmpeg -y -ss "$SEEK" -i "$MP4" -frames:v 1 "$JPG"
 # of a livestream recording.
 PREVIEW_COUNT=5
 PREVIEW_KEYS_JSON="[]"
+PREVIEW_KEYS=()
 if [ "$DUR" -gt 5 ]; then
   PERCENTS=(5 25 45 65 85)
-  PREVIEW_KEYS=()
   for i in "${!PERCENTS[@]}"; do
     PCT="${PERCENTS[$i]}"
     N=$(( i + 1 ))
@@ -138,7 +197,7 @@ rclone copyto "$MP4" "r2:${R2_BUCKET_VOD}/${KEY_MP4}"
 rclone copyto "$JPG" "r2:${R2_BUCKET_VOD}/${KEY_JPG}"
 
 # Upload only the stills that actually succeeded.
-if [ "${#PREVIEW_KEYS[@]:-0}" -gt 0 ]; then
+if [ "${#PREVIEW_KEYS[@]}" -gt 0 ]; then
   for KEY in "${PREVIEW_KEYS[@]}"; do
     BASENAME="$(basename "$KEY")"
     rclone copyto "${PREVIEW_DIR}/${BASENAME}" "r2:${R2_BUCKET_VOD}/${KEY}"
@@ -173,5 +232,13 @@ curl -fsS -o /dev/null -X POST \
   -d "${PAYLOAD}" \
   "https://vids.tube/api/ingest/recording?path=${SLUG}"
 
-rm -f "$SRC"
 rm -rf "$PREVIEW_DIR"
+
+# Keep the raw segments until the broadcast has ended: a reconnect will add more
+# footage and re-finalize (concatenating everything since go-live). Only once the
+# owner ends the broadcast do we remove them.
+if [ "${ENDED}" = "true" ]; then
+  for SEG in "${SEGMENTS[@]}"; do
+    rm -f "$SEG"
+  done
+fi

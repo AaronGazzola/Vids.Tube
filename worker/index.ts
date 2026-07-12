@@ -5,6 +5,7 @@ import {
   releaseLock,
   resolveEligibleStream,
   tryAcquireLock,
+  upsertWorkerHeartbeat,
 } from "./lib/streams";
 
 function sleep(ms: number): Promise<void> {
@@ -12,6 +13,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function tick(): Promise<void> {
+  await upsertWorkerHeartbeat();
+
   const stream = await resolveEligibleStream();
   if (!stream) return;
 
@@ -21,9 +24,20 @@ async function tick(): Promise<void> {
     return;
   }
 
-  console.error(`engaging stream ${stream.id} (transcribe + score)`);
+  // Scoring, YouTube-chat polling, and moderation run for any engaged public
+  // stream (waiting room or live). Transcription pulls the RTMP feed and only
+  // makes sense once the stream is live.
+  const jobs = [runScoringJob(stream)];
+  if (stream.status === "live") {
+    jobs.push(runTranscriptionJob(stream));
+  }
+  console.error(
+    `engaging stream ${stream.id} (${stream.status}): ${
+      stream.status === "live" ? "transcribe + score" : "score only"
+    }`
+  );
   try {
-    await Promise.all([runTranscriptionJob(stream), runScoringJob(stream)]);
+    await Promise.all(jobs);
   } finally {
     await releaseLock(stream.id);
     console.error(`stopped engaging stream ${stream.id}`);
@@ -31,7 +45,7 @@ async function tick(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.error("worker started; polling for live streams");
+  console.error("worker started; polling for public streams");
   for (;;) {
     try {
       await tick();

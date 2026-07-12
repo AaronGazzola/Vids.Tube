@@ -328,8 +328,19 @@ a round-trip, not re-uploaded bytes — harmless.
 
 ### 8.3 Finalize script
 
-`runOnNotReady` (§3) launches this in the background. It remuxes the session
-recording to a single faststart MP4, captures pixel dimensions (`ffprobe`),
+`runOnNotReady` (§3) launches this in the background on every encoder disconnect.
+It asks the app (`GET /api/ingest/recording?path=<slug>&recordedAt=<session start>`)
+for the session's `liveAt` and `ended` flags. A broadcast that never went live (no
+`liveAt`) produces **no VOD**. Otherwise it **concatenates every recorded segment
+since go-live** — a broadcast that disconnected and reconnected leaves one file per
+encoder session — trimming the first segment to start at `liveAt` (excluding the
+private preview footage) and appending each reconnect segment whole. The result is a
+single faststart MP4 with a **jump cut** (no black) at each reconnect. It posts the
+result on every disconnect, but the app keeps the VOD hidden (`processing`) until
+the owner presses **End stream**; only then does the row flip to `ready`. The raw
+segments are deleted only once the broadcast has `ended`, so a reconnect can always
+re-finalize with the added footage. The script also captures pixel dimensions
+(`ffprobe`),
 grabs a poster thumbnail at `min(10s, dur/2)`, extracts 5 hover-preview stills
 (~480px wide at 5%/25%/45%/65%/85% of the duration), uploads everything to R2
 under `vod/<slug>/<ts>.{mp4,jpg}` and `vod/<slug>/<ts>/preview-<n>.jpg`, then

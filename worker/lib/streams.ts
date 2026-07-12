@@ -1,25 +1,44 @@
-import { isLiveAndFresh } from "@/lib/stream";
+import { isLiveAndFresh, isStreamPublic } from "@/lib/stream";
 import { supabaseAdmin } from "../supabase";
+import { workerConfig } from "../config";
 
 export interface EligibleStream {
   id: string;
+  status: string;
   startedAtMs: number;
+}
+
+// A stream the worker should engage: it is public (live, or a dated
+// scheduled/preview waiting room). A `live` stream must also be fresh (encoder
+// heartbeating); a scheduled/preview waiting room needs no encoder freshness.
+function isEngageable(row: {
+  status: string;
+  scheduled_start_at: string | null;
+  last_seen_at: string | null;
+}): boolean {
+  if (!isStreamPublic(row)) {
+    return false;
+  }
+  if (row.status === "live") {
+    return isLiveAndFresh(row, Date.now());
+  }
+  return true;
 }
 
 export async function resolveEligibleStream(): Promise<EligibleStream | null> {
   const { data: stream, error } = await supabaseAdmin
     .from("streams")
-    .select("id, status, last_seen_at, started_at")
-    .eq("status", "live")
+    .select("id, status, scheduled_start_at, last_seen_at, started_at")
+    .in("status", ["scheduled", "preview", "live"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
     console.error(error);
-    throw new Error("Failed to resolve live stream");
+    throw new Error("Failed to resolve engageable stream");
   }
-  if (!stream || !isLiveAndFresh(stream, Date.now())) {
+  if (!stream || !isEngageable(stream)) {
     return null;
   }
 
@@ -39,6 +58,7 @@ export async function resolveEligibleStream(): Promise<EligibleStream | null> {
 
   return {
     id: stream.id,
+    status: stream.status,
     startedAtMs: stream.started_at
       ? new Date(stream.started_at).getTime()
       : Date.now(),
@@ -48,10 +68,10 @@ export async function resolveEligibleStream(): Promise<EligibleStream | null> {
 export async function isStreamEligible(streamId: string): Promise<boolean> {
   const { data: stream } = await supabaseAdmin
     .from("streams")
-    .select("status, last_seen_at")
+    .select("status, scheduled_start_at, last_seen_at")
     .eq("id", streamId)
     .maybeSingle();
-  if (!stream || !isLiveAndFresh(stream, Date.now())) {
+  if (!stream || !isEngageable(stream)) {
     return false;
   }
   const { data: state } = await supabaseAdmin
@@ -60,6 +80,44 @@ export async function isStreamEligible(streamId: string): Promise<boolean> {
     .eq("stream_id", streamId)
     .maybeSingle();
   return !!state?.enabled;
+}
+
+let heartbeatChannelId: string | null = null;
+
+async function resolveWorkerChannelId(): Promise<string | null> {
+  if (heartbeatChannelId) {
+    return heartbeatChannelId;
+  }
+  const { data, error } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", workerConfig.mtxPath)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    return null;
+  }
+  heartbeatChannelId = data?.id ?? null;
+  return heartbeatChannelId;
+}
+
+// Upsert the worker heartbeat so the /live page can show a running indicator and
+// schedule-save can warn when the worker is unreachable. Called every tick, even
+// when no stream is eligible.
+export async function upsertWorkerHeartbeat(): Promise<void> {
+  const channelId = await resolveWorkerChannelId();
+  if (!channelId) {
+    return;
+  }
+  const { error } = await supabaseAdmin
+    .from("worker_heartbeats")
+    .upsert(
+      { channel_id: channelId, last_heartbeat_at: new Date().toISOString() },
+      { onConflict: "channel_id" }
+    );
+  if (error) {
+    console.error(error);
+  }
 }
 
 export async function tryAcquireLock(

@@ -3,7 +3,6 @@
 import { createClient } from "@/supabase/server-client";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
-import { STALE_MS } from "@/lib/stream";
 import {
   isReservedHandle,
   isValidHandle,
@@ -303,15 +302,9 @@ export async function getLiveStreamAction(
     return null;
   }
 
-  if (data.status === "live") {
-    const lastSeen = data.last_seen_at
-      ? new Date(data.last_seen_at).getTime()
-      : 0;
-    if (Date.now() - lastSeen > STALE_MS) {
-      return { ...data, status: "ended" };
-    }
-  }
-
+  // A stale `live` row is NOT downgraded to ended: the encoder is disconnected but
+  // the broadcast continues. The client detects this via isFeedDisconnected and
+  // shows a Disconnected state while keeping chat open.
   return data;
 }
 

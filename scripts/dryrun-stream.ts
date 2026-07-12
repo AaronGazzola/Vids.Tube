@@ -264,7 +264,11 @@ async function main() {
       }
       if (raw) {
         const result = parseScoreResult(raw);
-        await applyScoreResult(streamId, batch, result);
+        await applyScoreResult(streamId, batch, result, {
+          mode: "manual",
+          highlighting: true,
+          autoDisplay: false,
+        });
         const { data: state } = await admin
           .from("chat_scoring_state")
           .select("moderation_mode")

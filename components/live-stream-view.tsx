@@ -4,12 +4,13 @@ import {
   useChannel,
   useUpcomingScheduled,
 } from "@/app/[channelSlug]/page.hooks";
-import { useLiveStream } from "@/app/layout.hooks";
+import { useLiveStream, useWaitingCount } from "@/app/layout.hooks";
 import { CollapsibleDescription } from "@/components/collapsible-description";
 import { LiveChat } from "@/components/live-chat";
 import { LiveStage } from "@/components/live-stage";
 import { ScheduledCard } from "@/components/scheduled-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -35,6 +36,8 @@ export function LiveStreamView({ slug }: { slug: string }) {
   const isLive = stream?.status === "live" && !!stream.hls_path;
   const upcoming = upcomingScheduled ?? null;
   const streamId = isLive ? stream.id : upcoming?.id ?? null;
+  const waitingChatOpen = !isLive && !!upcoming?.waiting_room_chat;
+  const waitingCount = useWaitingCount(!isLive ? upcoming?.id ?? null : null);
 
   const settled =
     !channelPending && (!channel || (!streamPending && !upcomingPending));
@@ -68,7 +71,13 @@ export function LiveStreamView({ slug }: { slug: string }) {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+        <div
+          className={
+            waitingChatOpen
+              ? "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]"
+              : "mx-auto w-full max-w-3xl"
+          }
+        >
           <div className="space-y-3">
             <ScheduledCard broadcast={upcoming} />
             {upcoming?.title && (
@@ -76,10 +85,18 @@ export function LiveStreamView({ slug }: { slug: string }) {
                 {upcoming.title}
               </h2>
             )}
+            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              {waitingCount === 1
+                ? "1 person waiting"
+                : `${waitingCount} people waiting`}
+            </p>
           </div>
-          <div className="lg:h-[70vh]">
-            <LiveChat streamId={streamId} />
-          </div>
+          {waitingChatOpen && (
+            <div className="lg:h-[70vh]">
+              <LiveChat streamId={streamId} />
+            </div>
+          )}
         </div>
       )}
     </main>

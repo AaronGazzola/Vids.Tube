@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { decideGoLive, SCHEDULED_CLAIM_GRACE_MS } from "@/lib/stream";
+import { decideGoLive } from "@/lib/stream";
 import { hasValidIngestSecret, resolveIngestChannel, supabaseAdmin } from "../_shared";
 
 export async function POST(request: Request) {
@@ -20,36 +20,21 @@ export async function POST(request: Request) {
   const hlsPath = `${host}/${mtxPath}/index.m3u8`;
   const now = new Date().toISOString();
 
-  const { data: existing, error: existingError } = await supabaseAdmin
+  const { data: active, error: activeError } = await supabaseAdmin
     .from("streams")
-    .select("id, status, last_seen_at")
+    .select("id, status")
     .eq("channel_id", channel.id)
+    .in("status", ["draft", "scheduled", "preview", "live"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (existingError) {
-    console.error(existingError);
+  if (activeError) {
+    console.error(activeError);
     return new NextResponse(null, { status: 500 });
   }
 
-  const claimCutoff = new Date(Date.now() - SCHEDULED_CLAIM_GRACE_MS).toISOString();
-  const { data: scheduled, error: scheduledError } = await supabaseAdmin
-    .from("streams")
-    .select("id, status, scheduled_start_at")
-    .eq("channel_id", channel.id)
-    .eq("status", "scheduled")
-    .gte("scheduled_start_at", claimCutoff)
-    .order("scheduled_start_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (scheduledError) {
-    console.error(scheduledError);
-    return new NextResponse(null, { status: 500 });
-  }
-
-  const decision = decideGoLive(existing, Date.now(), scheduled);
+  const decision = decideGoLive(active);
 
   if (decision.action === "reconnect") {
     const { error } = await supabaseAdmin
@@ -60,10 +45,22 @@ export async function POST(request: Request) {
       console.error(error);
       return new NextResponse(null, { status: 500 });
     }
+    // Reconnecting a live row after a disconnect closes its open reconnect gap.
+    if (active?.status === "live") {
+      const { error: gapError } = await supabaseAdmin
+        .from("stream_gaps")
+        .update({ gap_end_at: now })
+        .eq("stream_id", decision.streamId)
+        .is("gap_end_at", null);
+      if (gapError) {
+        console.error(gapError);
+        return new NextResponse(null, { status: 500 });
+      }
+    }
     return NextResponse.json({ ok: true });
   }
 
-  if (decision.action === "claim-scheduled") {
+  if (decision.action === "claim") {
     const { error } = await supabaseAdmin
       .from("streams")
       .update({
@@ -73,7 +70,7 @@ export async function POST(request: Request) {
         last_seen_at: now,
       })
       .eq("id", decision.streamId)
-      .eq("status", "scheduled");
+      .in("status", ["draft", "scheduled"]);
     if (error) {
       console.error(error);
       return new NextResponse(null, { status: 500 });
@@ -81,20 +78,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (decision.action === "new-after-stale") {
-    const { error } = await supabaseAdmin
-      .from("streams")
-      .update({ status: "ended", ended_at: now })
-      .eq("id", decision.staleStreamId);
-    if (error) {
-      console.error(error);
-      return new NextResponse(null, { status: 500 });
-    }
-  }
-
   const { error } = await supabaseAdmin.from("streams").insert({
     channel_id: channel.id,
     status: "preview",
+    created_in_ui: false,
     hls_path: hlsPath,
     started_at: now,
     last_seen_at: now,

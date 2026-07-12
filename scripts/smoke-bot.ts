@@ -238,7 +238,11 @@ async function main() {
       log(`  returned: ${result.scores.map((s) => s.ref).join("  |  ")}`);
     }
 
-    await applyScoreResult(streamId, batch, result);
+    await applyScoreResult(streamId, batch, result, {
+      mode: "manual",
+      highlighting: true,
+      autoDisplay: false,
+    });
 
     const { data: scores } = await admin
       .from("viewer_scores")

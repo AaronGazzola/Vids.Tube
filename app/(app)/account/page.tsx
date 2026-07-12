@@ -1,6 +1,11 @@
 "use client";
 
-import { useMyChannel, useOwnerChannel, useRequireAuth } from "@/app/layout.hooks";
+import {
+  useIsOwner,
+  useMyChannel,
+  useOwnerChannel,
+  useRequireAuth,
+} from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { ChannelSettingsForm } from "@/components/channel-settings-form";
 import { CustomToast } from "@/components/CustomToast";
@@ -31,6 +36,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { channelAssetUrl } from "@/lib/storage";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
+import { OriginBadge } from "@/components/origin-badge";
+import {
+  useBannedParticipants,
+  useUnbanParticipant,
+} from "./page.hooks";
 
 function stubToast(title: string) {
   toast.custom(() => (
@@ -38,11 +48,68 @@ function stubToast(title: string) {
   ));
 }
 
+function BannedUsersCard() {
+  const { data: banned, isPending } = useBannedParticipants(true);
+  const unban = useUnbanParticipant();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Banned users</CardTitle>
+        <CardDescription>
+          People blocked from chatting on your channel. Bans apply across all
+          streams until you unban.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isPending ? (
+          <Skeleton className="h-16 w-full" />
+        ) : !banned?.length ? (
+          <p className="text-sm text-muted-foreground">No one is banned.</p>
+        ) : (
+          <ul className="divide-y">
+            {banned.map((b) => {
+              const label = b.handle
+                ? `@${b.handle}`
+                : b.authorName ?? "viewer";
+              return (
+                <li
+                  key={b.participantKey}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <OriginBadge origin={b.origin} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{label}</p>
+                    {b.reason && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {b.reason}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={unban.isPending}
+                    onClick={() => unban.mutate(b.participantKey)}
+                  >
+                    Unban
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AccountPage() {
   const { isPending, isAuthenticated } = useRequireAuth();
   const user = useAuthStore((state) => state.user);
   const { data: channel, isPending: channelPending } = useMyChannel();
   const { data: ownerChannel } = useOwnerChannel();
+  const isOwner = useIsOwner();
 
   if (isPending || !isAuthenticated) {
     return (
@@ -91,6 +158,8 @@ export default function AccountPage() {
       </div>
 
       <ChannelSettingsForm />
+
+      {isOwner && <BannedUsersCard />}
 
       <Card>
         <CardHeader>

@@ -58,9 +58,10 @@ async function findTargetVideo(
         throw new Error("Failed to resolve recording VOD");
       }
       if (byStream) {
-        return byStream.mp4_path
-          ? null
-          : { id: byStream.id, thumbnail_path: byStream.thumbnail_path };
+        // Allow re-finalize to overwrite while still processing: a reconnected
+        // broadcast finalizes again (with more footage) on each disconnect. Once
+        // published (ready), the row is no longer `processing` and won't match.
+        return { id: byStream.id, thumbnail_path: byStream.thumbnail_path };
       }
     }
     console.warn(
@@ -114,6 +115,50 @@ function sanitizeDimension(value: unknown): number | null | undefined {
   return Math.round(value);
 }
 
+// The VM finalize hook calls this before building the MP4 to learn where the
+// public (live) portion of the recording begins. `startedAt` is when the encoder
+// connected (recording start); `liveAt` is when the owner pressed Go live. The
+// finalize trims everything before `liveAt` so the VOD excludes preview footage.
+export async function GET(request: Request) {
+  if (!hasValidIngestSecret(request)) {
+    return new NextResponse(null, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const mtxPath = searchParams.get("path") ?? searchParams.get("channel");
+  const recordedAt = searchParams.get("recordedAt");
+
+  const channel = await resolveIngestChannel(mtxPath);
+  if (!channel) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  let query = supabaseAdmin
+    .from("streams")
+    .select("id, started_at, live_at, status")
+    .eq("channel_id", channel.id)
+    .order("started_at", { ascending: false })
+    .limit(1);
+  if (recordedAt && ISO_RE.test(recordedAt)) {
+    query = query.lte("started_at", recordedAt);
+  }
+
+  const { data: stream, error } = await query.maybeSingle();
+  if (error) {
+    console.error(error);
+    return new NextResponse(null, { status: 500 });
+  }
+  if (!stream) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  return NextResponse.json({
+    startedAt: stream.started_at,
+    liveAt: stream.live_at,
+    ended: stream.status === "ended",
+  });
+}
+
 export async function POST(request: Request) {
   if (!hasValidIngestSecret(request)) {
     return new NextResponse(null, { status: 403 });
@@ -140,12 +185,32 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 404 });
   }
 
+  // A live broadcast can disconnect/reconnect several times; the VM re-finalizes on
+  // each disconnect. Only publish (ready) once the owner has ended the broadcast —
+  // otherwise store the recording but keep the row processing (hidden).
+  const { data: vodRow } = await supabaseAdmin
+    .from("videos")
+    .select("source_stream_id")
+    .eq("id", pending.id)
+    .maybeSingle();
+  let streamEnded = false;
+  if (vodRow?.source_stream_id) {
+    const { data: sourceStream } = await supabaseAdmin
+      .from("streams")
+      .select("status")
+      .eq("id", vodRow.source_stream_id)
+      .maybeSingle();
+    streamEnded = sourceStream?.status === "ended";
+  }
+
   const update: VideoUpdate = {
-    status: "ready",
     mp4_path: body.mp4Path,
     duration_s: body.durationS ?? null,
-    published_at: new Date().toISOString(),
   };
+  if (streamEnded) {
+    update.status = "ready";
+    update.published_at = new Date().toISOString();
+  }
 
   if (!pending.thumbnail_path) {
     update.thumbnail_path = body.thumbnailPath ?? null;

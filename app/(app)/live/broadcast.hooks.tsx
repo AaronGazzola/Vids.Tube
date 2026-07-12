@@ -4,13 +4,22 @@ import { CustomToast } from "@/components/CustomToast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  discardBroadcastAction,
   endStreamAction,
   getCurrentBroadcastAction,
   getStreamKeyAction,
+  getStreamSettingsAction,
+  getTranscriptAction,
+  getWorkerStatusAction,
   goLiveAction,
   regenerateStreamKeyAction,
+  saveStreamSettingsAction,
+  type StreamSettingsInput,
   uploadBroadcastThumbnailAction,
-} from "./page.actions";
+  upsertBroadcastAction,
+} from "./broadcast.actions";
+
+const settingsKey = ["stream-settings"] as const;
 
 const broadcastKey = ["current-broadcast"] as const;
 
@@ -26,6 +35,128 @@ export function useCurrentBroadcast() {
     queryKey: broadcastKey,
     queryFn: () => getCurrentBroadcastAction(),
     refetchInterval: 10000,
+  });
+}
+
+export function useWorkerStatus() {
+  return useQuery({
+    queryKey: ["worker-status"],
+    queryFn: () => getWorkerStatusAction(),
+    refetchInterval: 15000,
+  });
+}
+
+export function useTranscript(streamId: string | null, live: boolean) {
+  return useQuery({
+    queryKey: ["transcript", streamId],
+    queryFn: () => getTranscriptAction(streamId!),
+    enabled: !!streamId && live,
+    refetchInterval: 5000,
+  });
+}
+
+export function useStreamSettings() {
+  return useQuery({
+    queryKey: settingsKey,
+    queryFn: () => getStreamSettingsAction(),
+    refetchInterval: 15000,
+  });
+}
+
+export function useSaveStreamSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: StreamSettingsInput) => {
+      const res = await saveStreamSettingsAction(input);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsKey });
+      queryClient.invalidateQueries({ queryKey: broadcastKey });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Saved"
+          message="Your broadcast settings are saved."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't save"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useUpsertBroadcast() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      title: string;
+      description: string;
+      scheduledStartAt: string | null;
+    }) => {
+      const res = await upsertBroadcastAction(input);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: broadcastKey });
+      toast.custom(() => (
+        <CustomToast
+          variant="success"
+          title="Saved"
+          message="Your broadcast settings are saved."
+        />
+      ));
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't save"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useDiscardBroadcast() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await discardBroadcastAction();
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: broadcastKey });
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't discard"
+          message={error.message}
+        />
+      ));
+    },
   });
 }
 

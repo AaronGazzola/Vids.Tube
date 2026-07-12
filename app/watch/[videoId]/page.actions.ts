@@ -50,20 +50,31 @@ export async function getStreamChatReplayAction(
   streamId: string
 ): Promise<ChatReplay> {
   if (!UUID_RE.test(streamId)) {
-    return { startedAt: null, messages: [] };
+    return { startedAt: null, liveAt: null, gaps: [], messages: [] };
   }
 
   const supabase = await createClient();
 
   const { data: stream, error: streamError } = await supabase
     .from("streams")
-    .select("started_at")
+    .select("started_at, live_at")
     .eq("id", streamId)
     .maybeSingle();
 
   if (streamError) {
     console.error(streamError);
     throw new Error("Failed to fetch stream for chat replay");
+  }
+
+  const { data: gapRows, error: gapsError } = await supabase
+    .from("stream_gaps")
+    .select("gap_start_at, gap_end_at")
+    .eq("stream_id", streamId)
+    .order("gap_start_at", { ascending: true });
+
+  if (gapsError) {
+    console.error(gapsError);
+    throw new Error("Failed to fetch reconnect gaps for chat replay");
   }
 
   const { data: messages, error } = await supabase
@@ -88,6 +99,11 @@ export async function getStreamChatReplayAction(
 
   return {
     startedAt: stream?.started_at ?? null,
+    liveAt: stream?.live_at ?? null,
+    gaps: (gapRows ?? []).map((g) => ({
+      startAt: g.gap_start_at,
+      endAt: g.gap_end_at,
+    })),
     messages: rows.map((m) => ({
       id: m.id,
       user_id: m.user_id,

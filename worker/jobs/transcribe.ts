@@ -79,6 +79,12 @@ async function transcribeChunk(
 export async function runTranscriptionJob(
   stream: EligibleStream
 ): Promise<void> {
+  // Transcription is live-only: it pulls the RTMP feed and writes transcript
+  // segments that must never accrue during the private preview/waiting room.
+  if (stream.status !== "live") {
+    return;
+  }
+
   const workDir = await fs.mkdtemp(
     path.join(os.tmpdir(), `vt-transcribe-${stream.id}-`)
   );

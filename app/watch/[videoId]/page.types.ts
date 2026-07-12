@@ -18,8 +18,15 @@ export type ChatReplayRow = {
   created_at: string;
 };
 
+export type ReplayGap = {
+  startAt: string;
+  endAt: string | null;
+};
+
 export type ChatReplay = {
   startedAt: string | null;
+  liveAt: string | null;
+  gaps: ReplayGap[];
   messages: ChatReplayRow[];
 };
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/supabase/server-client";
-import { SCHEDULED_CLAIM_GRACE_MS, STALE_MS } from "@/lib/stream";
+import { SCHEDULED_CLAIM_GRACE_MS, STALE_MS, isStreamPublic } from "@/lib/stream";
 import type { ActionResult, Stream } from "@/app/layout.types";
 import type { Channel, Video } from "./page.types";
 
@@ -22,7 +22,9 @@ export async function getUpcomingScheduledBroadcastAction(
     throw new Error("Failed to fetch scheduled broadcast");
   }
 
-  const rows = data ?? [];
+  // Only dated scheduled/preview rows are public. An undated draft or an ad-hoc
+  // preview (created by the encoder, no datetime) stays private until go-live.
+  const rows = (data ?? []).filter(isStreamPublic);
   const now = Date.now();
 
   const connectedPreview = rows

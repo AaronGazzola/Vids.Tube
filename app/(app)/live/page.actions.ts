@@ -1,9 +1,103 @@
 "use server";
 
-import type { ActionResult } from "@/app/layout.types";
+import type { ActionResult, ChatMessage } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
+
+// Owner chat feed for the /live Activity tab: unlike the public chat query, this
+// includes hidden messages so the owner can reveal / unhide them.
+export async function getOwnerChatMessagesAction(
+  streamId: string
+): Promise<ChatMessage[]> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return [];
+  }
+  const ok = await assertStreamOwned(streamId, owned.data.id);
+  if ("error" in ok) {
+    return [];
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("chat_messages")
+    .select("*")
+    .eq("stream_id", streamId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load chat");
+  }
+
+  const authorByUser = await resolveAuthorIdentities(
+    supabaseAdmin,
+    (data ?? []).map((m) => m.user_id).filter((id): id is string => !!id)
+  );
+
+  return (data ?? []).map((m) => ({
+    ...m,
+    author: m.user_id ? authorByUser.get(m.user_id) ?? null : null,
+  }));
+}
+
+// Highlight any chat message on the overlay, even one the bot never featured. If a
+// featured row already exists it is (re)promoted; otherwise a manual one is created.
+export async function manualHighlightAction(
+  chatMessageId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) return { error: owned.error };
+
+  const { data: msg } = await supabaseAdmin
+    .from("chat_messages")
+    .select(
+      "id, stream_id, user_id, origin, external_author_id, author_name, author_avatar_url, body"
+    )
+    .eq("id", chatMessageId)
+    .maybeSingle();
+  if (!msg) return { error: "That message no longer exists." };
+  const ok = await assertStreamOwned(msg.stream_id, owned.data.id);
+  if ("error" in ok) return { error: ok.error };
+
+  const nowIso = new Date().toISOString();
+  const { data: existing } = await supabaseAdmin
+    .from("featured_messages")
+    .select("id")
+    .eq("chat_message_id", chatMessageId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from("featured_messages")
+      .update({ promoted_at: nowIso })
+      .eq("id", existing.id);
+    if (error) {
+      console.error(error);
+      throw new Error("Failed to highlight message");
+    }
+  } else {
+    const { error } = await supabaseAdmin.from("featured_messages").insert({
+      stream_id: msg.stream_id,
+      chat_message_id: msg.id,
+      user_id: msg.user_id,
+      origin: msg.origin,
+      external_author_id: msg.external_author_id,
+      author_name: msg.author_name,
+      author_avatar_url: msg.author_avatar_url,
+      body: msg.body,
+      score: 0,
+      reason: null,
+      ring_level: 1,
+      promoted_at: nowIso,
+    });
+    if (error) {
+      console.error(error);
+      throw new Error("Failed to highlight message");
+    }
+  }
+  return { data: { ok: true } };
+}
 
 type OwnedChannel = { id: string; slug: string };
 
@@ -203,6 +297,7 @@ export async function banParticipantAction(input: {
   externalAuthorId: string | null;
   authorName: string | null;
   reason?: string | null;
+  hidePastMessages?: boolean;
 }): Promise<ActionResult<{ ok: true }>> {
   const owned = await getOwnedChannel();
   if ("error" in owned) return { error: owned.error };
@@ -226,6 +321,39 @@ export async function banParticipantAction(input: {
     console.error(error);
     throw new Error("Failed to ban participant");
   }
+
+  // Optionally hide all of this participant's past messages in the stream (and
+  // drop any features of theirs).
+  if (input.hidePastMessages && (input.userId || input.externalAuthorId)) {
+    const nowIso = new Date().toISOString();
+    let hideQuery = supabaseAdmin
+      .from("chat_messages")
+      .update({ hidden_at: nowIso, hidden_by: "owner" })
+      .eq("stream_id", input.streamId)
+      .is("hidden_at", null);
+    let featuredQuery = supabaseAdmin
+      .from("featured_messages")
+      .delete()
+      .eq("stream_id", input.streamId);
+    if (input.userId) {
+      hideQuery = hideQuery.eq("user_id", input.userId);
+      featuredQuery = featuredQuery.eq("user_id", input.userId);
+    } else if (input.externalAuthorId) {
+      hideQuery = hideQuery
+        .eq("origin", "youtube")
+        .eq("external_author_id", input.externalAuthorId);
+      featuredQuery = featuredQuery
+        .eq("origin", "youtube")
+        .eq("external_author_id", input.externalAuthorId);
+    }
+    const { error: hideError } = await hideQuery;
+    if (hideError) {
+      console.error(hideError);
+      throw new Error("Failed to hide the participant's past messages");
+    }
+    await featuredQuery;
+  }
+
   await logAction({
     streamId: input.streamId,
     targetKind: "participant",

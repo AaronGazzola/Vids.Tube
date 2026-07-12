@@ -177,7 +177,9 @@ export type Database = {
       }
       chat_scoring_state: {
         Row: {
+          auto_display_featured: boolean
           enabled: boolean
+          highlighting_enabled: boolean
           last_scored_at: string | null
           locked_until: string | null
           moderation_mode: string
@@ -185,7 +187,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_display_featured?: boolean
           enabled?: boolean
+          highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
           moderation_mode?: string
@@ -193,7 +197,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_display_featured?: boolean
           enabled?: boolean
+          highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
           moderation_mode?: string
@@ -456,6 +462,35 @@ export type Database = {
           },
         ]
       }
+      stream_gaps: {
+        Row: {
+          gap_end_at: string | null
+          gap_start_at: string
+          id: string
+          stream_id: string
+        }
+        Insert: {
+          gap_end_at?: string | null
+          gap_start_at?: string
+          id?: string
+          stream_id: string
+        }
+        Update: {
+          gap_end_at?: string | null
+          gap_start_at?: string
+          id?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_gaps_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stream_goals: {
         Row: {
           baseline_likes: number | null
@@ -530,51 +565,60 @@ export type Database = {
         Row: {
           channel_id: string
           created_at: string
+          created_in_ui: boolean
           description: string | null
           ended_at: string | null
           hls_path: string | null
           id: string
           last_seen_at: string | null
+          live_at: string | null
           max_viewers: number
           scheduled_start_at: string | null
           started_at: string | null
           status: string
           thumbnail_path: string | null
           title: string | null
+          waiting_room_chat: boolean
           youtube_channel_id: string | null
           youtube_video_id: string | null
         }
         Insert: {
           channel_id: string
           created_at?: string
+          created_in_ui?: boolean
           description?: string | null
           ended_at?: string | null
           hls_path?: string | null
           id?: string
           last_seen_at?: string | null
+          live_at?: string | null
           max_viewers?: number
           scheduled_start_at?: string | null
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          waiting_room_chat?: boolean
           youtube_channel_id?: string | null
           youtube_video_id?: string | null
         }
         Update: {
           channel_id?: string
           created_at?: string
+          created_in_ui?: boolean
           description?: string | null
           ended_at?: string | null
           hls_path?: string | null
           id?: string
           last_seen_at?: string | null
+          live_at?: string | null
           max_viewers?: number
           scheduled_start_at?: string | null
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          waiting_room_chat?: boolean
           youtube_channel_id?: string | null
           youtube_video_id?: string | null
         }
@@ -732,6 +776,29 @@ export type Database = {
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_heartbeats: {
+        Row: {
+          channel_id: string
+          last_heartbeat_at: string
+        }
+        Insert: {
+          channel_id: string
+          last_heartbeat_at?: string
+        }
+        Update: {
+          channel_id?: string
+          last_heartbeat_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_heartbeats_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "channels"
             referencedColumns: ["id"]
           },
         ]

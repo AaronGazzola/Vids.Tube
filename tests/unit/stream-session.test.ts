@@ -4,6 +4,8 @@ import {
   isClaimableScheduled,
   isLiveAndFresh,
   isOngoingAndFresh,
+  isStreamPublic,
+  previewRevertTarget,
   SCHEDULED_CLAIM_GRACE_MS,
   STALE_MS,
 } from "@/lib/stream";
@@ -76,76 +78,98 @@ describe("isOngoingAndFresh", () => {
 });
 
 describe("decideGoLive", () => {
-  it("starts a new session when no stream row exists", () => {
-    expect(decideGoLive(null, now)).toEqual({ action: "new" });
+  it("starts a new ad-hoc session when no active row exists", () => {
+    expect(decideGoLive(null)).toEqual({ action: "new" });
   });
 
-  it("reconnects to an ongoing live session", () => {
-    expect(decideGoLive(row("live", 5, "s-live"), now)).toEqual({
+  it("reconnects to an existing live row", () => {
+    expect(decideGoLive({ id: "s-live", status: "live" })).toEqual({
       action: "reconnect",
       streamId: "s-live",
     });
   });
 
-  it("reconnects to an ongoing preview session", () => {
-    expect(decideGoLive(row("preview", 5, "s-prev"), now)).toEqual({
+  it("reconnects to an existing preview row (fresh or stale)", () => {
+    expect(decideGoLive({ id: "s-prev", status: "preview" })).toEqual({
       action: "reconnect",
       streamId: "s-prev",
     });
   });
 
-  it("ends the orphan and starts a new session after a stale preview row", () => {
-    expect(
-      decideGoLive(row("preview", STALE_MS / 1000 + 30, "s-stale-prev"), now)
-    ).toEqual({ action: "new-after-stale", staleStreamId: "s-stale-prev" });
-  });
-
-  it("starts a new session after a prior session ended", () => {
-    expect(decideGoLive(row("ended", 5), now)).toEqual({ action: "new" });
-  });
-
-  it("starts a new session when the latest row is idle", () => {
-    expect(decideGoLive(row("idle", 5), now)).toEqual({ action: "new" });
-  });
-
-  it("ends the orphan and starts a new session after a stale live row", () => {
-    expect(decideGoLive(row("live", STALE_MS / 1000 + 30, "s-stale"), now)).toEqual(
-      { action: "new-after-stale", staleStreamId: "s-stale" }
-    );
-  });
-
-  it("claims a claimable scheduled broadcast when there is no ongoing session", () => {
-    expect(
-      decideGoLive(null, now, scheduledRow(3600, "s-sched"))
-    ).toEqual({ action: "claim-scheduled", streamId: "s-sched" });
-  });
-
-  it("claims the scheduled broadcast over a prior ended row", () => {
-    expect(
-      decideGoLive(row("ended", 5), now, scheduledRow(3600, "s-sched"))
-    ).toEqual({ action: "claim-scheduled", streamId: "s-sched" });
-  });
-
-  it("prefers reconnecting to an ongoing session over claiming a scheduled broadcast", () => {
-    expect(
-      decideGoLive(row("live", 5, "s-live"), now, scheduledRow(3600, "s-sched"))
-    ).toEqual({ action: "reconnect", streamId: "s-live" });
-  });
-
-  it("does not claim a missed scheduled broadcast (past the grace window)", () => {
-    const missed = scheduledRow(
-      -(SCHEDULED_CLAIM_GRACE_MS / 1000) - 3600,
-      "s-missed"
-    );
-    expect(decideGoLive(null, now, missed)).toEqual({ action: "new" });
-  });
-
-  it("claims a scheduled broadcast started within the grace window", () => {
-    const recentlyStarted = scheduledRow(-600, "s-late");
-    expect(decideGoLive(null, now, recentlyStarted)).toEqual({
-      action: "claim-scheduled",
-      streamId: "s-late",
+  it("claims a draft row created in the UI", () => {
+    expect(decideGoLive({ id: "s-draft", status: "draft" })).toEqual({
+      action: "claim",
+      streamId: "s-draft",
     });
+  });
+
+  it("claims a scheduled row created in the UI", () => {
+    expect(decideGoLive({ id: "s-sched", status: "scheduled" })).toEqual({
+      action: "claim",
+      streamId: "s-sched",
+    });
+  });
+
+  it("starts a new session for an ended row", () => {
+    expect(decideGoLive({ id: "s-ended", status: "ended" })).toEqual({
+      action: "new",
+    });
+  });
+
+  it("starts a new session for an idle row", () => {
+    expect(decideGoLive({ id: "s-idle", status: "idle" })).toEqual({
+      action: "new",
+    });
+  });
+});
+
+describe("isStreamPublic", () => {
+  it("is true for a live stream regardless of schedule", () => {
+    expect(isStreamPublic({ status: "live", scheduled_start_at: null })).toBe(
+      true
+    );
+  });
+
+  it("is true for a dated scheduled or preview stream", () => {
+    const at = new Date(now).toISOString();
+    expect(
+      isStreamPublic({ status: "scheduled", scheduled_start_at: at })
+    ).toBe(true);
+    expect(isStreamPublic({ status: "preview", scheduled_start_at: at })).toBe(
+      true
+    );
+  });
+
+  it("is false for a draft and for an ad-hoc (undated) preview", () => {
+    expect(isStreamPublic({ status: "draft", scheduled_start_at: null })).toBe(
+      false
+    );
+    expect(
+      isStreamPublic({ status: "preview", scheduled_start_at: null })
+    ).toBe(false);
+  });
+});
+
+describe("previewRevertTarget", () => {
+  it("reverts a dated preview to scheduled", () => {
+    expect(
+      previewRevertTarget({
+        scheduled_start_at: new Date(now).toISOString(),
+        created_in_ui: true,
+      })
+    ).toBe("scheduled");
+  });
+
+  it("reverts an undated UI-created preview to draft", () => {
+    expect(
+      previewRevertTarget({ scheduled_start_at: null, created_in_ui: true })
+    ).toBe("draft");
+  });
+
+  it("deletes an ad-hoc preview", () => {
+    expect(
+      previewRevertTarget({ scheduled_start_at: null, created_in_ui: false })
+    ).toBe("delete");
   });
 });
 

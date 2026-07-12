@@ -1,5 +1,7 @@
 "use client";
 
+import { useIsOwner, useUser } from "@/app/layout.hooks";
+import { useAuthStore } from "@/app/layout.stores";
 import { Logo } from "@/components/logo";
 import {
   Sidebar,
@@ -13,10 +15,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  PanelRightClose,
-  PanelRightOpen,
+  Menu,
   Radio,
-  SlidersHorizontal,
   User,
   type LucideIcon,
 } from "lucide-react";
@@ -28,15 +28,25 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  ownerOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/account", label: "Account", icon: User },
-  { href: "/go-live", label: "Go Live", icon: Radio },
-  { href: "/control", label: "Control room", icon: SlidersHorizontal },
+  { href: "/live", label: "Go Live", icon: Radio, ownerOnly: true },
 ];
 
-function ToggleButton({ collapsed }: { collapsed: boolean }) {
+function useVisibleNavItems() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOwner = useIsOwner();
+
+  if (!isAuthenticated) {
+    return [];
+  }
+  return NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
+}
+
+function ToggleButton() {
   const { toggleSidebar } = useSidebar();
   return (
     <button
@@ -45,11 +55,7 @@ function ToggleButton({ collapsed }: { collapsed: boolean }) {
       aria-label="Toggle sidebar"
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
-      {collapsed ? (
-        <PanelRightClose className="h-5 w-5" />
-      ) : (
-        <PanelRightOpen className="h-5 w-5" />
-      )}
+      <Menu className="h-5 w-5" />
     </button>
   );
 }
@@ -105,6 +111,8 @@ function NavRow({
 
 function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const items = useVisibleNavItems();
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -113,7 +121,7 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
           <Link href="/" aria-label="Vids.Tube home">
             <Logo className="h-auto w-9" />
           </Link>
-          <ToggleButton collapsed />
+          {isAuthenticated && <ToggleButton />}
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2 p-2">
@@ -124,26 +132,37 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
             <Logo className="h-auto w-9" />
             Vids.Tube
           </Link>
-          <ToggleButton collapsed={false} />
+          {isAuthenticated && <ToggleButton />}
         </div>
       )}
 
-      <SidebarContent className={cn("gap-1 p-2", collapsed && "items-center")}>
-        {NAV_ITEMS.map((item) => (
-          <NavRow
-            key={item.href}
-            item={item}
-            active={pathname === item.href}
-            collapsed={collapsed}
-          />
-        ))}
-      </SidebarContent>
+      {items.length > 0 && (
+        <SidebarContent className={cn("gap-1 p-2", collapsed && "items-center")}>
+          {items.map((item) => (
+            <NavRow
+              key={item.href}
+              item={item}
+              active={pathname === item.href}
+              collapsed={collapsed}
+            />
+          ))}
+        </SidebarContent>
+      )}
     </div>
   );
 }
 
 export function AppSidebar() {
   const measureRef = useRef<HTMLDivElement>(null);
+  const { setOpen } = useSidebar();
+  const { isPending } = useUser();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (!isPending && !isAuthenticated) {
+      setOpen(false);
+    }
+  }, [isPending, isAuthenticated, setOpen]);
 
   useEffect(() => {
     const el = measureRef.current;

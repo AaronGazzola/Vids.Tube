@@ -28,8 +28,10 @@ export function computeGoalProgress(
 ): Record<GoalMetric, MetricProgress> {
   const b = baseline ?? { subs: 0, likes: 0, viewers: 0 };
   return {
+    // Subs are a delta from an auto-captured baseline; likes and viewers are
+    // absolute current YouTube values (no baseline, no start).
     subs: fromBaseline(counts.subs, b.subs, goals.subs),
-    likes: fromBaseline(counts.likes, b.likes, goals.likes),
+    likes: fromAbsolute(counts.likes, goals.likes),
     viewers: fromAbsolute(counts.viewers, goals.viewers),
   };
 }

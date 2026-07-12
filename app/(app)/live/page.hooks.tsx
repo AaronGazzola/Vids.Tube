@@ -9,13 +9,24 @@ import {
   banParticipantAction,
   dismissSuggestionAction,
   getModerationFeedAction,
+  getOwnerChatMessagesAction,
   getViewerReasoningAction,
   hideMessageAction,
+  manualHighlightAction,
   promoteHighlightAction,
   setModerationModeAction,
   unbanParticipantAction,
   unhideMessageAction,
 } from "./page.actions";
+
+export function useOwnerChat(streamId: string | null) {
+  return useQuery({
+    queryKey: ["owner-chat", streamId],
+    queryFn: () => getOwnerChatMessagesAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 3000,
+  });
+}
 
 export type ReasoningIdentity = {
   participantKey: string;
@@ -78,6 +89,7 @@ function useModerationInvalidator() {
   return (streamId: string | null) => {
     queryClient.invalidateQueries({ queryKey: ["moderation-feed", streamId] });
     queryClient.invalidateQueries({ queryKey: ["chat", streamId] });
+    queryClient.invalidateQueries({ queryKey: ["owner-chat", streamId] });
     queryClient.invalidateQueries({ queryKey: ["read-this", streamId] });
     queryClient.invalidateQueries({ queryKey: ["viewer-leaderboard", streamId] });
   };
@@ -91,6 +103,16 @@ export function usePromoteHighlight(streamId: string | null) {
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["read-this", streamId] }),
     onError: errorToast("Couldn't show on overlay"),
+  });
+}
+
+export function useManualHighlight(streamId: string | null) {
+  const invalidate = useModerationInvalidator();
+  return useMutation({
+    mutationFn: async (chatMessageId: string) =>
+      unwrap(await manualHighlightAction(chatMessageId)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't highlight message"),
   });
 }
 
@@ -133,6 +155,7 @@ export function useBanParticipant(streamId: string | null) {
       userId: string | null;
       externalAuthorId: string | null;
       authorName: string | null;
+      hidePastMessages?: boolean;
     }) =>
       unwrap(
         await banParticipantAction({ streamId: streamId!, ...input })

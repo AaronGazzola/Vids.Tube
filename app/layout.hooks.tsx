@@ -420,6 +420,46 @@ export function useViewerCap(
   return state;
 }
 
+// Counts distinct presence members on a stream. `track: true` (the default) also
+// registers this client as a member — correct for a viewer on the waiting/live
+// page. The owner's /live toolbar passes `track: false` so it only observes the
+// audience and doesn't count itself or consume a viewer-cap slot.
+export function useWaitingCount(
+  streamId: string | null,
+  options: { track?: boolean } = {}
+): number {
+  const track = options.track ?? true;
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!streamId) {
+      return;
+    }
+
+    const presenceKey = crypto.randomUUID();
+    const channel = supabase.channel(`presence:stream:${streamId}`, {
+      config: { presence: { key: presenceKey } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const presence = channel.presenceState<{ online_at: string }>();
+        setCount(Object.keys(presence).length);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED" && track) {
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, track]);
+
+  return count;
+}
+
 export function useLiveChat(streamId: string | null) {
   const queryClient = useQueryClient();
 
