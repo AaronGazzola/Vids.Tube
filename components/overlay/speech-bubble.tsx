@@ -64,8 +64,9 @@ export function AuthorColumn({
   size?: number;
   cornerIcon?: React.ReactNode;
 }) {
-  const handle = author?.handle ? `@${author.handle}` : null;
-  const name = author?.name ?? "viewer";
+  const label = author?.handle
+    ? `@${author.handle}`
+    : author?.name ?? "viewer";
   const badge = Math.round(size * 0.45);
   return (
     <div className="flex shrink-0 flex-col items-center" style={{ width: size }}>
@@ -94,13 +95,8 @@ export function AuthorColumn({
           </span>
         )}
       </div>
-      {handle && (
-        <span className="mt-1 max-w-full truncate text-base font-bold text-white drop-shadow">
-          {handle}
-        </span>
-      )}
-      <span className="max-w-full truncate text-sm text-white/80 drop-shadow">
-        {name}
+      <span className="mt-1 max-w-full truncate text-base font-bold text-white drop-shadow">
+        {label}
       </span>
     </div>
   );
