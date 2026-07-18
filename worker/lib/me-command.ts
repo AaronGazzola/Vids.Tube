@@ -1,7 +1,15 @@
 import type { BufferedMessage } from "../jobs/score";
-import { runClaude } from "./claude";
 import type { CommandContext } from "./commands";
-import { supabaseAdmin } from "../supabase";
+
+// Imported lazily so the pure helpers (regeneration rules, clipping) stay
+// testable without worker env configured.
+async function deps() {
+  const [{ supabaseAdmin }, { runClaude }] = await Promise.all([
+    import("../supabase"),
+    import("./claude"),
+  ]);
+  return { supabaseAdmin, runClaude };
+}
 
 const REGEN_MESSAGE_DELTA = 20;
 const MAX_PROFILE_CHARS = 400;
@@ -40,6 +48,7 @@ export function truncateProfile(text: string): string {
 export async function resolveMeIdentity(
   m: BufferedMessage
 ): Promise<MeIdentity> {
+  const { supabaseAdmin } = await deps();
   if (m.origin === "youtube" && m.externalAuthorId) {
     return {
       key: `youtube:${m.externalAuthorId}`,
@@ -69,6 +78,7 @@ export async function resolveMeIdentity(
 }
 
 export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
+  const { supabaseAdmin } = await deps();
   let totalMessages = 0;
   let videosAttended = 0;
   let firstSeenAt: string | null = null;
@@ -114,10 +124,18 @@ export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
 
 export function needsRegeneration(
   snapshot: Partial<MeStats> | null,
-  current: MeStats
+  current: MeStats,
+  generatedAt: string | null = null,
+  streamStartedAt: string | null = null
 ): boolean {
   if (!snapshot) {
     return true;
+  }
+  if (streamStartedAt) {
+    const generated = generatedAt ? Date.parse(generatedAt) : NaN;
+    if (!Number.isFinite(generated) || generated < Date.parse(streamStartedAt)) {
+      return true;
+    }
   }
   const prevMessages = snapshot.totalMessages ?? 0;
   const prevAttended = snapshot.videosAttended ?? 0;
@@ -125,6 +143,65 @@ export function needsRegeneration(
     Math.abs(current.totalMessages - prevMessages) >= REGEN_MESSAGE_DELTA ||
     current.videosAttended !== prevAttended
   );
+}
+
+const MAX_SAMPLE_CHARS = 120;
+const MAX_SAMPLES_PER_SOURCE = 8;
+
+export function clipSample(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > MAX_SAMPLE_CHARS
+    ? `${clean.slice(0, MAX_SAMPLE_CHARS - 1)}…`
+    : clean;
+}
+
+export async function gatherRecentMessages(
+  identity: MeIdentity
+): Promise<string[]> {
+  const { supabaseAdmin } = await deps();
+  const filters: string[] = [];
+  if (identity.userId) {
+    filters.push(`user_id.eq.${identity.userId}`);
+  }
+  if (identity.youtubeChannelId) {
+    filters.push(
+      `and(origin.eq.youtube,external_author_id.eq.${identity.youtubeChannelId})`
+    );
+  }
+
+  const samples: string[] = [];
+  if (filters.length) {
+    const { data } = await supabaseAdmin
+      .from("chat_messages")
+      .select("body")
+      .or(filters.join(","))
+      .is("hidden_at", null)
+      .order("created_at", { ascending: false })
+      .limit(MAX_SAMPLES_PER_SOURCE * 2);
+    for (const row of data ?? []) {
+      if (samples.length >= MAX_SAMPLES_PER_SOURCE) break;
+      if (row.body.startsWith("!")) continue;
+      samples.push(clipSample(row.body));
+    }
+  }
+
+  if (identity.youtubeChannelId) {
+    const { data } = await supabaseAdmin
+      .from("youtube_chat_archive")
+      .select("body")
+      .eq("author_channel_id", identity.youtubeChannelId)
+      .order("published_at", { ascending: false })
+      .limit(MAX_SAMPLES_PER_SOURCE * 2);
+    let added = 0;
+    for (const row of data ?? []) {
+      if (added >= MAX_SAMPLES_PER_SOURCE) break;
+      if (row.body.startsWith("!")) continue;
+      samples.push(clipSample(row.body));
+      added += 1;
+    }
+  }
+
+  return samples;
 }
 
 function hasHistory(stats: MeStats): boolean {
@@ -135,9 +212,14 @@ function hasHistory(stats: MeStats): boolean {
   );
 }
 
-function buildMePrompt(identity: MeIdentity, stats: MeStats): string {
+function buildMePrompt(
+  identity: MeIdentity,
+  stats: MeStats,
+  recentMessages: string[]
+): string {
+  const name = identity.displayName.replace(/^@+/, "");
   const lines = [
-    `Viewer name: ${identity.displayName}`,
+    `Viewer name: ${name}`,
     `Messages in the channel's YouTube chat history: ${stats.totalMessages}`,
     `Streams/videos attended: ${stats.videosAttended}`,
   ];
@@ -149,15 +231,23 @@ function buildMePrompt(identity: MeIdentity, stats: MeStats): string {
       `Vids.Tube activity: ${stats.vidstubeScore} points across ${stats.vidstubeStreams} stream(s), featured ${stats.vidstubeFeatures}x`
     );
   }
+  if (recentMessages.length) {
+    lines.push(
+      "Things they've said recently:",
+      ...recentMessages.map((m) => `- ${m}`)
+    );
+  }
   return [
     "You write one-line chat-bot bios for live-stream viewers.",
-    "Using only these facts, write a warm, playful mini-bio in the second person, under 350 characters, plain text, no hashtags, no emojis at the start, no quotes around it:",
+    `Using only these facts, write a warm, playful mini-bio about ${name} in the third person (e.g. "${name} has been part of the community since…"), under 350 characters, plain text, no hashtags, no emojis at the start, no quotes around it.`,
+    "If their recent messages suggest what they like to talk about, weave in one playful nod to it.",
     ...lines,
     "Reply with the bio text only.",
   ].join("\n");
 }
 
 export async function meHandler(ctx: CommandContext): Promise<void> {
+  const { supabaseAdmin, runClaude } = await deps();
   const identity = await resolveMeIdentity(ctx.message);
   const stats = await gatherMeStats(identity);
   const mention = `@${identity.displayName.replace(/^@+/, "")}`;
@@ -169,16 +259,30 @@ export async function meHandler(ctx: CommandContext): Promise<void> {
 
   const { data: cached } = await supabaseAdmin
     .from("me_profiles")
-    .select("profile, snapshot")
+    .select("profile, snapshot, generated_at")
     .eq("profile_key", identity.key)
     .maybeSingle();
+
+  const { data: streamRow } = await supabaseAdmin
+    .from("streams")
+    .select("started_at, created_at")
+    .eq("id", ctx.stream.id)
+    .maybeSingle();
+  const streamStartedAt =
+    streamRow?.started_at ?? streamRow?.created_at ?? null;
 
   let profile = cached?.profile ?? null;
   if (
     !profile ||
-    needsRegeneration(cached?.snapshot as Partial<MeStats> | null, stats)
+    needsRegeneration(
+      cached?.snapshot as Partial<MeStats> | null,
+      stats,
+      cached?.generated_at ?? null,
+      streamStartedAt
+    )
   ) {
-    const raw = await runClaude(buildMePrompt(identity, stats));
+    const recent = await gatherRecentMessages(identity);
+    const raw = await runClaude(buildMePrompt(identity, stats, recent));
     profile = truncateProfile(raw);
     const { error } = await supabaseAdmin.from("me_profiles").upsert(
       {

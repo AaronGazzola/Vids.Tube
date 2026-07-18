@@ -84,7 +84,15 @@ async function main() {
     const bio = first.replies[0];
     if (bio.length > 400) fail(`bio exceeds 400 chars (${bio.length})`);
     if (bio.includes(FIRST_TIMER_REPLY)) fail("known chatter got the welcome");
-    ok(`known chatter bio generated (${bio.length} chars): ${bio.slice(0, 90)}…`);
+    const name = (knownChatter.author_name ?? "Chatter").replace(/^@+/, "");
+    const profileText = bio.replace(/^@\S+\s*/, "");
+    if (/^you\b/i.test(profileText)) {
+      fail(`bio reads second-person: ${profileText.slice(0, 60)}`);
+    }
+    if (!profileText.toLowerCase().includes(name.toLowerCase())) {
+      fail(`bio does not name the chatter (${name}): ${profileText}`);
+    }
+    ok(`third-person bio generated (${bio.length} chars): ${bio}`);
 
     const { data: profileRow } = await admin
       .from("me_profiles")
