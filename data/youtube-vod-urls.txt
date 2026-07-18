@@ -1,0 +1,5 @@
+# Unlisted (or otherwise undiscoverable) YouTube VOD URLs for the chat backfill.
+# One URL or video id per line; lines starting with # are ignored.
+# Unlisted videos cannot be enumerated automatically — copy their links from
+# YouTube Studio -> Content and paste them here, then run:
+#   npm run backfill:youtube-chat

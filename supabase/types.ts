@@ -272,6 +272,36 @@ export type Database = {
           },
         ]
       }
+      chatter_stats: {
+        Row: {
+          author_channel_id: string
+          author_name: string | null
+          first_seen_at: string | null
+          last_seen_at: string | null
+          total_messages: number
+          updated_at: string
+          videos_attended: number
+        }
+        Insert: {
+          author_channel_id: string
+          author_name?: string | null
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+          total_messages?: number
+          updated_at?: string
+          videos_attended?: number
+        }
+        Update: {
+          author_channel_id?: string
+          author_name?: string | null
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+          total_messages?: number
+          updated_at?: string
+          videos_attended?: number
+        }
+        Relationships: []
+      }
       command_events: {
         Row: {
           args: string | null
@@ -948,6 +978,68 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      youtube_chat_archive: {
+        Row: {
+          author_channel_id: string
+          author_name: string | null
+          body: string
+          id: string
+          message_id: string
+          published_at: string
+          video_id: string
+        }
+        Insert: {
+          author_channel_id: string
+          author_name?: string | null
+          body: string
+          id?: string
+          message_id: string
+          published_at: string
+          video_id: string
+        }
+        Update: {
+          author_channel_id?: string
+          author_name?: string | null
+          body?: string
+          id?: string
+          message_id?: string
+          published_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_chat_archive_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_vods"
+            referencedColumns: ["video_id"]
+          },
+        ]
+      }
+      youtube_vods: {
+        Row: {
+          backfilled_at: string
+          message_count: number
+          published_at: string | null
+          title: string | null
+          video_id: string
+        }
+        Insert: {
+          backfilled_at?: string
+          message_count?: number
+          published_at?: string | null
+          title?: string | null
+          video_id: string
+        }
+        Update: {
+          backfilled_at?: string
+          message_count?: number
+          published_at?: string | null
+          title?: string | null
+          video_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

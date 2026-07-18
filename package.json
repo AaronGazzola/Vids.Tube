@@ -25,7 +25,8 @@
     "worker:doctor": "doppler run -- tsx worker/doctor.ts",
     "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts",
     "dryrun": "doppler run -- tsx scripts/dryrun-stream.ts",
-    "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts"
+    "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts",
+    "backfill:youtube-chat": "doppler run -- tsx scripts/backfill-youtube-chat.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
