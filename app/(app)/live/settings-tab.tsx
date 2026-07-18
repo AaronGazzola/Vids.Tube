@@ -53,6 +53,7 @@ export type SettingsForm = {
   banMode: "suggest" | "auto";
   ttsMode: "suggest" | "auto";
   askMode: "suggest" | "auto";
+  bridgeEnabled: boolean;
   highlightingEnabled: boolean;
   usefulInfoEnabled: boolean;
   competitionStatusEnabled: boolean;
@@ -758,6 +759,12 @@ export function SettingsTab({
           description="On: grounded answers post without a click. Off: you approve each Q&A."
           checked={form.askMode === "auto"}
           onCheckedChange={(v) => set({ askMode: v ? "auto" : "suggest" })}
+        />
+        <SwitchRow
+          label="Bridge chat to YouTube"
+          description="Post vids.tube chat messages into the YouTube live chat via Nightbot."
+          checked={form.bridgeEnabled}
+          onCheckedChange={(v) => set({ bridgeEnabled: v })}
         />
         <SwitchRow
           label="Featured highlighting"

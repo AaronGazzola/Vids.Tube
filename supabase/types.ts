@@ -358,6 +358,7 @@ export type Database = {
         Row: {
           ask_mode: string
           auto_display_featured: boolean
+          bridge_enabled: boolean
           competition_status_enabled: boolean
           enabled: boolean
           highlighting_enabled: boolean
@@ -376,6 +377,7 @@ export type Database = {
         Insert: {
           ask_mode?: string
           auto_display_featured?: boolean
+          bridge_enabled?: boolean
           competition_status_enabled?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean
@@ -394,6 +396,7 @@ export type Database = {
         Update: {
           ask_mode?: string
           auto_display_featured?: boolean
+          bridge_enabled?: boolean
           competition_status_enabled?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean

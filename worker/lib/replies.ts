@@ -41,7 +41,11 @@ const defaultSender: NightbotSender = (text, token) =>
     body: new URLSearchParams({ message: text }).toString(),
   });
 
+const BRIDGE_MAX_QUEUE = 5;
+
 const queue: string[] = [];
+const bridgeQueue: string[] = [];
+let bridgeDropped = 0;
 let draining = false;
 let warnedMissingToken = false;
 
@@ -60,8 +64,8 @@ async function drainQueue(
   }
   draining = true;
   try {
-    while (queue.length) {
-      const text = queue.shift()!;
+    while (queue.length || bridgeQueue.length) {
+      const text = (queue.length ? queue.shift() : bridgeQueue.shift())!;
       try {
         let token = await tokenFn();
         if (!token) {
@@ -92,7 +96,7 @@ async function drainQueue(
       } catch (e) {
         console.error("nightbot send error:", e);
       }
-      if (queue.length) {
+      if (queue.length || bridgeQueue.length) {
         await wait(sendSpacingMs());
       }
     }
@@ -118,6 +122,27 @@ export function enqueueNightbotSend(
     return;
   }
   queue.push(truncateForYoutube(text));
+  void drainQueue(sender, wait, tokenFn, refreshFn);
+}
+
+export function enqueueNightbotBridge(
+  text: string,
+  sender: NightbotSender = defaultSender,
+  wait: typeof sleep = sleep,
+  tokenFn: NightbotTokenFn = getNightbotToken,
+  refreshFn: NightbotTokenFn = forceNightbotRefresh
+): void {
+  if (!nightbotConfigured()) {
+    return;
+  }
+  bridgeQueue.push(truncateForYoutube(text));
+  while (bridgeQueue.length > BRIDGE_MAX_QUEUE) {
+    bridgeQueue.shift();
+    bridgeDropped += 1;
+    console.error(
+      `nightbot bridge queue full — dropped oldest (total dropped: ${bridgeDropped})`
+    );
+  }
   void drainQueue(sender, wait, tokenFn, refreshFn);
 }
 

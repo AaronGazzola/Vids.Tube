@@ -467,6 +467,7 @@ export type StreamSettings = {
   wrapupMvpEnabled: boolean;
   wrapupSummaryEnabled: boolean;
   wrapupThanksEnabled: boolean;
+  bridgeEnabled: boolean;
   workerRunning: boolean;
 };
 
@@ -490,6 +491,7 @@ export type StreamSettingsInput = {
   wrapupMvpEnabled: boolean;
   wrapupSummaryEnabled: boolean;
   wrapupThanksEnabled: boolean;
+  bridgeEnabled: boolean;
 };
 
 export async function getStreamSettingsAction(): Promise<StreamSettings> {
@@ -542,6 +544,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       wrapupMvpEnabled: true,
       wrapupSummaryEnabled: true,
       wrapupThanksEnabled: true,
+      bridgeEnabled: true,
       autoDisplayFeatured: false,
       waitingRoomChat: false,
       disabledCommands: [],
@@ -557,7 +560,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
   const { data: scoring } = await supabaseAdmin
     .from("chat_scoring_state")
     .select(
-      "enabled, moderation_mode, tts_mode, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled"
+      "enabled, moderation_mode, tts_mode, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled, bridge_enabled"
     )
     .eq("stream_id", stream.id)
     .maybeSingle();
@@ -585,6 +588,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     wrapupMvpEnabled: scoring?.wrapup_mvp_enabled ?? true,
     wrapupSummaryEnabled: scoring?.wrapup_summary_enabled ?? true,
     wrapupThanksEnabled: scoring?.wrapup_thanks_enabled ?? true,
+    bridgeEnabled: scoring?.bridge_enabled ?? true,
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
@@ -748,6 +752,7 @@ export async function saveStreamSettingsAction(
         wrapup_mvp_enabled: input.wrapupMvpEnabled,
         wrapup_summary_enabled: input.wrapupSummaryEnabled,
         wrapup_thanks_enabled: input.wrapupThanksEnabled,
+        bridge_enabled: input.bridgeEnabled,
         highlighting_enabled: input.highlightingEnabled,
         auto_display_featured: input.autoDisplayFeatured,
         updated_at: new Date().toISOString(),

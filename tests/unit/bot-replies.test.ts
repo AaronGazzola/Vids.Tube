@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { enqueueNightbotSend, truncateForYoutube } from "@/worker/lib/replies";
+import {
+  enqueueNightbotBridge,
+  enqueueNightbotSend,
+  truncateForYoutube,
+} from "@/worker/lib/replies";
 import { resetNightbotTokenState } from "@/worker/lib/nightbot-token";
 
 describe("truncateForYoutube", () => {
@@ -120,5 +124,64 @@ describe("enqueueNightbotSend", () => {
       "refresh",
       "send:hello:fresh-token",
     ]);
+  });
+
+  it("sends replies before bridged messages", async () => {
+    const sent: string[] = [];
+    const sender = async (text: string) => {
+      sent.push(text);
+      return new Response("ok", { status: 200 });
+    };
+    const wait = async () => {};
+
+    enqueueNightbotBridge("bridge-1", sender, wait, token, token);
+    enqueueNightbotBridge("bridge-2", sender, wait, token, token);
+    enqueueNightbotSend("reply-1", sender, wait, token, token);
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(sent).toEqual(["bridge-1", "reply-1", "bridge-2"]);
+  });
+
+  it("drops the oldest bridged message beyond the buffer", async () => {
+    const sent: string[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const sender = async (text: string) => {
+      sent.push(text);
+      await gate;
+      return new Response("ok", { status: 200 });
+    };
+    const wait = async () => {};
+
+    for (let i = 1; i <= 7; i++) {
+      enqueueNightbotBridge(`b${i}`, sender, wait, token, token);
+    }
+    release();
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(sent).toEqual(["b1", "b3", "b4", "b5", "b6", "b7"]);
+  });
+
+  it("truncates bridged messages to 400 chars", async () => {
+    const sent: string[] = [];
+    const sender = async (text: string) => {
+      sent.push(text);
+      return new Response("ok", { status: 200 });
+    };
+
+    enqueueNightbotBridge(
+      `viewer: ${"word ".repeat(120)}`,
+      sender,
+      async () => {},
+      token,
+      token
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].length).toBeLessThanOrEqual(400);
+    expect(sent[0].endsWith("…")).toBe(true);
   });
 });

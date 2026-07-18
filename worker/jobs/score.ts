@@ -17,6 +17,7 @@ import {
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
 import { processCommands } from "../lib/commands";
+import { enqueueNightbotBridge } from "../lib/replies";
 import { runProactiveMoments, runWrapupIfRequested } from "../lib/moments";
 import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
@@ -466,6 +467,21 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
           },
           unmoderated
         );
+      }
+
+      if (youtubeVideoId) {
+        const { data: bridgeState } = await supabaseAdmin
+          .from("chat_scoring_state")
+          .select("bridge_enabled")
+          .eq("stream_id", stream.id)
+          .maybeSingle();
+        if (bridgeState?.bridge_enabled !== false) {
+          for (const m of batch) {
+            if (m.origin === "vidstube") {
+              enqueueNightbotBridge(`${m.authorName ?? m.author}: ${m.text}`);
+            }
+          }
+        }
       }
 
       if (batch.length) {
