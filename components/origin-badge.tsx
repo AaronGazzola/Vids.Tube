@@ -21,6 +21,19 @@ export function OriginBadge({
       </span>
     );
   }
+  if (origin === "bot") {
+    return (
+      <span
+        title="VidsBot"
+        className={cn(
+          "inline-flex items-center rounded bg-indigo-600 px-1 text-[0.5rem] font-bold leading-tight text-white align-middle",
+          className
+        )}
+      >
+        BOT
+      </span>
+    );
+  }
   return (
     <span
       title="Vids.Tube"

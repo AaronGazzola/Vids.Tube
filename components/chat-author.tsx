@@ -6,6 +6,7 @@ import { OriginBadge } from "@/components/origin-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { cn } from "@/lib/utils";
+import { Bot } from "lucide-react";
 
 export function ChatAuthor({
   message,
@@ -19,6 +20,31 @@ export function ChatAuthor({
   size?: "chat" | "comment";
   className?: string;
 }) {
+  if (message.origin === "bot") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 align-middle",
+          className
+        )}
+      >
+        <Avatar className={size === "chat" ? "h-5 w-5" : "h-6 w-6"}>
+          <AvatarFallback className="bg-indigo-600 text-white">
+            <Bot className={size === "chat" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+          </AvatarFallback>
+        </Avatar>
+        <span
+          className={cn(
+            "font-medium",
+            size === "chat" ? "text-xs" : "text-sm"
+          )}
+        >
+          {message.author_name ?? "VidsBot"}
+        </span>
+        <OriginBadge origin="bot" />
+      </span>
+    );
+  }
   if (message.origin === "youtube") {
     const name = message.author_name ?? "YouTube viewer";
     const url = message.author_avatar_url || placeholderAvatar(name);

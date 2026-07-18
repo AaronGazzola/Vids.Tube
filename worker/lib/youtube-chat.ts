@@ -17,6 +17,16 @@ export async function resolveLiveChatId(
   return video.activeLiveChatId;
 }
 
+// The bot's own YouTube sends come back through the poller as the Nightbot
+// account; they must never be persisted, scored, or command-processed.
+function isNightbot(m: YouTubeChatMessage): boolean {
+  const nightbotChannelId = process.env.NIGHTBOT_YOUTUBE_CHANNEL_ID;
+  if (nightbotChannelId && m.authorChannelId === nightbotChannelId) {
+    return true;
+  }
+  return m.author === "Nightbot";
+}
+
 export async function* pollYoutubeChat(
   liveChatId: string | null
 ): AsyncGenerator<YoutubeChatMessage> {
@@ -27,6 +37,9 @@ export async function* pollYoutubeChat(
   for (;;) {
     const page = await fetchLiveChatPage(liveChatId, pageToken);
     for (const m of page.messages) {
+      if (isNightbot(m)) {
+        continue;
+      }
       yield { ...m, origin: "youtube" };
     }
     if (!page.nextPageToken) {

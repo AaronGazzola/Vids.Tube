@@ -1,5 +1,6 @@
 import { parseChatCommand } from "@/lib/chat-commands";
 import type { BufferedMessage } from "../jobs/score";
+import { deliverReply } from "./replies";
 import { supabaseAdmin } from "../supabase";
 
 export type CommandRegistryRow = {
@@ -149,14 +150,20 @@ export async function processCommands(
         continue;
       }
       if (!count) {
+        const pointer = "Unknown command — try !help";
         await insertEvent(
           stream,
           m,
           parsed.keyword,
           parsed.args,
           "unknown",
-          "Unknown command — try !help"
+          pointer
         );
+        await deliverReply({
+          streamId: stream.id,
+          origin: m.origin,
+          text: pointer,
+        });
       }
       continue;
     }
@@ -239,14 +246,21 @@ export async function processCommands(
       console.error(`command !${row.keyword} handler failed:`, e);
       continue;
     }
-    if (replyText && eventId) {
-      const { error } = await supabaseAdmin
-        .from("command_events")
-        .update({ reply: replyText })
-        .eq("id", eventId);
-      if (error) {
-        console.error(error);
+    if (replyText) {
+      if (eventId) {
+        const { error } = await supabaseAdmin
+          .from("command_events")
+          .update({ reply: replyText })
+          .eq("id", eventId);
+        if (error) {
+          console.error(error);
+        }
       }
+      await deliverReply({
+        streamId: stream.id,
+        origin: m.origin,
+        text: replyText,
+      });
     }
   }
 

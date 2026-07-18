@@ -468,7 +468,8 @@ function ChatMessageRow({
   }
 
   // Normal (incl. already highlighted/dismissed → secondary styling). The
-  // three-dot menu stays visible so highlighted messages keep their actions.
+  // three-dot menu stays visible so highlighted messages keep their actions;
+  // bot rows are the bot's own output and carry no moderation or scoring.
   return (
     <li
       className={cn(
@@ -479,13 +480,13 @@ function ChatMessageRow({
       <div className="min-w-0 flex-1">
         <ChatAuthor message={msg} size="chat" className="mr-1" />
         <ChatText text={msg.body} className="text-sm" />
-        {featured && (
+        {featured && msg.origin !== "bot" && (
           <span className="ml-1 align-middle">
             <ScoreBadge score={featured.score} reason={featured.reason} />
           </span>
         )}
       </div>
-      <MessageMenu msg={msg} streamId={streamId} />
+      {msg.origin !== "bot" && <MessageMenu msg={msg} streamId={streamId} />}
     </li>
   );
 }
