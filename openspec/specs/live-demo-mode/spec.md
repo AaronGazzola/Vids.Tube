@@ -131,11 +131,13 @@ be owner-scoped.
 ### Requirement: Simulated activity
 
 While demo is on, the system SHALL render the Activity tab — header (goal progress and
-competition), mod bot actions, and live chat — from a client-side generator using the
-same presentational components as the live Activity tab. Simulated messages SHALL arrive
-over time with a subset scored, a few featured/highlighted, and the leaderboard and goal
-counts updating, using the production standings and goal math. The demo SHALL simulate
-the overlays' outputs, not the AI's decision quality.
+competition), mod bot actions, VidsBot actions, and live chat — from a client-side
+generator using the same presentational components as the live Activity tab. Simulated
+messages SHALL arrive over time with a subset scored, a few featured/highlighted, and
+the leaderboard and goal counts updating, using the production standings and goal math.
+The collapsed competition section SHALL show only the top-3 badges and expand chevron;
+its "Competition" title SHALL appear only in the expanded state. The demo SHALL
+simulate the overlays' outputs, not the AI's decision quality.
 
 #### Scenario: Simulated chat populates activity
 
@@ -148,6 +150,12 @@ the overlays' outputs, not the AI's decision quality.
 - **WHEN** the generator scores and features simulated messages
 - **THEN** the competition/leaderboard and featured highlights update via the production
   standings and goal math
+
+#### Scenario: Collapsed competition is badges-only
+
+- **WHEN** the competition section is collapsed
+- **THEN** it shows the top-3 badges and the chevron without the "Competition"
+  title, which appears once expanded
 
 #### Scenario: Scope is visuals, not AI decisions
 
@@ -180,22 +188,34 @@ The demo stage SHALL render the complete OBS overlay feed — highlighted
 message, TTS card, and !ask exchange — as one stacked column inside the
 highlight box, using the same presentational components as the real overlay
 page, so the demo preview is visually identical to the OBS browser source.
-The TTS card and !ask exchange SHALL each have a visibility toggle in the
-overlay control panel, persisted with the rest of the demo layout.
+The stage highlight SHALL show only promoted messages (not every
+generator-featured suggestion). In the overlay control panel, the Highlight,
+TTS card, and !ask exchange rows SHALL each offer: a visibility toggle
+(persisted with the demo layout), a **Play** button that displays one demo
+value on the stage immediately, and a **persist** checkbox that keeps the
+played overlay on screen instead of auto-hiding when its animation, audio, or
+hold timer ends.
 
-#### Scenario: Demo TTS card matches the overlay
+#### Scenario: Play buttons drive the stage
 
-- **WHEN** a demo TTS request is approved
-- **THEN** the stage shows the same TTS card the OBS overlay renders (speaker
-  icon, author name, text) and plays the bundled sample voice clip, clearing
-  when playback ends
+- **WHEN** the owner clicks Play under TTS card (or !ask exchange, or
+  Highlight)
+- **THEN** the stage immediately shows a demo TTS card playing the sample
+  clip (or a full ask exchange, or a promoted highlight) without touching the
+  Activity tab
 
-#### Scenario: Demo !ask exchange matches the overlay
+#### Scenario: Persist freezes the overlay
 
-- **WHEN** a demo !ask request is approved with "Include AI answer" checked
-- **THEN** the stage shows the mirrored exchange — question with the asker's
-  name on top, VidsBot answer bubble beneath — for the same 10-second hold;
-  unchecking the box shows the question card only
+- **WHEN** persist is checked for an overlay and it is played
+- **THEN** the overlay stays visible after its clip/hold/animation would have
+  ended, until persist is unchecked or the element is replaced
+
+#### Scenario: Highlight is owner-driven
+
+- **WHEN** the generator features a simulated message and the owner does
+  nothing
+- **THEN** it appears as a suggestion in the demo Activity chat but the stage
+  highlight stays empty until a message is promoted or Play is clicked
 
 #### Scenario: Toggles hide the new overlays
 
@@ -210,17 +230,24 @@ The demo SHALL simulate the chat-interactivity request flows end to end: the
 generator seeds one suggested !tts request, two suggested !ask requests, and
 one clip marker immediately and continues producing them intermittently, each
 accompanied by the visible `!command` message and a VidsBot ack row in the
-demo chat. The demo Activity view SHALL provide the same owner controls as
-the real Activity tab: a TTS requests panel (approve/dismiss), an Ask
-requests panel (approve with a per-row "Include AI answer" checkbox,
-dismiss), a clip markers list, and a Wrap up button that — after a
-confirmation dialog — posts the MVP (top demo scorer), an achievement
-summary, and a thanks message as VidsBot rows, exactly once.
+demo chat. The demo Activity view SHALL group the owner controls in a single
+collapsible **"VidsBot actions"** component with one tab per flow — TTS
+requests (approve/dismiss), Ask requests (approve with a per-row "Include AI
+answer" checkbox, dismiss), Clip markers, and Wrap up (confirmation dialog →
+MVP naming the top demo scorer, an achievement summary, and a thanks message
+as VidsBot rows, exactly once). Approving a TTS or ask request SHALL still
+play it on the stage.
+
+#### Scenario: Tabbed VidsBot actions
+
+- **WHEN** the owner opens the VidsBot actions component in the demo Activity
+  tab
+- **THEN** TTS requests, Ask requests, Clip markers, and Wrap up are separate
+  tabs inside the one collapsible panel
 
 #### Scenario: Approving a TTS request
 
-- **WHEN** the owner approves a suggested TTS request in the demo Activity
-  panel
+- **WHEN** the owner approves a suggested TTS request in the TTS tab
 - **THEN** its status changes, it plays on the stage, and it is marked played
   when the clip ends
 

@@ -11,6 +11,7 @@ export function HighlightedMessage({
   progress,
   rank,
   size = 72,
+  persist = false,
   onDone,
 }: {
   author: FeaturedAuthor | null;
@@ -18,6 +19,7 @@ export function HighlightedMessage({
   progress: number;
   rank: number;
   size?: number;
+  persist?: boolean;
   onDone: () => void;
 }) {
   const handle = author?.handle ? `@${author.handle}` : null;
@@ -26,8 +28,12 @@ export function HighlightedMessage({
   return (
     <div
       className="w-full px-3"
-      style={{ animation: `highlight-pop ${HOLD_MS}ms ease-in-out forwards` }}
-      onAnimationEnd={onDone}
+      style={{
+        animation: persist
+          ? "none"
+          : `highlight-pop ${HOLD_MS}ms ease-in-out forwards`,
+      }}
+      onAnimationEnd={persist ? undefined : onDone}
     >
       <div className="flex w-full items-start gap-3">
         <div

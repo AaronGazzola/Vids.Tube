@@ -14,11 +14,16 @@ import {
 
 // ── Layout store ───────────────────────────────────────────────────────────
 
+export type DemoPersistKey = "highlight" | "tts" | "ask";
+
 type LayoutState = {
   config: DemoLayoutConfig;
   hydrated: boolean;
   // Whether the on-stage controls panel is shown (ephemeral UI state, not saved).
   panelOpen: boolean;
+  // Per-overlay "keep on screen" flags (ephemeral, not saved).
+  persist: Record<DemoPersistKey, boolean>;
+  setPersist: (key: DemoPersistKey, v: boolean) => void;
   setPanelOpen: (v: boolean) => void;
   hydrate: (c: DemoLayoutConfig) => void;
   setBox: (key: DemoBoxKey, box: DemoBox) => void;
@@ -33,6 +38,9 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
   config: DEFAULT_DEMO_LAYOUT,
   hydrated: false,
   panelOpen: true,
+  persist: { highlight: false, tts: false, ask: false },
+  setPersist: (key, v) =>
+    set((s) => ({ persist: { ...s.persist, [key]: v } })),
   setPanelOpen: (v) => set({ panelOpen: v }),
   hydrate: (c) => set({ config: mergeDemoLayout(c), hydrated: true }),
   setBox: (key, box) =>
@@ -294,6 +302,9 @@ type GeneratorState = {
   unbanViewer: (viewerKey: string) => void;
   approveMod: (id: string) => void;
   dismissMod: (id: string) => void;
+  playHighlight: () => void;
+  playTts: () => void;
+  playAsk: () => void;
   approveTts: (id: string) => void;
   dismissTts: (id: string) => void;
   markTtsPlayed: (id: string) => void;
@@ -637,6 +648,70 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
     })),
   dismissMod: (id) =>
     set((s) => ({ mod: s.mod.filter((a) => a.id !== id) })),
+  playHighlight: () =>
+    set((s) => {
+      const seq = s.seq + 1;
+      const eligible = s.viewers.filter((v) => !s.banned.has(v.key));
+      if (!eligible.length) return { seq };
+      const viewer = pick(eligible);
+      const score = 6 + Math.floor(Math.random() * 4);
+      const prev = s.scores[viewer.key] ?? { total: 0, features: 0 };
+      const msg: DemoMessage = {
+        ...viewerMessage(`dm-play-${seq}`, viewer.key, pick(FEATURE_LINES)),
+        featured: true,
+        promoted: true,
+        score,
+        reason: pick(FEATURE_REASONS),
+      };
+      return {
+        seq,
+        scores: {
+          ...s.scores,
+          [viewer.key]: {
+            total: prev.total + score,
+            features: prev.features + 1,
+          },
+        },
+        messages: [...s.messages, msg].slice(-MAX_MESSAGES),
+      };
+    }),
+  playTts: () =>
+    set((s) => {
+      const seq = s.seq + 1;
+      const viewer = pick(s.viewers);
+      return {
+        seq,
+        tts: [
+          ...s.tts,
+          {
+            id: `tts-play-${seq}`,
+            viewerKey: viewer.key,
+            text: pick(TTS_LINES),
+            status: "approved" as const,
+          },
+        ].slice(-20),
+      };
+    }),
+  playAsk: () =>
+    set((s) => {
+      const seq = s.seq + 1;
+      const viewer = pick(s.viewers);
+      const qa = pick(ASK_QAS);
+      return {
+        seq,
+        asks: [
+          ...s.asks,
+          {
+            id: `ask-play-${seq}`,
+            viewerKey: viewer.key,
+            question: qa.q,
+            answer: qa.a,
+            includeAnswer: true,
+            status: "approved" as const,
+          },
+        ].slice(-20),
+      };
+    }),
   approveTts: (id) =>
     set((s) => ({
       tts: s.tts.map((t) => (t.id === id ? { ...t, status: "approved" } : t)),

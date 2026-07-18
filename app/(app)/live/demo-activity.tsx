@@ -25,6 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OriginBadge } from "@/components/origin-badge";
 import { computeGoalProgress, type Counts } from "@/lib/goals";
 import { useChatAutoScroll } from "@/lib/use-chat-autoscroll";
@@ -137,39 +138,58 @@ function Competition() {
     <div className="rounded-lg border">
       <button
         onClick={() => setExpanded((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2"
       >
-        <span>Competition</span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")} />
-      </button>
-      <div className="border-t px-3 py-2">
-        {ranked.length === 0 ? (
-          <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
-        ) : expanded ? (
-          <ul>
-            {ranked.map((x, i) => {
-              const label = labelOf(x.v);
-              return (
-                <li key={x.v.key} className="flex items-center gap-2 py-1">
-                  <span className="w-5 text-xs text-muted-foreground">#{i + 1}</span>
-                  <Avatar className="h-5 w-5 shrink-0">
-                    <AvatarImage src={x.v.avatarUrl} alt={label} />
-                    <AvatarFallback className="text-[9px]">{initials(label)}</AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-xs">{label}</span>
-                  <span className="text-xs font-bold tabular-nums">{x.total}</span>
-                </li>
-              );
-            })}
-          </ul>
+        {expanded ? (
+          <span className="text-sm font-semibold">Competition</span>
+        ) : ranked.length === 0 ? (
+          <span className="text-xs text-muted-foreground">No scores yet.</span>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <span className="flex flex-wrap gap-2">
             {top3.map((x, i) => (
               <CompetitorBadge key={x.v.key} x={x} rank={i + 1} />
             ))}
-          </div>
+          </span>
         )}
-      </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform",
+            expanded && "rotate-180"
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t px-3 py-2">
+          {ranked.length === 0 ? (
+            <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+          ) : (
+            <ul>
+              {ranked.map((x, i) => {
+                const label = labelOf(x.v);
+                return (
+                  <li key={x.v.key} className="flex items-center gap-2 py-1">
+                    <span className="w-5 text-xs text-muted-foreground">
+                      #{i + 1}
+                    </span>
+                    <Avatar className="h-5 w-5 shrink-0">
+                      <AvatarImage src={x.v.avatarUrl} alt={label} />
+                      <AvatarFallback className="text-[9px]">
+                        {initials(label)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="min-w-0 flex-1 truncate text-xs">
+                      {label}
+                    </span>
+                    <span className="text-xs font-bold tabular-nums">
+                      {x.total}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -532,38 +552,7 @@ function ModBotActions() {
   );
 }
 
-// ── Interactivity panels ───────────────────────────────────────────────────
-
-function PanelShell({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
-          {title}
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {count}
-          </span>
-        </span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && <div className="border-t p-2">{children}</div>}
-    </div>
-  );
-}
+// ── VidsBot actions ────────────────────────────────────────────────────────
 
 function TtsRequests() {
   const tts = useDemoGeneratorStore((s) => s.tts);
@@ -573,7 +562,7 @@ function TtsRequests() {
   const active = tts.filter((t) => t.status !== "dismissed");
 
   return (
-    <PanelShell title="TTS requests" count={active.length}>
+    <div>
       {active.length === 0 ? (
         <p className="px-1 py-2 text-xs text-muted-foreground">
           No TTS requests yet.
@@ -619,7 +608,7 @@ function TtsRequests() {
           })}
         </ul>
       )}
-    </PanelShell>
+    </div>
   );
 }
 
@@ -632,7 +621,7 @@ function AskRequests() {
   const active = asks.filter((a) => a.status !== "dismissed");
 
   return (
-    <PanelShell title="Ask requests" count={active.length}>
+    <div>
       {active.length === 0 ? (
         <p className="px-1 py-2 text-xs text-muted-foreground">
           No questions yet.
@@ -700,7 +689,7 @@ function AskRequests() {
           })}
         </ul>
       )}
-    </PanelShell>
+    </div>
   );
 }
 
@@ -709,7 +698,7 @@ function ClipMarkers() {
   const viewers = useDemoGeneratorStore((s) => s.viewers);
 
   return (
-    <PanelShell title="Clip markers" count={clips.length}>
+    <div>
       {clips.length === 0 ? (
         <p className="px-1 py-2 text-xs text-muted-foreground">
           No clip markers yet.
@@ -733,7 +722,7 @@ function ClipMarkers() {
           })}
         </ul>
       )}
-    </PanelShell>
+    </div>
   );
 }
 
@@ -774,6 +763,55 @@ function WrapupButton() {
   );
 }
 
+function VidsBotActions() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+      >
+        <span>VidsBot actions</span>
+        <ChevronDown
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="border-t p-2">
+          <Tabs defaultValue="tts">
+            <TabsList className="mb-2 h-8">
+              <TabsTrigger value="tts" className="px-2 text-xs">
+                TTS
+              </TabsTrigger>
+              <TabsTrigger value="ask" className="px-2 text-xs">
+                Ask
+              </TabsTrigger>
+              <TabsTrigger value="clips" className="px-2 text-xs">
+                Clips
+              </TabsTrigger>
+              <TabsTrigger value="wrapup" className="px-2 text-xs">
+                Wrap up
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="tts">
+              <TtsRequests />
+            </TabsContent>
+            <TabsContent value="ask">
+              <AskRequests />
+            </TabsContent>
+            <TabsContent value="clips">
+              <ClipMarkers />
+            </TabsContent>
+            <TabsContent value="wrapup">
+              <WrapupButton />
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Activity ───────────────────────────────────────────────────────────────
 
 export function DemoActivity({ goals }: { goals: Counts | null }) {
@@ -786,11 +824,8 @@ export function DemoActivity({ goals }: { goals: Counts | null }) {
       <div className="shrink-0">
         <ModBotActions />
       </div>
-      <div className="shrink-0 space-y-3">
-        <TtsRequests />
-        <AskRequests />
-        <ClipMarkers />
-        <WrapupButton />
+      <div className="shrink-0">
+        <VidsBotActions />
       </div>
       <ChatPanel />
     </div>

@@ -141,13 +141,12 @@ function HighlightField() {
   const messages = useDemoGeneratorStore((s) => s.messages);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const scores = useDemoGeneratorStore((s) => s.scores);
+  const persist = useDemoLayoutStore((s) => s.persist.highlight);
   const [done, setDone] = useState<Set<string>>(new Set());
 
   const current = [...messages]
     .reverse()
-    .find(
-      (m) => (m.promoted || m.featured) && !m.dismissed && !done.has(m.id)
-    );
+    .find((m) => m.promoted && !m.dismissed && !done.has(m.id));
   if (!current) {
     return (
       <div
@@ -174,6 +173,7 @@ function HighlightField() {
         text={current.text}
         rank={st.rank}
         progress={st.progress}
+        persist={persist}
         onDone={() =>
           setDone((prev) => {
             const next = new Set(prev);
@@ -192,7 +192,17 @@ function DemoTtsFeed() {
   const tts = useDemoGeneratorStore((s) => s.tts);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const markTtsPlayed = useDemoGeneratorStore((s) => s.markTtsPlayed);
+  const persist = useDemoLayoutStore((s) => s.persist.tts);
+  const [finished, setFinished] = useState<Set<string>>(new Set());
   const current = tts.find((t) => t.status === "approved") ?? null;
+  const currentId = current?.id ?? null;
+
+  useEffect(() => {
+    if (!persist && currentId && finished.has(currentId)) {
+      markTtsPlayed(currentId);
+    }
+  }, [persist, currentId, finished, markTtsPlayed]);
+
   if (!current) return null;
   const viewer = viewers.find((v) => v.key === current.viewerKey);
   return (
@@ -201,7 +211,17 @@ function DemoTtsFeed() {
       text={current.text}
       audioSrc="/demo/tts-sample.mp3"
       audioKey={current.id}
-      onDone={() => markTtsPlayed(current.id)}
+      onDone={() => {
+        if (persist) {
+          setFinished((prev) => {
+            const next = new Set(prev);
+            next.add(current.id);
+            return next;
+          });
+        } else {
+          markTtsPlayed(current.id);
+        }
+      }}
     />
   );
 }
@@ -212,14 +232,15 @@ function DemoAskFeed() {
   const asks = useDemoGeneratorStore((s) => s.asks);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const markAskShown = useDemoGeneratorStore((s) => s.markAskShown);
+  const persist = useDemoLayoutStore((s) => s.persist.ask);
   const current = asks.find((a) => a.status === "approved") ?? null;
   const currentId = current?.id ?? null;
 
   useEffect(() => {
-    if (!currentId) return;
+    if (!currentId || persist) return;
     const timer = setTimeout(() => markAskShown(currentId), DEMO_ASK_HOLD_MS);
     return () => clearTimeout(timer);
-  }, [currentId, markAskShown]);
+  }, [currentId, persist, markAskShown]);
 
   if (!current) return null;
   const viewer = viewers.find((v) => v.key === current.viewerKey);
@@ -261,7 +282,17 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
   const resetLayout = useDemoLayoutStore((s) => s.resetLayout);
   const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
+  const persist = useDemoLayoutStore((s) => s.persist);
+  const setPersist = useDemoLayoutStore((s) => s.setPersist);
   const counts = useDemoGeneratorStore((s) => s.counts);
+  const playHighlight = useDemoGeneratorStore((s) => s.playHighlight);
+  const playTts = useDemoGeneratorStore((s) => s.playTts);
+  const playAsk = useDemoGeneratorStore((s) => s.playAsk);
+  const playFor = {
+    highlight: playHighlight,
+    tts: playTts,
+    ask: playAsk,
+  } as const;
   const { data: myChannel } = useMyChannel();
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -466,13 +497,35 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
         </div>
         {(Object.keys(DEMO_OVERLAY_LABELS) as (keyof typeof DEMO_OVERLAY_LABELS)[]).map(
           (key) => (
-            <label key={key} className="flex items-center justify-between gap-2">
-              <span className="truncate">{DEMO_OVERLAY_LABELS[key]}</span>
-              <Switch
-                checked={config.visible[key]}
-                onCheckedChange={() => toggleVisible(key)}
-              />
-            </label>
+            <div key={key} className="space-y-1">
+              <label className="flex items-center justify-between gap-2">
+                <span className="truncate">{DEMO_OVERLAY_LABELS[key]}</span>
+                <Switch
+                  checked={config.visible[key]}
+                  onCheckedChange={() => toggleVisible(key)}
+                />
+              </label>
+              {(key === "highlight" || key === "tts" || key === "ask") && (
+                <div className="flex items-center justify-between gap-2 pl-2">
+                  <button
+                    onClick={playFor[key]}
+                    className="rounded bg-white/15 px-2 py-0.5 text-[10px] hover:bg-white/25"
+                    aria-label={`Play ${DEMO_OVERLAY_LABELS[key]}`}
+                  >
+                    Play
+                  </button>
+                  <label className="flex items-center gap-1 text-[10px] text-white/80">
+                    <input
+                      type="checkbox"
+                      aria-label={`Persist ${DEMO_OVERLAY_LABELS[key]}`}
+                      checked={persist[key]}
+                      onChange={(e) => setPersist(key, e.target.checked)}
+                    />
+                    persist
+                  </label>
+                </div>
+              )}
+            </div>
           )
         )}
         <div className="my-0.5 h-px bg-white/15" />

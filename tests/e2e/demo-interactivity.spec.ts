@@ -82,17 +82,24 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await enableDemo(page);
   const stage = page.getByTestId("demo-stage");
 
+  await expect(
+    stage.locator("div.border-dashed", { hasText: "Highlight" })
+  ).toBeVisible({ timeout: 15_000 });
+
   await page.getByRole("tab", { name: "Activity" }).click();
-  const ttsPanel = page.locator("div.rounded-lg.border", {
-    hasText: "TTS requests",
+  const vbPanel = page.locator("div.rounded-lg.border", {
+    hasText: "VidsBot actions",
+  });
+  await expect(vbPanel.getByRole("tab", { name: "TTS" })).toBeVisible({
+    timeout: 15_000,
   });
   await expect(
-    ttsPanel
+    vbPanel
       .getByText("big shoutout to the mods, you keep this place cozy")
       .first()
   ).toBeVisible({ timeout: 15_000 });
 
-  await ttsPanel
+  await vbPanel
     .locator("li", { hasText: "big shoutout" })
     .first()
     .getByRole("button", { name: "Approve" })
@@ -106,10 +113,8 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await expect(stageTts).toHaveCount(0, { timeout: 25_000 });
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  const askPanel = page.locator("div.rounded-lg.border", {
-    hasText: "Ask requests",
-  });
-  const ask1 = askPanel
+  await vbPanel.getByRole("tab", { name: "Ask" }).click();
+  const ask1 = vbPanel
     .locator("li", { hasText: "what editor theme is that?" })
     .first();
   await expect(ask1).toBeVisible({ timeout: 10_000 });
@@ -127,7 +132,8 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   });
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  const ask2 = askPanel
+  await vbPanel.getByRole("tab", { name: "Ask" }).click();
+  const ask2 = vbPanel
     .locator("li", { hasText: "how long have you been building" })
     .first();
   await ask2.locator('button[role="checkbox"]').click();
@@ -151,12 +157,11 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   ).toBeVisible();
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  const clipPanel = page.locator("div.rounded-lg.border", {
-    hasText: "Clip markers",
-  });
-  await expect(clipPanel.getByText("that overlay reveal").first()).toBeVisible();
+  await vbPanel.getByRole("tab", { name: "Clips" }).click();
+  await expect(vbPanel.getByText("that overlay reveal").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Wrap up", exact: true }).click();
+  await vbPanel.getByRole("tab", { name: "Wrap up" }).click();
+  await vbPanel.getByRole("button", { name: "Wrap up", exact: true }).click();
   await expect(page.getByText("Send the wrap-up messages?")).toBeVisible();
   await page
     .getByRole("alertdialog")
@@ -172,6 +177,27 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await expect(
     page.getByRole("button", { name: "Wrap-up sent" })
   ).toBeDisabled();
+
+  await expect(page.getByText("Competition", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByRole("button", { name: "Play Highlight" }).click();
+  await expect(
+    stage
+      .getByText(/best explanation|200 subs|carried me|friendliest/)
+      .first()
+  ).toBeVisible({ timeout: 5_000 });
+
+  await page.getByLabel("Persist TTS card").check();
+  await page.getByRole("button", { name: "Play TTS card" }).click();
+  const playedTts = stage.getByText(
+    /big shoutout|GG on hitting|night shift crew/
+  );
+  await expect(playedTts.first()).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(8_000);
+  await expect(playedTts.first()).toBeVisible();
+  await page.getByLabel("Persist TTS card").uncheck();
+  await expect(playedTts).toHaveCount(0, { timeout: 5_000 });
 });
 
 test("new overlay toggles persist with the demo layout", async ({ page }) => {
