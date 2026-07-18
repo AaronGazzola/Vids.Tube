@@ -171,6 +171,17 @@
   }
 }
 
+@keyframes arrow-nudge {
+  0%,
+  35%,
+  100% {
+    transform: translate(0, 0);
+  }
+  17% {
+    transform: translate(4px, -4px);
+  }
+}
+
 @keyframes confetti-burst {
   0% {
     transform: translate(0, 0) rotate(0deg);
@@ -201,62 +212,12 @@
   }
 }
 
-@keyframes rainbow-bar-x {
-  to {
-    background-position: 336px 0;
-  }
-}
-@keyframes rainbow-bar-y {
-  to {
-    background-position: 0 -336px;
-  }
-}
-@keyframes rainbow-hue {
-  from {
-    filter: hue-rotate(0deg);
-  }
-  to {
-    filter: hue-rotate(360deg);
-  }
-}
 @keyframes rainbow-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.rainbow-icon {
-  background-color: #ff0040;
-  animation: rainbow-hue 10s linear infinite;
-}
-.rainbow-bar-h {
-  background-image: repeating-linear-gradient(
-    90deg,
-    #ff0040 0px,
-    #ff8a00 48px,
-    #ffe600 96px,
-    #2ecc40 144px,
-    #00c2ff 192px,
-    #6a5cff 240px,
-    #ff44cc 288px,
-    #ff0040 336px
-  );
-  animation: rainbow-bar-x 8s linear infinite;
-}
-.rainbow-bar-v {
-  background-image: repeating-linear-gradient(
-    0deg,
-    #ff0040 0px,
-    #ff8a00 48px,
-    #ffe600 96px,
-    #2ecc40 144px,
-    #00c2ff 192px,
-    #6a5cff 240px,
-    #ff44cc 288px,
-    #ff0040 336px
-  );
-  animation: rainbow-bar-y 8s linear infinite;
-}
 .rainbow-ring {
   background-image: conic-gradient(
     from 0deg,
@@ -269,13 +230,5 @@
     #ff44cc,
     #ff0040
   );
-  animation: rainbow-spin 6s linear infinite;
-}
-.rainbow-mask {
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
+  animation: rainbow-spin 6s ease-in-out infinite alternate;
 }

@@ -72,7 +72,7 @@ export function useDemoController(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     seed();
-    for (let i = 0; i < 6; i++) tick();
+    for (let i = 0; i < 40; i++) tick();
     const id = setInterval(() => tick(), 1600);
     return () => clearInterval(id);
   }, [enabled, seed, tick]);

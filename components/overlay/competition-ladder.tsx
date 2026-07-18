@@ -21,8 +21,8 @@ const CONFETTI_COLORS = [
 ];
 
 function rankScale(rank: number): number {
-  if (rank === 1) return 1;
-  if (rank === 2) return 2 / 3;
+  if (rank === 1) return 0.85;
+  if (rank === 2) return 0.6;
   return 1 / 3;
 }
 
@@ -159,6 +159,9 @@ export function CompetitionLadder({
                 progress={st.progress}
                 rank={st.rank}
                 size={size}
+                stroke={5}
+                badgeScale={st.rank === 2 ? rankScale(1) / rankScale(2) : 1}
+                badgeNudge={st.rank === 2 ? 6 : 0}
               />
             </div>
           </div>

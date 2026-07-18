@@ -34,7 +34,14 @@ export function HighlightedMessage({
           className="flex shrink-0 flex-col items-center"
           style={{ width: size }}
         >
-          <AvatarBubble author={author} progress={progress} rank={rank} size={size} />
+          <AvatarBubble
+            author={author}
+            progress={progress}
+            rank={rank}
+            size={size}
+            stroke={5}
+            showBadge={rank < 99}
+          />
           {handle && (
             <span className="mt-1 max-w-full truncate text-sm font-bold text-white drop-shadow">
               {handle}

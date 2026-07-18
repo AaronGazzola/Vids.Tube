@@ -703,13 +703,13 @@ export function SettingsTab({
 
       <Section title="OBS overlays">
         <CopyRow label="Highlights" url={base} dimensions="460 × 400" />
-        <CopyRow label="Goal · Subs" url={`${base}/goals/subs`} dimensions="600 × 160" />
-        <CopyRow label="Goal · Likes" url={`${base}/goals/likes`} dimensions="200 × 820" />
+        <CopyRow label="Goal · Subs" url={`${base}/goals/subs`} dimensions="160 × 160" />
+        <CopyRow label="Goal · Likes" url={`${base}/goals/likes`} dimensions="160 × 160" />
         <CopyRow label="Goal · Viewers" url={`${base}/goals/viewers`} dimensions="160 × 160" />
         <CopyRow
           label="Competition"
           url={`${base}/competition?opacity=${(opacityPct / 100).toFixed(2)}`}
-          dimensions="120 × 300"
+          dimensions="120 × 520"
         />
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between">

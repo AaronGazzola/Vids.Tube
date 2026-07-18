@@ -128,7 +128,7 @@ function CompetitionField() {
     .map((v) => ({ key: v.key, author: authorOf(v), score: scores[v.key]?.total ?? 0 }))
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .slice(0, 18);
 
   return <CompetitionLadder entries={entries} size={52} />;
 }
@@ -146,7 +146,16 @@ function HighlightField() {
     .find(
       (m) => (m.promoted || m.featured) && !m.dismissed && !done.has(m.id)
     );
-  if (!current) return null;
+  if (!current) {
+    return (
+      <div
+        className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/30 text-xs text-white/40"
+        style={{ width: 420 }}
+      >
+        Highlight
+      </div>
+    );
+  }
 
   const viewer = viewers.find((v) => v.key === current.viewerKey) ?? null;
   const active = viewers
@@ -156,7 +165,7 @@ function HighlightField() {
     computeStandings(active).get(current.viewerKey) ?? { rank: 99, progress: 0 };
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-6 w-[min(90%,420px)] -translate-x-1/2">
+    <div style={{ width: 420 }}>
       <HighlightedMessage
         key={current.id}
         author={viewer ? authorOf(viewer) : null}
@@ -177,14 +186,17 @@ function HighlightField() {
 
 // ── Goal box ───────────────────────────────────────────────────────────────
 
-const BOX_METRIC: Record<Exclude<DemoBoxKey, "competition">, GoalMetric> = {
+const BOX_METRIC: Record<
+  Exclude<DemoBoxKey, "competition" | "highlight">,
+  GoalMetric
+> = {
   goalSubs: "subs",
   goalLikes: "likes",
   goalViewers: "viewers",
 };
 
 function GoalBox({ boxKey, data }: { boxKey: DemoBoxKey; data: MetricProgress }) {
-  if (boxKey === "competition") return null;
+  if (boxKey === "competition" || boxKey === "highlight") return null;
   return <GoalBar metric={BOX_METRIC[boxKey]} data={data} height={110} />;
 }
 
@@ -300,10 +312,12 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           </div>
         )}
 
-        {/* full-stage overlays */}
-        {config.visible.highlight && <HighlightField />}
-
         {/* positioned box overlays */}
+        {config.visible.highlight && (
+          <DraggableBox boxKey="highlight">
+            <HighlightField />
+          </DraggableBox>
+        )}
         {config.visible.goalSubs && (
           <DraggableBox boxKey="goalSubs">
             <GoalBox boxKey="goalSubs" data={metricFor("subs")} />

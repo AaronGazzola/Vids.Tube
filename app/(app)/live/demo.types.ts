@@ -1,7 +1,12 @@
 import type { Counts } from "@/lib/goals";
 
-export type DemoBoxKey = "goalSubs" | "goalLikes" | "goalViewers" | "competition";
-export type DemoOverlayKey = DemoBoxKey | "highlight";
+export type DemoBoxKey =
+  | "goalSubs"
+  | "goalLikes"
+  | "goalViewers"
+  | "competition"
+  | "highlight";
+export type DemoOverlayKey = DemoBoxKey;
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
 export type DemoBox = { x: number; y: number; scale: number };
@@ -36,6 +41,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     goalLikes: { x: 24, y: 120, scale: 1 },
     goalViewers: { x: 300, y: 24, scale: 1 },
     competition: { x: 24, y: 220, scale: 1 },
+    highlight: { x: 160, y: 40, scale: 1 },
   },
   visible: {
     goalSubs: true,

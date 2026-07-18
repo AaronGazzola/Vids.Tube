@@ -105,6 +105,22 @@ const NAMES: [string, string | null, DemoOrigin][] = [
   ["Ben T", null, "youtube"],
   ["hollowtones", "hollowtones", "vidstube"],
   ["GG_Kai", null, "youtube"],
+  ["Suki", "suki", "vidstube"],
+  ["torchlight", "torchlight", "vidstube"],
+  ["Mena P.", "menap", "vidstube"],
+  ["JDub", null, "youtube"],
+  ["frostbyte", null, "youtube"],
+  ["Liv", "livstreams", "vidstube"],
+  ["okra_boy", null, "youtube"],
+  ["Cassidy", "cassidy", "vidstube"],
+  ["moth.exe", null, "youtube"],
+  ["Ravi K", "ravik", "vidstube"],
+  ["sleepytea", "sleepytea", "vidstube"],
+  ["BigLantern", null, "youtube"],
+  ["june bug", null, "youtube"],
+  ["Petra", "petra", "vidstube"],
+  ["wanderfall", "wanderfall", "vidstube"],
+  ["ZipZap", null, "youtube"],
 ];
 
 const CHAT_LINES = [

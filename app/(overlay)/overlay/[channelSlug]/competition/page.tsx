@@ -12,7 +12,7 @@ export default function CompetitionOverlayPage({
 }) {
   const { channelSlug } = use(params);
   const sp = useSearchParams();
-  const max = Number(sp.get("max")) || 8;
+  const max = Number(sp.get("max")) || 18;
   const size = Number(sp.get("size")) || 56;
   const opacity = sp.get("opacity") != null ? Number(sp.get("opacity")) : 0.6;
 
