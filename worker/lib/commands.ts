@@ -20,6 +20,7 @@ export type CommandStreamInfo = {
   id: string;
   channelId: string;
   channelSlug: string;
+  disabledCommands: string[];
 };
 
 export type CommandContext = {
@@ -81,6 +82,22 @@ export const BUILTIN_HANDLERS: Record<
   me: async (ctx) => {
     const { meHandler } = await import("./me-command");
     await meHandler(ctx);
+  },
+  rank: async (ctx) => {
+    const { rankHandler } = await import("./info-commands");
+    await rankHandler(ctx);
+  },
+  top: async (ctx) => {
+    const { topHandler } = await import("./info-commands");
+    await topHandler(ctx);
+  },
+  goal: async (ctx) => {
+    const { goalHandler } = await import("./info-commands");
+    await goalHandler(ctx);
+  },
+  uptime: async (ctx) => {
+    const { uptimeHandler } = await import("./info-commands");
+    await uptimeHandler(ctx);
   },
 };
 
@@ -172,7 +189,7 @@ export async function processCommands(
       continue;
     }
 
-    if (!row.enabled) {
+    if (!row.enabled || stream.disabledCommands.includes(row.keyword)) {
       await insertEvent(stream, m, row.keyword, parsed.args, "disabled", null);
       continue;
     }
@@ -226,29 +243,31 @@ export async function processCommands(
       null
     );
 
-    const handler =
-      row.kind === "builtin" && row.builtin_key
+    let replyText: string | null = null;
+    if (row.kind === "custom") {
+      replyText = row.response?.trim() || null;
+    } else {
+      const handler = row.builtin_key
         ? BUILTIN_HANDLERS[row.builtin_key]
         : null;
-    if (!handler) {
-      continue;
-    }
-
-    let replyText: string | null = null;
-    const ctx: CommandContext = {
-      stream,
-      message: m,
-      args: parsed.args,
-      registry,
-      reply: (text: string) => {
-        replyText = text;
-      },
-    };
-    try {
-      await handler(ctx);
-    } catch (e) {
-      console.error(`command !${row.keyword} handler failed:`, e);
-      continue;
+      if (!handler) {
+        continue;
+      }
+      const ctx: CommandContext = {
+        stream,
+        message: m,
+        args: parsed.args,
+        registry,
+        reply: (text: string) => {
+          replyText = text;
+        },
+      };
+      try {
+        await handler(ctx);
+      } catch (e) {
+        console.error(`command !${row.keyword} handler failed:`, e);
+        continue;
+      }
     }
     if (replyText) {
       if (eventId) {

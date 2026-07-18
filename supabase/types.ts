@@ -764,6 +764,7 @@ export type Database = {
           created_at: string
           created_in_ui: boolean
           description: string | null
+          disabled_commands: string[]
           ended_at: string | null
           hls_path: string | null
           id: string
@@ -784,6 +785,7 @@ export type Database = {
           created_at?: string
           created_in_ui?: boolean
           description?: string | null
+          disabled_commands?: string[]
           ended_at?: string | null
           hls_path?: string | null
           id?: string
@@ -804,6 +806,7 @@ export type Database = {
           created_at?: string
           created_in_ui?: boolean
           description?: string | null
+          disabled_commands?: string[]
           ended_at?: string | null
           hls_path?: string | null
           id?: string

@@ -441,12 +441,23 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         (m) => !bannedKeys.has(participantKey(m))
       );
       await processLinkVerifications(unmoderated);
-      const batch = channelId
-        ? await processCommands(
-            { id: stream.id, channelId, channelSlug },
-            unmoderated
-          )
-        : unmoderated;
+      let batch = unmoderated;
+      if (channelId) {
+        const { data: prefs } = await supabaseAdmin
+          .from("streams")
+          .select("disabled_commands")
+          .eq("id", stream.id)
+          .maybeSingle();
+        batch = await processCommands(
+          {
+            id: stream.id,
+            channelId,
+            channelSlug,
+            disabledCommands: prefs?.disabled_commands ?? [],
+          },
+          unmoderated
+        );
+      }
 
       if (batch.length) {
         const transcript = await fetchTranscriptWindow(stream.id);

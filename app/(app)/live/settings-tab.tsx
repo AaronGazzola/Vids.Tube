@@ -28,6 +28,12 @@ import {
   useStreamKey,
   useUploadBroadcastThumbnail,
 } from "./broadcast.hooks";
+import {
+  useChannelCommandsAdmin,
+  useCreateCustomCommand,
+  useDeleteCustomCommand,
+  useUpdateCustomCommand,
+} from "./commands.hooks";
 
 const STREAM_HOST = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
 
@@ -42,6 +48,7 @@ export type SettingsForm = {
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  disabledCommands: string[];
 };
 
 function Section({
@@ -195,6 +202,205 @@ function ConnectionSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </Section>
+  );
+}
+
+type CommandDialogState = {
+  id: string | null;
+  keyword: string;
+  description: string;
+  response: string;
+  cooldownS: string;
+};
+
+const EMPTY_COMMAND_DIALOG: CommandDialogState = {
+  id: null,
+  keyword: "",
+  description: "",
+  response: "",
+  cooldownS: "30",
+};
+
+function ChatCommandsSection({
+  form,
+  set,
+  channelSlug,
+  workerRunning,
+}: {
+  form: SettingsForm;
+  set: (patch: Partial<SettingsForm>) => void;
+  channelSlug: string;
+  workerRunning: boolean;
+}) {
+  const { data: commands, isPending } = useChannelCommandsAdmin();
+  const create = useCreateCustomCommand();
+  const update = useUpdateCustomCommand();
+  const remove = useDeleteCustomCommand();
+  const [dialog, setDialog] = useState<CommandDialogState | null>(null);
+
+  const toggleStream = (keyword: string, included: boolean) => {
+    const withoutKeyword = form.disabledCommands.filter((k) => k !== keyword);
+    set({
+      disabledCommands: included
+        ? withoutKeyword
+        : [...withoutKeyword, keyword].sort(),
+    });
+  };
+
+  const submitDialog = () => {
+    if (!dialog) return;
+    const input = {
+      keyword: dialog.keyword,
+      description: dialog.description,
+      response: dialog.response,
+      cooldownS: Number(dialog.cooldownS) || 0,
+    };
+    const done = { onSuccess: () => setDialog(null) };
+    if (dialog.id) {
+      update.mutate({ id: dialog.id, input }, done);
+    } else {
+      create.mutate(input, done);
+    }
+  };
+
+  return (
+    <Section title="Chat commands">
+      <p className="text-xs text-muted-foreground">
+        Viewers can type these in chat (both platforms). Checkboxes choose which
+        commands run on this stream — saved with Save changes. Commands need the
+        local worker{" "}
+        <span
+          className={cn(
+            "font-medium",
+            workerRunning ? "text-green-600" : "text-amber-600"
+          )}
+        >
+          ({workerRunning ? "running" : "stopped"})
+        </span>
+        . Public guide: /{channelSlug}/commands
+      </p>
+      {isPending ? (
+        <Skeleton className="h-24 w-full" />
+      ) : (
+        <ul className="divide-y rounded-md border">
+          {(commands ?? []).map((c) => (
+            <li key={c.id} className="flex items-center gap-3 p-2.5">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={!form.disabledCommands.includes(c.keyword)}
+                onChange={(e) => toggleStream(c.keyword, e.target.checked)}
+                aria-label={`Include !${c.keyword} on this stream`}
+              />
+              <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold">
+                !{c.keyword}
+              </code>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {c.description}
+              </span>
+              {c.kind === "custom" && (
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() =>
+                      setDialog({
+                        id: c.id,
+                        keyword: c.keyword,
+                        description: c.description,
+                        response: c.response ?? "",
+                        cooldownS: String(c.cooldownS),
+                      })
+                    }
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs text-destructive"
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate(c.id)}
+                  >
+                    Delete
+                  </Button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setDialog(EMPTY_COMMAND_DIALOG)}
+      >
+        Add command
+      </Button>
+      {dialog && (
+        <div className="space-y-3 rounded-md border p-3">
+          <p className="text-sm font-medium">
+            {dialog.id ? `Edit !${dialog.keyword}` : "New command"}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="cmd-keyword">Keyword</Label>
+            <Input
+              id="cmd-keyword"
+              value={dialog.keyword}
+              onChange={(e) => setDialog({ ...dialog, keyword: e.target.value })}
+              placeholder="pc"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cmd-description">Description</Label>
+            <Input
+              id="cmd-description"
+              value={dialog.description}
+              onChange={(e) =>
+                setDialog({ ...dialog, description: e.target.value })
+              }
+              placeholder="What rig I stream on"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cmd-response">Response</Label>
+            <Textarea
+              id="cmd-response"
+              value={dialog.response}
+              onChange={(e) =>
+                setDialog({ ...dialog, response: e.target.value })
+              }
+              placeholder="The bot replies with this text."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cmd-cooldown">Cooldown (seconds)</Label>
+            <Input
+              id="cmd-cooldown"
+              type="number"
+              min={0}
+              value={dialog.cooldownS}
+              onChange={(e) =>
+                setDialog({ ...dialog, cooldownS: e.target.value })
+              }
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={create.isPending || update.isPending}
+              onClick={submitDialog}
+            >
+              {dialog.id ? "Save command" : "Add command"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDialog(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </Section>
   );
 }
@@ -389,6 +595,13 @@ export function SettingsTab({
           onCheckedChange={(v) => set({ waitingRoomChat: v })}
         />
       </Section>
+
+      <ChatCommandsSection
+        form={form}
+        set={set}
+        channelSlug={channelSlug}
+        workerRunning={workerRunning}
+      />
 
       <Section title="Local worker">
         <div className="flex items-center gap-2">

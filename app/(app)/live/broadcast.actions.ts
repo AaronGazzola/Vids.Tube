@@ -458,6 +458,7 @@ export type StreamSettings = {
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  disabledCommands: string[];
   workerRunning: boolean;
 };
 
@@ -472,6 +473,7 @@ export type StreamSettingsInput = {
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  disabledCommands: string[];
 };
 
 export async function getStreamSettingsAction(): Promise<StreamSettings> {
@@ -484,7 +486,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
   const { data: stream, error } = await supabaseAdmin
     .from("streams")
     .select(
-      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat"
+      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat, disabled_commands"
     )
     .eq("channel_id", channel.id)
     .in("status", ["draft", "scheduled", "preview", "live"])
@@ -518,6 +520,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       highlightingEnabled: true,
       autoDisplayFeatured: false,
       waitingRoomChat: false,
+      disabledCommands: [],
       workerRunning,
     };
   }
@@ -553,6 +556,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
+    disabledCommands: stream.disabled_commands ?? [],
     workerRunning,
   };
 }
@@ -597,12 +601,14 @@ export async function saveStreamSettingsAction(
       title: string | null;
       description: string | null;
       waiting_room_chat: boolean;
+      disabled_commands: string[];
       scheduled_start_at?: string | null;
       status?: string;
     } = {
       title,
       description,
       waiting_room_chat: input.waitingRoomChat,
+      disabled_commands: input.disabledCommands,
     };
     // Don't flip a live row's status/schedule; a preview can still be scheduled.
     if (active.status !== "live") {
@@ -631,6 +637,7 @@ export async function saveStreamSettingsAction(
         description,
         scheduled_start_at: scheduledStartAt,
         waiting_room_chat: input.waitingRoomChat,
+        disabled_commands: input.disabledCommands,
       })
       .select("id")
       .single();

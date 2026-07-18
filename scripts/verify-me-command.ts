@@ -50,6 +50,7 @@ async function main() {
     id: "00000000-0000-0000-0000-000000000000",
     channelId: channel.id,
     channelSlug: channel.slug,
+    disabledCommands: [],
   };
 
   const { data: knownChatter } = await admin

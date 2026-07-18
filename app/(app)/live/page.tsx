@@ -77,6 +77,7 @@ function buildForm(s: StreamSettings): SettingsForm {
     highlightingEnabled: s.highlightingEnabled,
     autoDisplayFeatured: s.autoDisplayFeatured,
     waitingRoomChat: s.waitingRoomChat,
+    disabledCommands: [...s.disabledCommands].sort(),
   };
 }
 
@@ -367,6 +368,7 @@ export default function LivePage() {
     highlightingEnabled: f.highlightingEnabled,
     autoDisplayFeatured: f.autoDisplayFeatured,
     waitingRoomChat: f.waitingRoomChat,
+    disabledCommands: f.disabledCommands,
   });
 
   const doSave = async (f: SettingsForm) => {
