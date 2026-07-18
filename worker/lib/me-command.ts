@@ -77,6 +77,12 @@ export async function resolveMeIdentity(
   };
 }
 
+function minIso(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return Date.parse(a) <= Date.parse(b) ? a : b;
+}
+
 export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
   const { supabaseAdmin } = await deps();
   let totalMessages = 0;
@@ -86,13 +92,30 @@ export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
   if (identity.youtubeChannelId) {
     const { data } = await supabaseAdmin
       .from("chatter_stats")
-      .select("total_messages, videos_attended, first_seen_at")
+      .select("total_messages, videos_attended, first_seen_at, last_seen_at")
       .eq("author_channel_id", identity.youtubeChannelId)
       .maybeSingle();
     if (data) {
       totalMessages += data.total_messages;
       videosAttended += data.videos_attended;
       firstSeenAt = data.first_seen_at;
+    }
+
+    let liveQuery = supabaseAdmin
+      .from("chat_messages")
+      .select("stream_id, created_at")
+      .eq("origin", "youtube")
+      .eq("external_author_id", identity.youtubeChannelId)
+      .order("created_at", { ascending: true })
+      .limit(2000);
+    if (data?.last_seen_at) {
+      liveQuery = liveQuery.gt("created_at", data.last_seen_at);
+    }
+    const { data: live } = await liveQuery;
+    if (live?.length) {
+      totalMessages += live.length;
+      videosAttended += new Set(live.map((m) => m.stream_id)).size;
+      firstSeenAt = minIso(firstSeenAt, live[0].created_at);
     }
   }
 
@@ -110,6 +133,17 @@ export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
       vidstubeStreams += 1;
     }
     videosAttended += vidstubeStreams;
+
+    const { count, data: earliest } = await supabaseAdmin
+      .from("chat_messages")
+      .select("created_at", { count: "exact" })
+      .eq("user_id", identity.userId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (count) {
+      totalMessages += count;
+      firstSeenAt = minIso(firstSeenAt, earliest?.[0]?.created_at ?? null);
+    }
   }
 
   return {
