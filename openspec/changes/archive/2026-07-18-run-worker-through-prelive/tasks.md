@@ -32,7 +32,7 @@
 ## 5. Verification
 
 - [x] 5.1 `npx tsc --noEmit` and `npx eslint` on `worker/` pass
-- [ ] 5.2 Script test (remote db): a dated `scheduled` stream with scoring on is
+- [x] 5.2 Script test (remote db): a dated `scheduled` stream with scoring on is
   engaged, its chat is scored/moderated and YouTube-polled, and no
   `transcript_segments` are written until it is `live`; the heartbeat row updates
   each tick; a `draft`/ad-hoc `preview` is NOT engaged

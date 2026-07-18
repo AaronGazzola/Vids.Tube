@@ -37,6 +37,6 @@
 ## 5. Verification
 
 - [x] 5.1 `npx tsc --noEmit`, `npx eslint`, `doppler run -- npm run build` pass
-- [ ] 5.2 Script test (remote db): posting to a public `scheduled` stream with
+- [x] 5.2 Script test (remote db): posting to a public `scheduled` stream with
   `waiting_room_chat` on succeeds and is rejected when off/private; the waiting page
   shows countdown + count + chat, and swaps to the player at go-live keeping chat

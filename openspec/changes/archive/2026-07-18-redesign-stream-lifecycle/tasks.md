@@ -88,7 +88,7 @@
 ## 8. Verification
 
 - [x] 8.1 `npx tsc --noEmit`, `npx eslint`, `doppler run -- npm run build` pass
-- [ ] 8.2 Script test (custom TS, remote db): create draft → claim via simulated
+- [x] 8.2 Script test (custom TS, remote db): create draft → claim via simulated
   connect → preview → go live sets `live_at` → offline while live ends + VODs;
   preview disconnect reverts to draft/scheduled or deletes ad-hoc; discard deletes
   never-live rows; the partial unique index rejects a second active row

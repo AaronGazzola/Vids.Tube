@@ -37,5 +37,5 @@
 - [x] 5.1 `npx tsc --noEmit`, `npx eslint`, `doppler run -- npm run build` pass
 - [x] 5.2 Unit test `lib/chat-replay.ts` gap math: message before a gap, inside a
   gap (clamped to cut), and after a gap (shifted by gap duration)
-- [ ] 5.3 Script/manual: a stale `live` row reads as disconnected (not ended) and
+- [x] 5.3 Script/manual: a stale `live` row reads as disconnected (not ended) and
   chat still posts; a VOD with one gap replays chat in sync across the jump

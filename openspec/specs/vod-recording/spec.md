@@ -5,15 +5,31 @@ TBD - created by archiving change add-vod-pipeline. Update Purpose after archive
 ## Requirements
 ### Requirement: Session recording on the VM
 
-The system SHALL record each live session on the VM as fMP4 by remux (no
-re-encode), concurrently with live HLS delivery, so that a recording exists for
-every published stream.
+The system SHALL record only the **public (live) portion** of each session on the VM
+as fMP4 by remux (no re-encode), concurrently with live HLS delivery. Footage
+captured while the session is `preview` (before the owner presses Go live) SHALL be
+excluded from the finalized VOD, using the stream's `live_at` marker as the start
+boundary — either by starting the recording at go-live, or by trimming everything
+before `live_at` during finalize. A broadcast that spans one or more encoder
+disconnects (each producing a separate recording segment) SHALL be finalized by
+**concatenating all segments from `live_at` onward into a single MP4**; the
+disconnected periods are simply absent (jump cuts), never black filler.
 
-#### Scenario: Stream is recorded
+#### Scenario: Only live footage is recorded
 
-- **WHEN** a publish is accepted and the stream goes live
-- **THEN** MediaMTX writes a session recording to local disk in fMP4 without
-  re-encoding the incoming H.264/AAC
+- **WHEN** the owner connects the encoder (preview) and later presses Go live
+- **THEN** the finalized VOD begins at `live_at` and contains no preview footage
+
+#### Scenario: Preview-only session produces no VOD
+
+- **WHEN** a session is connected in `preview` and disconnected without ever going live
+- **THEN** no recording is finalized and no VOD row is created
+
+#### Scenario: Reconnects produce one VOD with jump cuts
+
+- **WHEN** a live broadcast disconnects and reconnects one or more times before End
+- **THEN** the finalized VOD is a single MP4 concatenating every segment since
+  `live_at`, with a jump cut (no black) at each reconnect
 
 #### Scenario: Recording does not disrupt live delivery
 
@@ -65,33 +81,49 @@ VOD bucket under deterministic keys.
 - **THEN** the recording-complete hook is not called and the `videos` row
   remains `processing`, so no broken VOD is shown to viewers
 
-### Requirement: Processing VOD row on stream end
+### Requirement: Processing VOD row at go-live
 
-The system SHALL create a `videos` row in `processing` state when a broadcast
-that was publicly `live` ends, linked to the originating stream, before the
-recording upload completes. The processing row SHALL inherit the broadcast's
-`title`, `description`, and `thumbnail_path`. A session that ends from `preview`
+The system SHALL create a `videos` row in `processing` state at go-live, linked to
+the originating stream, so the VM finalize (which can fire on any disconnect) always
+has a row to attach the recording to. The processing row SHALL inherit the
+broadcast's `title`, `description`, and `thumbnail_path`, and SHALL stay hidden
+(processing) until the broadcast is ended. A session that disconnects from `preview`
 without ever having gone public `live` SHALL NOT create a `videos` row.
 
-#### Scenario: Offline hook creates the processing row
+#### Scenario: Go-live creates the processing row
 
-- **WHEN** the shared-secret-guarded `/api/ingest/offline` hook fires for a
-  broadcast that was publicly `live`
-- **THEN** the system sets the stream `status` to `ended` and inserts a `videos`
-  row with `status='processing'`, `source_stream_id` set to that stream, and the
-  stream's `title`, `description`, and `thumbnail_path`
+- **WHEN** the owner goes live from `preview`
+- **THEN** the system inserts a `videos` row with `status='processing'`,
+  `source_stream_id` set to that stream, and the stream's `title`, `description`,
+  and `thumbnail_path`
 
 #### Scenario: Preview-only session leaves no VOD
 
-- **WHEN** `/api/ingest/offline` fires for a session that is in `preview` and was
-  never promoted to public `live`
-- **THEN** the system sets the stream `status` to `ended` and creates no `videos`
-  row
+- **WHEN** a session disconnects from `preview` without ever going public `live`
+- **THEN** no `videos` row exists for it
 
 #### Scenario: Forged offline hook changes nothing
 
 - **WHEN** `/api/ingest/offline` is called without the valid shared secret
-- **THEN** the system rejects the request and creates no `videos` row
+- **THEN** the system rejects the request and changes no stream or `videos` row
+
+### Requirement: Finalize on End, not on disconnect
+
+The system SHALL finalize the VOD when the owner ends the broadcast, not on encoder
+disconnect. The processing VOD row created at go-live SHALL become visible (ready)
+only once the stream is `ended`; a disconnect that is later reconnected SHALL NOT
+publish a partial VOD.
+
+#### Scenario: Disconnect alone does not publish a VOD
+
+- **WHEN** the encoder disconnects mid-broadcast and the owner has not pressed End
+- **THEN** no VOD is published; the broadcast remains `live` in a disconnected state
+
+#### Scenario: End publishes the concatenated VOD
+
+- **WHEN** the owner presses End after the encoder has disconnected
+- **THEN** the segments since `live_at` are concatenated, uploaded, and the VOD row
+  flips to ready
 
 ### Requirement: Recording-complete publication hook
 

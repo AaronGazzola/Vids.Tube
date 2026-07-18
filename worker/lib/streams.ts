@@ -97,7 +97,23 @@ async function resolveWorkerChannelId(): Promise<string | null> {
     console.error(error);
     return null;
   }
-  heartbeatChannelId = data?.id ?? null;
+  if (data) {
+    heartbeatChannelId = data.id;
+    return heartbeatChannelId;
+  }
+  // The MediaMTX path ("owner") is not the channel slug; fall back the same way
+  // the ingest routes do so the heartbeat always lands on the owner channel.
+  const fallbackSlug = process.env.INGEST_CHANNEL_SLUG ?? "azanything";
+  const { data: fallback, error: fallbackError } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", fallbackSlug)
+    .maybeSingle();
+  if (fallbackError) {
+    console.error(fallbackError);
+    return null;
+  }
+  heartbeatChannelId = fallback?.id ?? null;
   return heartbeatChannelId;
 }
 

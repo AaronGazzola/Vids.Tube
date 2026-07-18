@@ -5,28 +5,37 @@ TBD - created by archiving change add-scheduled-broadcasts. Update Purpose after
 ## Requirements
 ### Requirement: Create a scheduled broadcast ahead of time
 
-The system SHALL let the channel owner create a future broadcast before any encoder
-connects, capturing a title (required, non-empty), an optional description, an
-optional thumbnail, and a `scheduled_start_at` time. The system SHALL persist this as
-a `streams` row with `status` `scheduled` and SHALL reject creation without a
-non-empty title.
+The system SHALL let the channel owner create/configure the single active broadcast
+before any encoder connects, capturing an optional title, description, thumbnail,
+overlay settings, and an optional `scheduled_start_at`. With a datetime the row is
+`status='scheduled'` (public waiting room); without a datetime it is `status='draft'`
+(private). Both are created with `created_in_ui=true`. Because at most one active
+stream may exist, saving SHALL edit the existing active row when one exists rather
+than creating a second. A non-empty title is NOT required to create/save; it is
+required only to go live (see `broadcast-setup`).
 
-#### Scenario: Owner creates a scheduled broadcast
+#### Scenario: Owner creates a private draft
 
-- **WHEN** the owner submits the create form with a non-empty title and a future
-  start time (optionally a description and thumbnail)
-- **THEN** the system stores a `streams` row with `status` `scheduled`, the given
-  `scheduled_start_at`, title, description, and `thumbnail_path`
+- **WHEN** the owner saves broadcast settings with no scheduled datetime and no
+  active stream exists
+- **THEN** the system stores a `streams` row with `status='draft'`, `created_in_ui=true`,
+  private to the owner
 
-#### Scenario: Create blocked without a title
+#### Scenario: Owner schedules a dated broadcast
 
-- **WHEN** the owner submits the create form with an empty title
-- **THEN** the system does not create the broadcast and returns a user-facing error
-  indicating a title is required
+- **WHEN** the owner saves broadcast settings with a scheduled datetime
+- **THEN** the active row is `status='scheduled'` with that `scheduled_start_at`,
+  public as a waiting room/coming-soon card
+
+#### Scenario: Saving edits the existing active row
+
+- **WHEN** the owner saves settings while an active `draft`/`scheduled`/`preview`/`live`
+  row exists
+- **THEN** the existing active row is updated in place; no second active row is created
 
 #### Scenario: Only the owner can create
 
-- **WHEN** an anonymous or non-owner user attempts to create a scheduled broadcast
+- **WHEN** an anonymous or non-owner user attempts to create/edit the broadcast
 - **THEN** the system rejects the request and creates no row
 
 ### Requirement: Scheduled-broadcast thumbnail upload
@@ -41,76 +50,63 @@ media, and recording the stored key as the broadcast's `thumbnail_path`.
 - **THEN** the system stores it in the VOD object store, sets the broadcast's
   `thumbnail_path` to its key, and the thumbnail renders from the CDN
 
-### Requirement: Studio Broadcasts list
-
-The system SHALL provide a Studio Broadcasts page that lists the channel's broadcasts
-split into upcoming (claimable `scheduled` rows, in start-time order), missed
-(`scheduled` rows whose start time is past by more than the grace window), and past
-(ended), accessible only to the channel owner.
-
-#### Scenario: Owner views their broadcasts
-
-- **WHEN** the owner opens the Broadcasts page
-- **THEN** the page lists upcoming scheduled broadcasts (title, thumbnail, start time),
-  any missed scheduled broadcasts marked as missed, and past broadcasts
-
-#### Scenario: Non-owner is denied
-
-- **WHEN** a non-owner (anonymous or non-owner user) opens the Broadcasts page
-- **THEN** they are denied access and redirected away
-
 ### Requirement: Edit a scheduled broadcast
 
-The system SHALL let the owner edit a scheduled broadcast's title, description,
-thumbnail, and start time while it is still `scheduled`, persisting the changes on the
-`streams` row, and SHALL reject an edit that clears the title.
+The system SHALL let the owner edit the active scheduled broadcast's title,
+description, thumbnail, and start time from the `/live` Settings tab while it is
+still pre-live, persisting the changes on the same active `streams` row. A non-empty
+title is NOT required to save (it is required only to go live — see
+`broadcast-setup`); clearing the start time turns the broadcast back into a private
+`draft`.
 
 #### Scenario: Owner edits a scheduled broadcast
 
-- **WHEN** the owner changes the title, description, thumbnail, or start time of a
-  `scheduled` broadcast
-- **THEN** the system stores the new values on that row and reflects them in the list
-  and the coming-soon card
-
-#### Scenario: Edit blocked without a title
-
-- **WHEN** the owner saves an edit with an empty title
-- **THEN** the system does not save and returns a user-facing error indicating a title
-  is required
+- **WHEN** the owner changes the title, description, thumbnail, or start time of the
+  active `scheduled` broadcast
+- **THEN** the system stores the new values on that row and reflects them on the
+  public coming-soon surface
 
 ### Requirement: Cancel a scheduled broadcast
 
-The system SHALL let the owner cancel a `scheduled` broadcast that has not been
-claimed by an encoder, removing it from the upcoming list and the channel's
-coming-soon surface so it can never be claimed into preview.
+The system SHALL let the owner discard the active pre-live broadcast
+(`draft`/`scheduled`/`preview`), which supersedes the prior cancel action. For
+`draft`/`scheduled` (no encoder) the row SHALL be deleted, removing it from the
+upcoming/coming-soon surfaces so it can never be claimed. For `preview` (encoder
+connected) the row SHALL be reset in place to a blank private ad-hoc preview (see
+`stream-lifecycle` Discard). Discard SHALL never create a VOD.
 
-#### Scenario: Owner cancels an upcoming broadcast
+#### Scenario: Owner discards an upcoming broadcast
 
-- **WHEN** the owner cancels a `scheduled` broadcast
-- **THEN** the system removes it from the upcoming list, it no longer renders as a
+- **WHEN** the owner discards a `draft` or `scheduled` broadcast
+- **THEN** the row and its per-stream data are deleted, it no longer renders as a
   coming-soon card, and a subsequent encoder connect does not claim it
+
+#### Scenario: Owner discards while previewing
+
+- **WHEN** the owner discards while `preview`
+- **THEN** the row is reset to a blank private ad-hoc preview instead of deleted, and
+  no VOD is created
 
 ### Requirement: Missed scheduled broadcasts
 
-The system SHALL treat a `scheduled` broadcast whose `scheduled_start_at` is past by
-more than the configured grace window as **missed**. A missed broadcast SHALL NOT be
-shown as an upcoming coming-soon card and SHALL NOT be claimable by a connecting
-encoder (see the `stream-pipeline` capability). The system SHALL NOT auto-delete missed
-broadcasts; they SHALL remain visible in the Broadcasts list, marked as missed, for the
-owner to delete or cancel manually.
+The system SHALL keep a `scheduled` broadcast whose `scheduled_start_at` has passed
+as the channel's single active row: it remains on the public waiting-room surface
+(countdown elapsed) and remains claimable by a connecting encoder (see
+`stream-lifecycle` and `stream-pipeline` — there is no grace window). The owner
+clears a missed broadcast by discarding it, or supersedes it by connecting the
+encoder and going live from it.
 
-#### Scenario: Scheduled broadcast becomes missed
+#### Scenario: Past-dated scheduled broadcast is still claimable
 
-- **WHEN** a `scheduled` broadcast's start time passes by more than the grace window
-  without being claimed
-- **THEN** the system marks it missed in the Broadcasts list, stops showing it as a
-  coming-soon card, and does not delete it
+- **WHEN** the encoder connects while the active `scheduled` row's start time has
+  already passed
+- **THEN** the system claims that row into `preview`, preserving its settings, and
+  creates no second row
 
-#### Scenario: Owner deletes a missed broadcast
+#### Scenario: Owner discards a missed broadcast
 
-- **WHEN** the owner deletes or cancels a missed broadcast
-- **THEN** the system removes it from the upcoming/missed surfaces (setting the row to
-  `ended`) and it can never be claimed
+- **WHEN** the owner discards a past-dated `scheduled` broadcast
+- **THEN** the row and its per-stream data are deleted and no active stream remains
 
 ### Requirement: Coming-soon card on the channel page
 
@@ -182,4 +178,64 @@ SHALL be added to the schedule/edit dialog.
 
 - **WHEN** a broadcast thumbnail is landscape (or not yet loaded)
 - **THEN** it fills its 16:9 container (`object-cover`) exactly as before
+
+### Requirement: Waiting-room chat setting
+
+The system SHALL provide a per-broadcast `waiting_room_chat` toggle on the active
+stream. When on, the public scheduled waiting room has an active chat before go-live;
+when off, the waiting room shows only the countdown. The setting SHALL be stored on
+the stream so it is fixed for that broadcast.
+
+#### Scenario: Waiting-room chat enabled
+
+- **WHEN** a dated `scheduled` broadcast has `waiting_room_chat = true`
+- **THEN** its public waiting room shows the live chat and accepts posts (auth
+  required)
+
+#### Scenario: Waiting-room chat disabled
+
+- **WHEN** a dated `scheduled` broadcast has `waiting_room_chat = false`
+- **THEN** its public waiting room shows only the countdown, with no chat
+
+### Requirement: Schedule-save validation
+
+The system SHALL, when the owner saves broadcast settings that persist a
+`scheduled_start_at`, check that the local worker is running (heartbeat within
+`WORKER_HEARTBEAT_STALE_MS`) and that a YouTube URL is set on the broadcast. If
+either is missing, the system SHALL show a confirmation dialog naming what is missing
+and its effect — worker down means no moderation/scoring during the wait; no YouTube
+URL means no YouTube chat merged — and SHALL offer Schedule anyway or Fix first,
+committing the schedule only on Schedule anyway.
+
+#### Scenario: Worker not running when scheduling
+
+- **WHEN** the owner saves with a scheduled datetime and the worker heartbeat is stale
+- **THEN** a confirmation explains moderation/scoring will be inactive during the wait
+  and offers Schedule anyway or Fix first
+
+#### Scenario: YouTube URL missing when scheduling
+
+- **WHEN** the owner saves with a scheduled datetime and no YouTube URL is set
+- **THEN** a confirmation explains YouTube chat will not be merged and offers Schedule
+  anyway or Fix first
+
+#### Scenario: All prerequisites satisfied
+
+- **WHEN** the owner saves with a scheduled datetime, the worker is fresh, and a
+  YouTube URL is set
+- **THEN** no validation dialog is shown for missing prerequisites
+
+### Requirement: First-time-schedule confirmation
+
+The system SHALL, when a save transitions the active broadcast from having no
+`scheduled_start_at` to having one, show a confirmation explaining that a public scheduled
+page with a countdown will be displayed, and — when `waiting_room_chat` is on — that
+the waiting-room chat will be public. When missing prerequisites also apply, the
+system SHALL present both concerns in one dialog before committing.
+
+#### Scenario: Newly scheduling a previously undated broadcast
+
+- **WHEN** the owner saves a datetime onto a broadcast that had none
+- **THEN** a confirmation explains the public scheduled page will appear, adds the
+  public-chat note if `waiting_room_chat` is on, and commits only on confirm
 

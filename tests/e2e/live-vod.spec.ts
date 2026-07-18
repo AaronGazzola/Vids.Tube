@@ -121,12 +121,14 @@ async function ownerIsLive(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-test("the owner channel shows the scheduled placeholder when offline", async ({
+test("the offline channel home shows no live feature card", async ({
   page,
 }) => {
   test.skip(await ownerIsLive(), "owner channel is currently live");
   await page.goto(`/${ownerSlug}`);
-  await expect(page.getByText("No stream scheduled right now")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText("LIVE", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Watch the live stream")).toHaveCount(0);
   await expect(page.getByText("Live chat", { exact: true })).toHaveCount(0);
 });
 
@@ -152,14 +154,15 @@ test("a connected encoder stays private (preview) until go-live", async ({
   try {
     expect(session?.status, "encoder connect lands in preview").toBe("preview");
     await page.goto(`/${ownerSlug}`);
-    await expect(page.getByText("No stream scheduled right now")).toBeVisible();
-    await expect(page.getByText("Live chat", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByText("LIVE", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Watch the live stream")).toHaveCount(0);
   } finally {
     if (session) await admin.from("streams").delete().eq("id", session.id);
   }
 });
 
-test("a live broadcast shows its title, description, and chat on the channel page", async ({
+test("a live broadcast features on the channel home and plays with chat at /live", async ({
   page,
 }) => {
   test.skip(await ownerIsLive(), "owner channel is currently live");
@@ -175,13 +178,21 @@ test("a live broadcast shows its title, description, and chat on the channel pag
       description: `E2E live description ${stamp}`,
       started_at: nowIso,
       last_seen_at: nowIso,
+      live_at: nowIso,
     })
     .select("id")
     .single();
 
   try {
     await page.goto(`/${ownerSlug}`);
+    await expect(page.getByText("LIVE", { exact: true })).toBeVisible();
     await expect(page.getByText(`E2E Live ${stamp}`)).toBeVisible();
+    await expect(page.getByText("Watch the live stream")).toBeVisible();
+
+    await page.goto(`/${ownerSlug}/live`);
+    await expect(
+      page.getByRole("heading", { name: `E2E Live ${stamp}` })
+    ).toBeVisible();
     await expect(
       page.getByText(`E2E live description ${stamp}`)
     ).toBeVisible();
@@ -191,13 +202,12 @@ test("a live broadcast shows its title, description, and chat on the channel pag
   }
 });
 
-test("ending a live broadcast creates a VOD that inherits title, description, and custom thumbnail", async ({
+test("an encoder drop while live opens a reconnect gap and keeps the broadcast live", async ({
   request,
 }) => {
   test.skip(await ownerIsLive(), "owner channel is currently live");
 
   const nowIso = new Date().toISOString();
-  const customThumb = `live-thumb/${ownerChannelId}/e2e-${stamp}.jpg`;
   const { data: live } = await admin
     .from("streams")
     .insert({
@@ -205,10 +215,9 @@ test("ending a live broadcast creates a VOD that inherits title, description, an
       status: "live",
       hls_path: "https://example.com/live/index.m3u8",
       title: `E2E Inherit ${stamp}`,
-      description: `E2E inherit description ${stamp}`,
-      thumbnail_path: customThumb,
       started_at: nowIso,
       last_seen_at: nowIso,
+      live_at: nowIso,
     })
     .select("id")
     .single();
@@ -224,26 +233,28 @@ test("ending a live broadcast creates a VOD that inherits title, description, an
       .select("status")
       .eq("id", live!.id)
       .single();
-    expect(stream?.status, "the stream is ended").toBe("ended");
+    expect(
+      stream?.status,
+      "the stream stays live across an encoder drop"
+    ).toBe("live");
 
-    const { data: vod } = await admin
-      .from("videos")
-      .select("title, description, thumbnail_path, status")
-      .eq("source_stream_id", live!.id)
+    const { data: gap } = await admin
+      .from("stream_gaps")
+      .select("id, gap_end_at")
+      .eq("stream_id", live!.id)
+      .is("gap_end_at", null)
       .maybeSingle();
-    expect(vod, "a VOD was created for the ended live session").toBeTruthy();
-    expect(vod!.title).toBe(`E2E Inherit ${stamp}`);
-    expect(vod!.description).toBe(`E2E inherit description ${stamp}`);
-    expect(vod!.thumbnail_path, "custom thumbnail is inherited").toBe(
-      customThumb
-    );
+    expect(gap, "the drop opens a reconnect gap").toBeTruthy();
   } finally {
+    await admin.from("stream_gaps").delete().eq("stream_id", live!.id);
     await admin.from("videos").delete().eq("source_stream_id", live!.id);
     await admin.from("streams").delete().eq("id", live!.id);
   }
 });
 
-test("a preview-only session that ends creates no VOD", async ({ request }) => {
+test("an ad-hoc preview session is deleted on disconnect and creates no VOD", async ({
+  request,
+}) => {
   test.skip(await ownerIsLive(), "owner channel is currently live");
 
   const nowIso = new Date().toISOString();
@@ -252,6 +263,7 @@ test("a preview-only session that ends creates no VOD", async ({ request }) => {
     .insert({
       channel_id: ownerChannelId,
       status: "preview",
+      created_in_ui: false,
       hls_path: "https://example.com/preview/index.m3u8",
       started_at: nowIso,
       last_seen_at: nowIso,
@@ -265,12 +277,11 @@ test("a preview-only session that ends creates no VOD", async ({ request }) => {
     });
     expect(res.ok()).toBeTruthy();
 
-    const { data: stream } = await admin
+    const { count: left } = await admin
       .from("streams")
-      .select("status")
-      .eq("id", preview!.id)
-      .single();
-    expect(stream?.status, "the preview session is ended").toBe("ended");
+      .select("*", { count: "exact", head: true })
+      .eq("id", preview!.id);
+    expect(left, "the ad-hoc preview row is deleted on disconnect").toBe(0);
 
     const { count } = await admin
       .from("videos")
@@ -520,11 +531,14 @@ test("an upcoming scheduled broadcast shows a coming-soon countdown card", async
 
   try {
     await page.goto(`/${ownerSlug}`);
-    await expect(page.getByText("Coming soon")).toBeVisible();
+    await expect(page.getByText("Scheduled", { exact: true })).toBeVisible();
     await expect(page.getByText(`E2E Scheduled ${stamp}`)).toBeVisible();
+
+    await page.goto(`/${ownerSlug}/live`);
+    await expect(page.getByText("Coming soon")).toBeVisible();
     await expect(
-      page.getByText("No stream scheduled right now")
-    ).toHaveCount(0);
+      page.getByRole("heading", { name: `E2E Scheduled ${stamp}` })
+    ).toBeVisible();
   } finally {
     await admin.from("streams").delete().eq("id", scheduled!.id);
   }
@@ -587,7 +601,9 @@ test("a connecting encoder claims the nearest upcoming scheduled broadcast", asy
   }
 });
 
-test("a missed scheduled broadcast is not claimed", async ({ request }) => {
+test("a past-dated scheduled broadcast is still the active row and is claimed on connect", async ({
+  request,
+}) => {
   test.skip(await ownerIsLive(), "owner channel is currently live");
 
   const startAt = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
@@ -602,36 +618,32 @@ test("a missed scheduled broadcast is not claimed", async ({ request }) => {
     .select("id")
     .single();
 
-  const createdIds = new Set<string>([missed!.id]);
   try {
     const res = await request.post(`/api/ingest/live`, {
       headers: { "x-ingest-secret": process.env.INGEST_SHARED_SECRET! },
     });
     expect(res.ok()).toBeTruthy();
 
-    const { data: stillScheduled } = await admin
+    const { data: claimed } = await admin
       .from("streams")
-      .select("status")
+      .select("status, title")
       .eq("id", missed!.id)
       .single();
     expect(
-      stillScheduled!.status,
-      "a missed scheduled row is left untouched"
-    ).toBe("scheduled");
+      claimed!.status,
+      "the single active row is claimed into preview even when its date passed"
+    ).toBe("preview");
+    expect(claimed!.title, "claiming keeps the broadcast settings").toBe(
+      `E2E Missed ${stamp}`
+    );
 
-    const { data: previews } = await admin
+    const { count: activeCount } = await admin
       .from("streams")
-      .select("id")
+      .select("*", { count: "exact", head: true })
       .eq("channel_id", ownerChannelId)
-      .eq("status", "preview");
-    previews!.forEach((s) => createdIds.add(s.id));
-    expect(
-      previews,
-      "a fresh ad-hoc preview row is created instead of claiming the missed row"
-    ).toHaveLength(1);
+      .in("status", ["draft", "scheduled", "preview", "live"]);
+    expect(activeCount, "no second active row is created").toBe(1);
   } finally {
-    for (const id of createdIds) {
-      await admin.from("streams").delete().eq("id", id);
-    }
+    await admin.from("streams").delete().eq("id", missed!.id);
   }
 });

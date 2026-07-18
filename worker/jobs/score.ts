@@ -13,6 +13,7 @@ import {
   type EligibleStream,
   isStreamEligible,
   renewLock,
+  upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { pollYoutubeChat, resolveLiveChatId } from "../lib/youtube-chat";
 import { workerConfig } from "../config";
@@ -412,6 +413,9 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
   try {
     for (;;) {
       await renewLock(stream.id, workerConfig.loop.lockLeaseMs);
+      // The dispatcher tick blocks for the whole engagement, so the heartbeat
+      // must be renewed from inside the loop or it goes stale mid-broadcast.
+      await upsertWorkerHeartbeat();
 
       const vid = await fetchNewVidstube(stream.id, vidstubeCursor);
       if (vid.length) {

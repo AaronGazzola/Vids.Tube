@@ -54,89 +54,62 @@ route validates the key with the admin (service-role) client.
 
 The system SHALL maintain a per-broadcast `streams` row when MediaMTX reports
 stream readiness, via ingest routes guarded by a shared-secret header. The ready
-hook SHALL land a new session in the private `preview` state, NOT public `live`:
-a `preview` session is visible only to the owner and is promoted to public `live`
-later by an explicit owner action (see the `broadcast-setup` capability). Each
-distinct broadcast session SHALL be its own `streams` row: the ready hook SHALL
-reuse the channel's most-recent row ONLY when that row represents an ongoing
-session — its `status` is `preview` or `live` AND its `last_seen_at` is within the
-staleness threshold (a reconnect or keep-alive). An ongoing session SHALL take
-precedence over any scheduled broadcast. When there is no ongoing session, the ready
-hook SHALL check for a **claimable scheduled broadcast** — the `scheduled` row with
-the soonest `scheduled_start_at` whose start time is in the future or within a grace
-window after it — and SHALL **claim** it: update that row to `status` `preview` with a
-fresh `hls_path`, `started_at`, and `last_seen_at`, preserving its authored `title`,
-`description`, and `thumbnail_path`. A `scheduled` row whose start time is past by more
-than the grace window is **missed** and SHALL NOT be claimed. In every other case (no
-row exists, or the most-recent row is `ended`, `idle`, or a stale `preview`/`live` row
-and no claimable scheduled broadcast exists) the ready hook SHALL insert a NEW row with
-`status` `preview` and a fresh `started_at` and `last_seen_at`. When the ready hook
-starts a new session because the prior row was a stale `preview`/`live` row, it SHALL
-also set that orphaned row's `status` to `ended` so live-state reads stay consistent.
-Claiming a `scheduled` row SHALL keep go-live manual — claiming only moves
-`scheduled → preview`; the public flip to `live` remains an explicit owner action.
+hook SHALL land a new session in the private `preview` state, NOT public `live`,
+promoted to public `live` later by an explicit owner action (see `broadcast-setup`
+and `stream-lifecycle`). The ready hook SHALL resolve the channel's single **active**
+row (`status IN ('draft','scheduled','preview','live')`) and:
 
-#### Scenario: First broadcast lands in preview
+- **Reconnect** — if the active row is `preview` or `live` with a fresh
+  `last_seen_at`, update its `hls_path` and `last_seen_at` without changing `id`,
+  `status`, or `started_at`.
+- **Claim** — if the active row is `draft` or `scheduled`, update it to `preview`
+  with fresh `hls_path`, `started_at`, `last_seen_at`, preserving `scheduled_start_at`,
+  `created_in_ui`, `title`, `description`, `thumbnail_path`, and configured overlay
+  settings. Claiming keeps go-live manual.
+- **New (ad-hoc)** — if no active row exists, insert a NEW `preview` row with
+  `created_in_ui=false` and fresh `started_at`/`last_seen_at`.
+
+The not-ready hook SHALL NOT blanketly end the session. It SHALL instead: for a
+`preview` row, revert it to `scheduled` (if dated), `draft` (if `created_in_ui=true`),
+or delete it (ad-hoc), clearing `hls_path`/`started_at`/`live_at` and creating no VOD;
+for a `live` row, **leave it `live` and open a reconnect gap** (never end it — only
+the owner's End action ends a live broadcast); for `draft`/`scheduled`/none, do
+nothing. The ready hook SHALL close any open reconnect gap when it reconnects a
+`live` row. The route SHALL be idempotent across repeated not-ready fires (a second
+not-ready with a gap already open SHALL not open another).
+
+#### Scenario: Encoder claims the active draft or scheduled broadcast
 
 - **WHEN** MediaMTX posts the ready hook with the valid shared secret and the
-  channel has no existing stream row
-- **THEN** the system inserts a new `streams` row with `status` `preview` and
-  records `started_at`, `hls_path`, and `last_seen_at`, and no public viewer sees
-  the stream
+  channel's active row is `draft` or `scheduled`
+- **THEN** the system claims it to `preview` with fresh `hls_path`/`started_at`/
+  `last_seen_at`, preserving its datetime, `created_in_ui`, and authored settings,
+  and no public viewer sees the feed until go-live
 
-#### Scenario: Encoder claims the nearest upcoming scheduled broadcast
+#### Scenario: Encoder-first ad-hoc session
 
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret, there is no
-  ongoing session, and one or more claimable `scheduled` broadcasts exist
-- **THEN** the system claims the one with the soonest `scheduled_start_at`, updating
-  that row to `status` `preview` with a fresh `hls_path`, `started_at`, and
-  `last_seen_at`, preserving its `title`, `description`, and `thumbnail_path`, and no
-  public viewer sees the stream until the owner goes live
-
-#### Scenario: Ongoing session takes precedence over a scheduled broadcast
-
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret, the channel's
-  most-recent row is an ongoing-and-fresh `preview`/`live` session, and a claimable
-  scheduled broadcast also exists
-- **THEN** the system reconnects to the ongoing session (updating its `hls_path` and
-  `last_seen_at`) and does not claim the scheduled broadcast
-
-#### Scenario: Missed scheduled broadcast is not claimed
-
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret and the only
-  `scheduled` row's start time is past by more than the grace window
-- **THEN** the system does not claim it and instead inserts a NEW `preview` row for a
-  fresh ad-hoc session, leaving the missed row untouched
+- **WHEN** MediaMTX posts the ready hook and the channel has no active row
+- **THEN** the system inserts a NEW `preview` row with `created_in_ui=false`,
+  private to the owner
 
 #### Scenario: Reconnect within an ongoing session
 
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret and the
-  channel's most-recent row is `preview` or `live` with a `last_seen_at` within
-  the staleness threshold
-- **THEN** the system updates that same row's `hls_path` and `last_seen_at`
-  without changing its `id`, `status`, or `started_at`
+- **WHEN** MediaMTX posts the ready hook and the active row is `preview` or `live`
+  with a fresh `last_seen_at`
+- **THEN** the system updates that row's `hls_path` and `last_seen_at` without
+  changing `id`, `status`, or `started_at`
 
-#### Scenario: New broadcast after a prior session ended
+#### Scenario: Preview disconnect reverts, not ends
 
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret and the
-  channel's most-recent row has `status` `ended` (or `idle`)
-- **THEN** the system inserts a NEW `streams` row with a new `id`, `status`
-  `preview`, and a fresh `started_at` and `last_seen_at`, leaving the prior row
-  untouched
+- **WHEN** MediaMTX posts the not-ready hook and the active row is `preview`
+- **THEN** the system reverts it to `scheduled`/`draft` or deletes it (ad-hoc),
+  clears the feed fields, and creates no VOD
 
-#### Scenario: New broadcast after a stale session row
+#### Scenario: Live disconnect keeps the stream live and opens a gap
 
-- **WHEN** MediaMTX posts the ready hook with the valid shared secret and the
-  channel's most-recent row is `preview` or `live` but its `last_seen_at` is older
-  than the staleness threshold
-- **THEN** the system sets that orphaned row's `status` to `ended` and inserts a
-  NEW `streams` row with a new `id`, `status` `preview`, and a fresh `started_at`
-
-#### Scenario: Stream ends
-
-- **WHEN** MediaMTX posts the not-ready hook with the valid shared secret
-- **THEN** the system sets the current session's `status` to `ended` and records
-  `ended_at`
+- **WHEN** MediaMTX posts the not-ready hook and the active row is `live`
+- **THEN** the system leaves it `live`, creates no VOD, and opens a reconnect gap
+  (recording the disconnect time) that the next ready hook closes
 
 #### Scenario: Forged hook call
 

@@ -54,7 +54,7 @@
   Hidden/Banned tabs with counters, suggested + auto-enacted cases with original
   message + reasoning + Unhide/Unban
 - [x] 5.4 Pop out the full Activity tab into its own window (reuse `/popout`)
-- [ ] 5.5 Activity fits the page without page scroll: header/competition/mod-bot at
+- [x] 5.5 Activity fits the page without page scroll: header/competition/mod-bot at
   natural height; chat fills the remaining space (min 250px) and is the only thing
   that scrolls
 
@@ -72,5 +72,5 @@
 
 - [x] 7.1 `npx tsc --noEmit`, `npx eslint`, `doppler run -- npm run build` pass; route
   table shows `/live`, no `/go-live` or `/control`
-- [ ] 7.2 Drive each state: none → create draft/schedule → preview (simulated connect)
+- [x] 7.2 Drive each state: none → create draft/schedule → preview (simulated connect)
   → go live → end; discard confirmations; save disabled when unchanged; pop-out opens
