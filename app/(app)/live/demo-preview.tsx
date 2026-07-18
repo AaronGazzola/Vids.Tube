@@ -9,7 +9,7 @@ import {
   MobileChromeOverlay,
   MobileChromeTopBar,
 } from "@/components/mobile-chrome";
-import { AvatarBubble } from "@/components/overlay/avatar-bubble";
+import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { Switch } from "@/components/ui/switch";
@@ -124,45 +124,13 @@ function CompetitionField() {
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const scores = useDemoGeneratorStore((s) => s.scores);
 
-  const active = viewers
-    .map((v) => ({ v, score: scores[v.key]?.total ?? 0 }))
-    .filter((x) => x.score > 0)
+  const entries = viewers
+    .map((v) => ({ key: v.key, author: authorOf(v), score: scores[v.key]?.total ?? 0 }))
+    .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
 
-  const standings = computeStandings(
-    active.map((x) => ({ id: x.v.key, score: x.score }))
-  );
-
-  return (
-    <div className="relative" style={{ width: 300, height: 140 }}>
-      {active.map((x, i) => {
-        const st = standings.get(x.v.key) ?? { rank: i + 1, progress: 0 };
-        const left = 4 + ((i * 37) % 80);
-        const bottom = 6 + ((i * 53) % 60);
-        const dur = 6 + (i % 5);
-        const delay = (i % 7) * 0.6;
-        return (
-          <div
-            key={x.v.key}
-            className="absolute"
-            style={{
-              left: `${left}%`,
-              bottom: `${bottom}%`,
-              animation: `bubble-float ${dur}s ease-in-out ${delay}s infinite`,
-            }}
-          >
-            <AvatarBubble
-              author={authorOf(x.v)}
-              progress={st.progress}
-              rank={st.rank}
-              size={52}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <CompetitionLadder entries={entries} size={52} />;
 }
 
 // ── Highlight overlay ──────────────────────────────────────────────────────

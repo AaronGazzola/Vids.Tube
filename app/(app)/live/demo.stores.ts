@@ -288,6 +288,21 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
         };
       }
 
+      if (Math.random() < 0.22) {
+        const ranked = Object.entries(scores)
+          .filter(([key]) => !s.banned.has(key))
+          .sort((a, b) => b[1].total - a[1].total);
+        if (ranked.length >= 2) {
+          const idx = 1 + Math.floor(Math.random() * Math.min(3, ranked.length - 1));
+          const [key, sc] = ranked[idx];
+          const above = ranked[idx - 1][1].total;
+          scores[key] = {
+            ...sc,
+            total: above + 1 + Math.floor(Math.random() * 3),
+          };
+        }
+      }
+
       const messages = [...s.messages, msg].slice(-MAX_MESSAGES);
       const counts = {
         subs: s.counts.subs + (Math.random() < 0.3 ? 1 : 0),

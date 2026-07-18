@@ -1017,6 +1017,36 @@ export type Database = {
           },
         ]
       }
+      youtube_links: {
+        Row: {
+          created_at: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+          verify_code: string
+          youtube_channel_id: string
+          youtube_handle: string
+        }
+        Insert: {
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+          verify_code: string
+          youtube_channel_id: string
+          youtube_handle: string
+        }
+        Update: {
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+          verify_code?: string
+          youtube_channel_id?: string
+          youtube_handle?: string
+        }
+        Relationships: []
+      }
       youtube_vods: {
         Row: {
           backfilled_at: string

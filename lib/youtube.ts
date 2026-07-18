@@ -62,6 +62,39 @@ export async function fetchVideoData(
   };
 }
 
+export type YouTubeChannelInfo = {
+  channelId: string;
+  handle: string;
+  title: string;
+};
+
+export async function fetchChannelByHandle(
+  handle: string
+): Promise<YouTubeChannelInfo | null> {
+  const cleaned = handle.trim().replace(/^@/, "");
+  if (!cleaned) {
+    return null;
+  }
+  const url = `${API}/channels?part=snippet&forHandle=${encodeURIComponent(cleaned)}&key=${key()}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(
+      `YouTube channels.list forHandle failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const data = await res.json();
+  const item = data.items?.[0];
+  if (!item?.id) {
+    return null;
+  }
+  const customUrl: string | undefined = item.snippet?.customUrl;
+  return {
+    channelId: item.id,
+    handle: (customUrl ?? `@${cleaned}`).replace(/^@/, ""),
+    title: item.snippet?.title ?? "",
+  };
+}
+
 export async function fetchSubs(channelId: string): Promise<number> {
   if (!channelId) {
     return 0;

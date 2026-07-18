@@ -328,7 +328,7 @@ export function SettingsTab({
         <CopyRow
           label="Competition"
           url={`${base}/competition?opacity=${(opacityPct / 100).toFixed(2)}`}
-          dimensions="380 × 180"
+          dimensions="120 × 300"
         />
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between">

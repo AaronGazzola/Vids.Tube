@@ -171,6 +171,17 @@
   }
 }
 
+@keyframes confetti-burst {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
 @keyframes highlight-pop {
   0% {
     opacity: 0;

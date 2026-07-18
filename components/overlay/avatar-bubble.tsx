@@ -24,11 +24,11 @@ export function AvatarBubble({
     (author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null)) ||
     placeholderAvatar(author?.handle ?? name);
   const color = rankColor(rank);
-  const stroke = 1;
+  const stroke = 2;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = Math.max(0, Math.min(1, progress)) * circ;
-  const badge = Math.round(size * 0.3);
+  const badge = Math.round(size * 0.45);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>

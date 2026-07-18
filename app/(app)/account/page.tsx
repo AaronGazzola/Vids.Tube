@@ -35,11 +35,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { channelAssetUrl } from "@/lib/storage";
 import { Info } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { OriginBadge } from "@/components/origin-badge";
 import {
   useBannedParticipants,
+  useRegenerateYoutubeCode,
+  useSaveYoutubeLink,
   useUnbanParticipant,
+  useUnlinkYoutube,
+  useYoutubeLink,
 } from "./page.hooks";
 
 function stubToast(title: string) {
@@ -104,6 +109,89 @@ function BannedUsersCard() {
   );
 }
 
+function YoutubeLinkCard({ ownerHandle }: { ownerHandle: string | null }) {
+  const { data: link, isPending } = useYoutubeLink();
+  const save = useSaveYoutubeLink();
+  const regenerate = useRegenerateYoutubeCode();
+  const unlink = useUnlinkYoutube();
+  const [handleInput, setHandleInput] = useState("");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>YouTube account</CardTitle>
+        <CardDescription>
+          Link your YouTube handle so your chat activity on YouTube and
+          Vids.Tube counts as one viewer history.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isPending ? (
+          <Skeleton className="h-16 w-full" />
+        ) : link ? (
+          <div className="space-y-3">
+            <p className="text-sm">
+              Linked to <span className="font-medium">@{link.youtubeHandle}</span>{" "}
+              {link.verifiedAt ? (
+                <span className="ml-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs font-medium text-emerald-600">
+                  Verified
+                </span>
+              ) : (
+                <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-600">
+                  Unverified
+                </span>
+              )}
+            </p>
+            {!link.verifiedAt && (
+              <div className="space-y-2 rounded-md border p-3 text-sm">
+                <p className="text-muted-foreground">
+                  To verify it&apos;s yours, post this code in{" "}
+                  {ownerHandle ? `@${ownerHandle}` : "the channel"}&apos;s
+                  YouTube live chat from that account during a stream:
+                </p>
+                <code className="block w-fit rounded bg-muted px-3 py-1.5 font-mono text-base font-semibold tracking-widest">
+                  {link.verifyCode}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={regenerate.isPending}
+                  onClick={() => regenerate.mutate()}
+                >
+                  New code
+                </Button>
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              disabled={unlink.isPending}
+              onClick={() => unlink.mutate()}
+            >
+              Unlink
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="@yourhandle"
+              value={handleInput}
+              onChange={(e) => setHandleInput(e.target.value)}
+            />
+            <Button
+              disabled={!handleInput.trim() || save.isPending}
+              onClick={() => save.mutate(handleInput)}
+            >
+              Link
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AccountPage() {
   const { isPending, isAuthenticated } = useRequireAuth();
   const user = useAuthStore((state) => state.user);
@@ -158,6 +246,8 @@ export default function AccountPage() {
       </div>
 
       <ChannelSettingsForm />
+
+      <YoutubeLinkCard ownerHandle={ownerHandle ?? null} />
 
       {isOwner && <BannedUsersCard />}
 

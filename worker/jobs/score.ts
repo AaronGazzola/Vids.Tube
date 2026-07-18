@@ -16,6 +16,7 @@ import {
   upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { processCommands } from "../lib/commands";
+import { processLinkVerifications } from "../lib/verify-links";
 import { pollYoutubeChat, resolveLiveChatId } from "../lib/youtube-chat";
 import { workerConfig } from "../config";
 import { supabaseAdmin } from "../supabase";
@@ -439,6 +440,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       const unmoderated = [...vid, ...yt].filter(
         (m) => !bannedKeys.has(participantKey(m))
       );
+      await processLinkVerifications(unmoderated);
       const batch = channelId
         ? await processCommands(
             { id: stream.id, channelId, channelSlug },
