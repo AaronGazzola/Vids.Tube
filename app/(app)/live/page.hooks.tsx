@@ -13,6 +13,7 @@ import {
   dismissSuggestionAction,
   dismissTtsAction,
   getAskFeedAction,
+  getClipMarkersAction,
   getModerationFeedAction,
   getOwnerChatMessagesAction,
   getTtsFeedAction,
@@ -267,5 +268,13 @@ export function useDismissAsk(streamId: string | null) {
     mutationFn: async (id: string) => unwrap(await dismissAskAction(id)),
     onSuccess: () => invalidate(streamId),
     onError: errorToast("Couldn't dismiss the question"),
+  });
+}
+
+export function useClipMarkers(streamId: string | null) {
+  return useQuery({
+    queryKey: ["clip-markers", streamId],
+    queryFn: () => getClipMarkersAction(streamId),
+    refetchInterval: 10_000,
   });
 }

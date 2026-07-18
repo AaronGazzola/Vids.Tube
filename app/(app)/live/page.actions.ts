@@ -813,3 +813,64 @@ export async function dismissAskAction(
   }
   return { data: { ok: true } };
 }
+
+export type ClipMarker = {
+  id: string;
+  authorName: string | null;
+  origin: string;
+  streamTimeS: number;
+  snippet: string | null;
+  createdAt: string;
+  streamTitle: string | null;
+};
+
+export async function getClipMarkersAction(
+  streamId: string | null
+): Promise<ClipMarker[]> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+
+  let targetStreamId = streamId;
+  let streamTitle: string | null = null;
+  if (!targetStreamId) {
+    const { data: latest, error: latestError } = await supabaseAdmin
+      .from("streams")
+      .select("id, title")
+      .eq("channel_id", owned.data.id)
+      .eq("status", "ended")
+      .order("ended_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestError) {
+      console.error(latestError);
+      throw new Error("Failed to resolve the latest stream");
+    }
+    if (!latest) {
+      return [];
+    }
+    targetStreamId = latest.id;
+    streamTitle = latest.title;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("clip_markers")
+    .select("id, author_name, origin, stream_time_s, snippet, created_at")
+    .eq("stream_id", targetStreamId)
+    .order("stream_time_s", { ascending: true })
+    .limit(100);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load clip markers");
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorName: r.author_name,
+    origin: r.origin,
+    streamTimeS: r.stream_time_s,
+    snippet: r.snippet,
+    createdAt: r.created_at,
+    streamTitle,
+  }));
+}

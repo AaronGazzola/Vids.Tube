@@ -111,6 +111,10 @@ export const BUILTIN_HANDLERS: Record<
     const { catchupHandler } = await import("./catchup-command");
     await catchupHandler(ctx);
   },
+  clip: async (ctx) => {
+    const { clipHandler } = await import("./clip-command");
+    await clipHandler(ctx);
+  },
 };
 
 function commandParticipantKey(m: BufferedMessage): string {

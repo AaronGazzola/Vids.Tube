@@ -51,6 +51,7 @@ import {
   useApproveTts,
   useAskFeed,
   useBanParticipant,
+  useClipMarkers,
   useDismissAsk,
   useDismissSuggestion,
   useDismissTts,
@@ -635,6 +636,75 @@ function TtsRequestsPanel({ streamId }: { streamId: string }) {
   );
 }
 
+function formatClipTime(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function ClipMarkersPanel({ streamId }: { streamId: string | null }) {
+  const { data: markers } = useClipMarkers(streamId);
+  const [open, setOpen] = useState(false);
+
+  const items = markers ?? [];
+
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+      >
+        <span>
+          Clip markers
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {items.length}
+            {!streamId && items[0]?.streamTitle
+              ? ` · ${items[0].streamTitle}`
+              : ""}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="border-t p-2">
+          {items.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-muted-foreground">
+              No clip markers yet — viewers drop them with !clip.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {items.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
+                >
+                  <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                    {formatClipTime(m.streamTimeS)}
+                  </code>
+                  <div className="min-w-0 flex-1">
+                    <OriginBadge origin={m.origin} className="mr-1" />
+                    <span className="font-semibold">{m.authorName ?? "viewer"}</span>
+                    {m.snippet && (
+                      <span className="block text-muted-foreground">
+                        {m.snippet}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AskRequestsPanel({ streamId }: { streamId: string }) {
   const { data: feed } = useAskFeed(streamId);
   const approve = useApproveAsk(streamId);
@@ -889,9 +959,12 @@ export function ActivityContent() {
 
   if (!streamId && !isPending) {
     return (
-      <div className="flex min-h-60 items-center justify-center rounded-lg border text-sm text-muted-foreground">
-        No active broadcast — go live and this fills with goals, chat, and mod
-        activity.
+      <div className="space-y-3">
+        <div className="flex min-h-60 items-center justify-center rounded-lg border text-sm text-muted-foreground">
+          No active broadcast — go live and this fills with goals, chat, and mod
+          activity.
+        </div>
+        <ClipMarkersPanel streamId={null} />
       </div>
     );
   }
@@ -904,9 +977,10 @@ export function ActivityContent() {
       </div>
 
       {streamId && (
-        <div className="shrink-0">
+        <div className="shrink-0 space-y-3">
           <AskRequestsPanel streamId={streamId} />
           <TtsRequestsPanel streamId={streamId} />
+          <ClipMarkersPanel streamId={streamId} />
           <ModBotActions streamId={streamId} />
         </div>
       )}

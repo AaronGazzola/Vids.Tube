@@ -387,6 +387,67 @@ export type Database = {
         }
         Relationships: []
       }
+      clip_markers: {
+        Row: {
+          author_name: string | null
+          channel_id: string
+          chat_message_id: string | null
+          created_at: string
+          id: string
+          origin: string
+          participant_key: string
+          snippet: string | null
+          stream_id: string
+          stream_time_s: number
+        }
+        Insert: {
+          author_name?: string | null
+          channel_id: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          origin: string
+          participant_key: string
+          snippet?: string | null
+          stream_id: string
+          stream_time_s: number
+        }
+        Update: {
+          author_name?: string | null
+          channel_id?: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          origin?: string
+          participant_key?: string
+          snippet?: string | null
+          stream_id?: string
+          stream_time_s?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clip_markers_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clip_markers_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clip_markers_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       command_events: {
         Row: {
           args: string | null
