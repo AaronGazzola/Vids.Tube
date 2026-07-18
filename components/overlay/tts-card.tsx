@@ -25,7 +25,7 @@ export function TtsCard({
         <AuthorColumn author={author} rank={rank} progress={progress} />
         <SpeechBubble pointer="left">
           <p className="whitespace-pre-wrap">
-            <Volume2 className="mr-1.5 inline h-4 w-4 align-[-2px] text-indigo-400" />
+            <Volume2 className="mr-1.5 inline h-4 w-4 align-[-2px] text-white" />
             {text}
           </p>
         </SpeechBubble>
