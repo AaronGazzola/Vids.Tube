@@ -2,10 +2,10 @@
 
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
+import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
+import { TtsCard } from "@/components/overlay/tts-card";
 import { computeStandings } from "@/lib/standings";
-import { Bot, MessageCircleQuestion } from "lucide-react";
-import { Volume2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { markAskShownAction, markTtsPlayedAction } from "./page.actions";
@@ -41,30 +41,12 @@ function AskExchange({ streamId }: { streamId: string | null }) {
   if (!current) return null;
 
   return (
-    <div className="mt-2 space-y-2">
-      <div className="flex items-start gap-2 rounded-xl bg-black/80 px-4 py-3 text-white shadow-lg backdrop-blur">
-        <MessageCircleQuestion className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-        <div className="min-w-0">
-          {current.authorName && (
-            <p className="text-xs font-semibold text-amber-300">
-              {current.authorName.replace(/^@+/, "")}
-            </p>
-          )}
-          <p className="text-sm leading-snug">{current.question}</p>
-        </div>
-      </div>
-      {current.includeAnswer && current.answer && (
-        <div className="ml-8 flex flex-row-reverse items-start gap-2 rounded-xl bg-indigo-950/90 px-4 py-3 text-white shadow-lg backdrop-blur">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600">
-            <Bot className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 text-left">
-            <p className="text-xs font-semibold text-indigo-300">VidsBot</p>
-            <p className="text-sm leading-snug">{current.answer}</p>
-          </div>
-        </div>
-      )}
-    </div>
+    <AskExchangeView
+      authorName={current.authorName}
+      question={current.question}
+      answer={current.answer}
+      includeAnswer={current.includeAnswer}
+    />
   );
 }
 
@@ -89,24 +71,13 @@ function TtsPlayer({ streamId }: { streamId: string | null }) {
   };
 
   return (
-    <div className="mt-2 flex items-start gap-2 rounded-xl bg-black/80 px-4 py-3 text-white shadow-lg backdrop-blur">
-      <Volume2 className="mt-0.5 h-5 w-5 shrink-0 text-indigo-400" />
-      <div className="min-w-0">
-        {current.authorName && (
-          <p className="text-xs font-semibold text-indigo-300">
-            {current.authorName.replace(/^@+/, "")}
-          </p>
-        )}
-        <p className="text-sm leading-snug">{current.text}</p>
-      </div>
-      <audio
-        key={current.id}
-        src={ttsAudioUrl(current.audioPath)}
-        autoPlay
-        onEnded={finish}
-        onError={finish}
-      />
-    </div>
+    <TtsCard
+      authorName={current.authorName}
+      text={current.text}
+      audioSrc={ttsAudioUrl(current.audioPath)}
+      audioKey={current.id}
+      onDone={finish}
+    />
   );
 }
 

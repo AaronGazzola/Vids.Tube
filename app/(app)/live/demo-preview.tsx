@@ -9,9 +9,11 @@ import {
   MobileChromeOverlay,
   MobileChromeTopBar,
 } from "@/components/mobile-chrome";
+import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
+import { TtsCard } from "@/components/overlay/tts-card";
 import { Switch } from "@/components/ui/switch";
 import { channelAssetUrl } from "@/lib/storage";
 import { computeGoalProgress, type Counts } from "@/lib/goals";
@@ -184,6 +186,53 @@ function HighlightField() {
   );
 }
 
+// ── TTS + ask overlay feeds ────────────────────────────────────────────────
+
+function DemoTtsFeed() {
+  const tts = useDemoGeneratorStore((s) => s.tts);
+  const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const markTtsPlayed = useDemoGeneratorStore((s) => s.markTtsPlayed);
+  const current = tts.find((t) => t.status === "approved") ?? null;
+  if (!current) return null;
+  const viewer = viewers.find((v) => v.key === current.viewerKey);
+  return (
+    <TtsCard
+      authorName={viewer?.name ?? null}
+      text={current.text}
+      audioSrc="/demo/tts-sample.mp3"
+      audioKey={current.id}
+      onDone={() => markTtsPlayed(current.id)}
+    />
+  );
+}
+
+const DEMO_ASK_HOLD_MS = 10_000;
+
+function DemoAskFeed() {
+  const asks = useDemoGeneratorStore((s) => s.asks);
+  const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const markAskShown = useDemoGeneratorStore((s) => s.markAskShown);
+  const current = asks.find((a) => a.status === "approved") ?? null;
+  const currentId = current?.id ?? null;
+
+  useEffect(() => {
+    if (!currentId) return;
+    const timer = setTimeout(() => markAskShown(currentId), DEMO_ASK_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [currentId, markAskShown]);
+
+  if (!current) return null;
+  const viewer = viewers.find((v) => v.key === current.viewerKey);
+  return (
+    <AskExchangeView
+      authorName={viewer?.name ?? null}
+      question={current.question}
+      answer={current.answer}
+      includeAnswer={current.includeAnswer}
+    />
+  );
+}
+
 // ── Goal box ───────────────────────────────────────────────────────────────
 
 const BOX_METRIC: Record<
@@ -282,6 +331,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
   return (
     <div
       ref={stageRef}
+      data-testid="demo-stage"
       className="relative h-full w-full overflow-hidden rounded-lg bg-black"
     >
       <div
@@ -313,9 +363,15 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
         )}
 
         {/* positioned box overlays */}
-        {config.visible.highlight && (
+        {(config.visible.highlight ||
+          config.visible.tts ||
+          config.visible.ask) && (
           <DraggableBox boxKey="highlight">
-            <HighlightField />
+            <div style={{ width: 420 }}>
+              {config.visible.highlight && <HighlightField />}
+              {config.visible.tts && <DemoTtsFeed />}
+              {config.visible.ask && <DemoAskFeed />}
+            </div>
           </DraggableBox>
         )}
         {config.visible.goalSubs && (

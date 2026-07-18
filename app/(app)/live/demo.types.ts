@@ -6,7 +6,7 @@ export type DemoBoxKey =
   | "goalViewers"
   | "competition"
   | "highlight";
-export type DemoOverlayKey = DemoBoxKey;
+export type DemoOverlayKey = DemoBoxKey | "tts" | "ask";
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
 export type DemoBox = { x: number; y: number; scale: number };
@@ -25,6 +25,8 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
   "goalViewers",
   "competition",
   "highlight",
+  "tts",
+  "ask",
 ];
 
 export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
@@ -33,6 +35,8 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
   goalViewers: "Viewers goal",
   competition: "Competition",
   highlight: "Highlight",
+  tts: "TTS card",
+  ask: "!ask exchange",
 };
 
 export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
@@ -49,6 +53,8 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     goalViewers: true,
     competition: true,
     highlight: true,
+    tts: true,
+    ask: true,
   },
   goalProgressFull: false,
   background: "slideshow",

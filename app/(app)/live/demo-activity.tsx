@@ -25,10 +25,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { OriginBadge } from "@/components/origin-badge";
 import { computeGoalProgress, type Counts } from "@/lib/goals";
 import { useChatAutoScroll } from "@/lib/use-chat-autoscroll";
 import { cn } from "@/lib/utils";
-import { ChevronDown, EllipsisVertical, Info, Sparkles } from "lucide-react";
+import {
+  Bot,
+  ChevronDown,
+  EllipsisVertical,
+  Info,
+  Sparkles,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   useDemoGeneratorStore,
@@ -249,6 +256,26 @@ function MessageMenu({ msg, viewer }: { msg: DemoMessage; viewer: DemoViewer | u
 }
 
 function ChatRow({ msg }: { msg: DemoMessage }) {
+  if (msg.bot) {
+    return (
+      <li className="flex items-start gap-2 rounded px-1 py-1">
+        <div className="min-w-0 flex-1">
+          <span className="mr-1 inline-flex items-center gap-1 align-middle">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-white">
+              <Bot className="h-3 w-3" />
+            </span>
+            <span className="text-xs font-semibold">VidsBot</span>
+            <OriginBadge origin="bot" />
+          </span>
+          <span className="text-sm">{msg.text}</span>
+        </div>
+      </li>
+    );
+  }
+  return <ViewerChatRow msg={msg} />;
+}
+
+function ViewerChatRow({ msg }: { msg: DemoMessage }) {
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const unhide = useDemoGeneratorStore((s) => s.unhideMessage);
   const hide = useDemoGeneratorStore((s) => s.hideMessage);
@@ -505,6 +532,248 @@ function ModBotActions() {
   );
 }
 
+// ── Interactivity panels ───────────────────────────────────────────────────
+
+function PanelShell({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+      >
+        <span>
+          {title}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {count}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && <div className="border-t p-2">{children}</div>}
+    </div>
+  );
+}
+
+function TtsRequests() {
+  const tts = useDemoGeneratorStore((s) => s.tts);
+  const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const approve = useDemoGeneratorStore((s) => s.approveTts);
+  const dismiss = useDemoGeneratorStore((s) => s.dismissTts);
+  const active = tts.filter((t) => t.status !== "dismissed");
+
+  return (
+    <PanelShell title="TTS requests" count={active.length}>
+      {active.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-muted-foreground">
+          No TTS requests yet.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {active.map((t) => {
+            const viewer = viewers.find((v) => v.key === t.viewerKey);
+            return (
+              <li
+                key={t.id}
+                className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="font-semibold">{labelOf(viewer)}</span>
+                  <span className="block text-muted-foreground">“{t.text}”</span>
+                </div>
+                {t.status === "suggested" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px]"
+                      onClick={() => approve(t.id)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-5 px-1.5 text-[10px]"
+                      onClick={() => dismiss(t.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px] capitalize">
+                    {t.status}
+                  </Badge>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
+
+function AskRequests() {
+  const asks = useDemoGeneratorStore((s) => s.asks);
+  const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const approve = useDemoGeneratorStore((s) => s.approveAsk);
+  const dismiss = useDemoGeneratorStore((s) => s.dismissAsk);
+  const [withheld, setWithheld] = useState<Set<string>>(new Set());
+  const active = asks.filter((a) => a.status !== "dismissed");
+
+  return (
+    <PanelShell title="Ask requests" count={active.length}>
+      {active.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-muted-foreground">
+          No questions yet.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {active.map((a) => {
+            const viewer = viewers.find((v) => v.key === a.viewerKey);
+            return (
+              <li key={a.id} className="rounded border px-2 py-1.5 text-xs">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-semibold">{labelOf(viewer)}</span>
+                    <span className="block">“{a.question}”</span>
+                    <span className="mt-0.5 block text-muted-foreground">
+                      Bot answer: {a.answer}
+                    </span>
+                  </div>
+                  {a.status === "suggested" ? (
+                    <>
+                      <Button
+                        size="sm"
+                        className="h-5 px-1.5 text-[10px]"
+                        onClick={() => approve(a.id, !withheld.has(a.id))}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-5 px-1.5 text-[10px]"
+                        onClick={() => dismiss(a.id)}
+                      >
+                        Dismiss
+                      </Button>
+                    </>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] capitalize"
+                    >
+                      {a.status}
+                    </Badge>
+                  )}
+                </div>
+                {a.status === "suggested" && (
+                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Checkbox
+                      className="h-3.5 w-3.5"
+                      checked={!withheld.has(a.id)}
+                      onCheckedChange={(v) =>
+                        setWithheld((prev) => {
+                          const next = new Set(prev);
+                          if (v === true) next.delete(a.id);
+                          else next.add(a.id);
+                          return next;
+                        })
+                      }
+                    />
+                    Include AI answer
+                  </label>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
+
+function ClipMarkers() {
+  const clips = useDemoGeneratorStore((s) => s.clips);
+  const viewers = useDemoGeneratorStore((s) => s.viewers);
+
+  return (
+    <PanelShell title="Clip markers" count={clips.length}>
+      {clips.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-muted-foreground">
+          No clip markers yet.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {clips.map((c) => {
+            const viewer = viewers.find((v) => v.key === c.viewerKey);
+            return (
+              <li
+                key={c.id}
+                className="flex items-baseline gap-2 rounded border px-2 py-1.5 text-xs"
+              >
+                <span className="font-mono font-semibold tabular-nums">
+                  {c.at}
+                </span>
+                <span className="min-w-0 flex-1 truncate">“{c.note}”</span>
+                <span className="text-muted-foreground">{labelOf(viewer)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
+
+function WrapupButton() {
+  const wrapupDone = useDemoGeneratorStore((s) => s.wrapupDone);
+  const runWrapup = useDemoGeneratorStore((s) => s.runWrapup);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={wrapupDone}
+        onClick={() => setOpen(true)}
+      >
+        {wrapupDone ? "Wrap-up sent" : "Wrap up"}
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send the wrap-up messages?</AlertDialogTitle>
+            <AlertDialogDescription>
+              VidsBot posts the MVP, an achievement summary, and a thanks
+              message to the demo chat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => runWrapup()}>
+              Wrap up
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ── Activity ───────────────────────────────────────────────────────────────
 
 export function DemoActivity({ goals }: { goals: Counts | null }) {
@@ -516,6 +785,12 @@ export function DemoActivity({ goals }: { goals: Counts | null }) {
       </div>
       <div className="shrink-0">
         <ModBotActions />
+      </div>
+      <div className="shrink-0 space-y-3">
+        <TtsRequests />
+        <AskRequests />
+        <ClipMarkers />
+        <WrapupButton />
       </div>
       <ChatPanel />
     </div>
