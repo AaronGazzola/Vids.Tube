@@ -211,6 +211,8 @@ test("the overlay plays an approved TTS request and marks it played", async ({
     await expect(page.getByText(`E2E overlay speech ${stamp}`)).toHaveCount(0, {
       timeout: 15_000,
     });
+    await expect(page.getByText("Highlight", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".border-dashed")).toHaveCount(0);
   } finally {
     await admin.from("tts_requests").delete().eq("stream_id", live!.id);
     await admin.from("streams").delete().eq("id", live!.id);

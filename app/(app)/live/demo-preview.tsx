@@ -135,122 +135,122 @@ function CompetitionField() {
   return <CompetitionLadder entries={entries} size={52} />;
 }
 
-// ── Highlight overlay ──────────────────────────────────────────────────────
-
-function HighlightField() {
-  const messages = useDemoGeneratorStore((s) => s.messages);
-  const viewers = useDemoGeneratorStore((s) => s.viewers);
-  const scores = useDemoGeneratorStore((s) => s.scores);
-  const persist = useDemoLayoutStore((s) => s.persist.highlight);
-  const [done, setDone] = useState<Set<string>>(new Set());
-
-  const current = [...messages]
-    .reverse()
-    .find((m) => m.promoted && !m.dismissed && !done.has(m.id));
-  if (!current) {
-    return (
-      <div
-        className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/30 text-xs text-white/40"
-        style={{ width: 420 }}
-      >
-        Highlight
-      </div>
-    );
-  }
-
-  const viewer = viewers.find((v) => v.key === current.viewerKey) ?? null;
-  const active = viewers
-    .map((v) => ({ id: v.key, score: scores[v.key]?.total ?? 0 }))
-    .filter((x) => x.score > 0);
-  const st =
-    computeStandings(active).get(current.viewerKey) ?? { rank: 99, progress: 0 };
-
-  return (
-    <div style={{ width: 420 }}>
-      <HighlightedMessage
-        key={current.id}
-        author={viewer ? authorOf(viewer) : null}
-        text={current.text}
-        rank={st.rank}
-        progress={st.progress}
-        persist={persist}
-        onDone={() =>
-          setDone((prev) => {
-            const next = new Set(prev);
-            next.add(current.id);
-            return next;
-          })
-        }
-      />
-    </div>
-  );
-}
-
-// ── TTS + ask overlay feeds ────────────────────────────────────────────────
-
-function DemoTtsFeed() {
-  const tts = useDemoGeneratorStore((s) => s.tts);
-  const viewers = useDemoGeneratorStore((s) => s.viewers);
-  const markTtsPlayed = useDemoGeneratorStore((s) => s.markTtsPlayed);
-  const persist = useDemoLayoutStore((s) => s.persist.tts);
-  const [finished, setFinished] = useState<Set<string>>(new Set());
-  const current = tts.find((t) => t.status === "approved") ?? null;
-  const currentId = current?.id ?? null;
-
-  useEffect(() => {
-    if (!persist && currentId && finished.has(currentId)) {
-      markTtsPlayed(currentId);
-    }
-  }, [persist, currentId, finished, markTtsPlayed]);
-
-  if (!current) return null;
-  const viewer = viewers.find((v) => v.key === current.viewerKey);
-  return (
-    <TtsCard
-      authorName={viewer?.name ?? null}
-      text={current.text}
-      audioSrc="/demo/tts-sample.mp3"
-      audioKey={current.id}
-      onDone={() => {
-        if (persist) {
-          setFinished((prev) => {
-            const next = new Set(prev);
-            next.add(current.id);
-            return next;
-          });
-        } else {
-          markTtsPlayed(current.id);
-        }
-      }}
-    />
-  );
-}
+// ── Single-slot overlay feed ───────────────────────────────────────────────
 
 const DEMO_ASK_HOLD_MS = 10_000;
 
-function DemoAskFeed() {
-  const asks = useDemoGeneratorStore((s) => s.asks);
+function DemoOverlayFeed() {
+  const config = useDemoLayoutStore((s) => s.config);
+  const persist = useDemoLayoutStore((s) => s.persist);
+  const messages = useDemoGeneratorStore((s) => s.messages);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const scores = useDemoGeneratorStore((s) => s.scores);
+  const tts = useDemoGeneratorStore((s) => s.tts);
+  const asks = useDemoGeneratorStore((s) => s.asks);
+  const markTtsPlayed = useDemoGeneratorStore((s) => s.markTtsPlayed);
   const markAskShown = useDemoGeneratorStore((s) => s.markAskShown);
-  const persist = useDemoLayoutStore((s) => s.persist.ask);
-  const current = asks.find((a) => a.status === "approved") ?? null;
-  const currentId = current?.id ?? null;
+  const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
+  const [finishedTts, setFinishedTts] = useState<Set<string>>(new Set());
+
+  const currentHighlight = config.visible.highlight
+    ? [...messages]
+        .reverse()
+        .find(
+          (m) => m.promoted && !m.dismissed && !doneHighlights.has(m.id)
+        ) ?? null
+    : null;
+  const currentTts =
+    !currentHighlight && config.visible.tts
+      ? tts.find((t) => t.status === 'approved') ?? null
+      : null;
+  const currentAsk =
+    !currentHighlight && !currentTts && config.visible.ask
+      ? asks.find((a) => a.status === 'approved') ?? null
+      : null;
+  const currentTtsId = currentTts?.id ?? null;
+  const currentAskId = currentAsk?.id ?? null;
 
   useEffect(() => {
-    if (!currentId || persist) return;
-    const timer = setTimeout(() => markAskShown(currentId), DEMO_ASK_HOLD_MS);
+    if (!currentAskId || persist.ask) return;
+    const timer = setTimeout(
+      () => markAskShown(currentAskId),
+      DEMO_ASK_HOLD_MS
+    );
     return () => clearTimeout(timer);
-  }, [currentId, persist, markAskShown]);
+  }, [currentAskId, persist.ask, markAskShown]);
 
-  if (!current) return null;
-  const viewer = viewers.find((v) => v.key === current.viewerKey);
+  useEffect(() => {
+    if (!persist.tts && currentTtsId && finishedTts.has(currentTtsId)) {
+      markTtsPlayed(currentTtsId);
+    }
+  }, [persist.tts, currentTtsId, finishedTts, markTtsPlayed]);
+
+  const active = viewers
+    .map((v) => ({ id: v.key, score: scores[v.key]?.total ?? 0 }))
+    .filter((x) => x.score > 0);
+  const standingMap = computeStandings(active);
+  const standingFor = (key: string) =>
+    standingMap.get(key) ?? { rank: 99, progress: 0 };
+  const authorFor = (key: string) => {
+    const viewer = viewers.find((v) => v.key === key);
+    return viewer ? authorOf(viewer) : null;
+  };
+
   return (
-    <AskExchangeView
-      authorName={viewer?.name ?? null}
-      question={current.question}
-      answer={current.answer}
-      includeAnswer={current.includeAnswer}
-    />
+    <div style={{ width: 420 }}>
+      {currentHighlight ? (
+        <HighlightedMessage
+          key={currentHighlight.id}
+          author={authorFor(currentHighlight.viewerKey)}
+          text={currentHighlight.text}
+          rank={standingFor(currentHighlight.viewerKey).rank}
+          progress={standingFor(currentHighlight.viewerKey).progress}
+          persist={persist.highlight}
+          onDone={() =>
+            setDoneHighlights((prev) => {
+              const next = new Set(prev);
+              next.add(currentHighlight.id);
+              return next;
+            })
+          }
+        />
+      ) : currentTts ? (
+        <TtsCard
+          key={currentTts.id}
+          author={authorFor(currentTts.viewerKey)}
+          rank={standingFor(currentTts.viewerKey).rank}
+          progress={standingFor(currentTts.viewerKey).progress}
+          text={currentTts.text}
+          audioSrc="/demo/tts-sample.mp3"
+          audioKey={currentTts.id}
+          onDone={() => {
+            if (persist.tts) {
+              setFinishedTts((prev) => {
+                const next = new Set(prev);
+                next.add(currentTts.id);
+                return next;
+              });
+            } else {
+              markTtsPlayed(currentTts.id);
+            }
+          }}
+        />
+      ) : currentAsk ? (
+        <AskExchangeView
+          key={currentAsk.id}
+          author={authorFor(currentAsk.viewerKey)}
+          rank={standingFor(currentAsk.viewerKey).rank}
+          progress={standingFor(currentAsk.viewerKey).progress}
+          question={currentAsk.question}
+          answer={currentAsk.answer}
+          includeAnswer={currentAsk.includeAnswer}
+        />
+      ) : (
+        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/30 text-xs text-white/40">
+          Highlight
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -398,11 +398,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           config.visible.tts ||
           config.visible.ask) && (
           <DraggableBox boxKey="highlight">
-            <div style={{ width: 420 }}>
-              {config.visible.highlight && <HighlightField />}
-              {config.visible.tts && <DemoTtsFeed />}
-              {config.visible.ask && <DemoAskFeed />}
-            </div>
+            <DemoOverlayFeed />
           </DraggableBox>
         )}
         {config.visible.goalSubs && (

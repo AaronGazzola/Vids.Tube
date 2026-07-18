@@ -171,19 +171,25 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await expect(page.getByText("Competition", { exact: true })).toHaveCount(0);
 
   await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByLabel("Persist Highlight").check();
   await page.getByRole("button", { name: "Play Highlight" }).click();
-  await expect(
-    stage
-      .getByText(/best explanation|200 subs|carried me|friendliest/)
-      .first()
-  ).toBeVisible({ timeout: 5_000 });
+  const highlightText = stage.getByText(
+    /best explanation|200 subs|carried me|friendliest/
+  );
+  await expect(highlightText.first()).toBeVisible({ timeout: 5_000 });
 
   await page.getByLabel("Persist TTS card").check();
   await page.getByRole("button", { name: "Play TTS card" }).click();
   const playedTts = stage.getByText(
     /big shoutout|GG on hitting|night shift crew/
   );
-  await expect(playedTts.first()).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(1_500);
+  await expect(playedTts).toHaveCount(0);
+  await expect(highlightText.first()).toBeVisible();
+
+  await page.getByLabel("Persist Highlight").uncheck();
+  await expect(playedTts.first()).toBeVisible({ timeout: 12_000 });
+  await expect(highlightText).toHaveCount(0);
   await page.waitForTimeout(8_000);
   await expect(playedTts.first()).toBeVisible();
   await page.getByLabel("Persist TTS card").uncheck();

@@ -18,67 +18,8 @@ import {
 
 const ASK_HOLD_MS = 10_000;
 
-function AskExchange({ streamId }: { streamId: string | null }) {
-  const { data: queue } = usePlayableAsk(streamId);
-  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-
-  const current = (queue ?? []).find((a) => !doneIds.has(a.id)) ?? null;
-  const currentId = current?.id ?? null;
-
-  useEffect(() => {
-    if (!currentId) return;
-    const timer = setTimeout(() => {
-      setDoneIds((prev) => {
-        const next = new Set(prev);
-        next.add(currentId);
-        return next;
-      });
-      markAskShownAction(currentId).catch((e) => console.error(e));
-    }, ASK_HOLD_MS);
-    return () => clearTimeout(timer);
-  }, [currentId]);
-
-  if (!current) return null;
-
-  return (
-    <AskExchangeView
-      authorName={current.authorName}
-      question={current.question}
-      answer={current.answer}
-      includeAnswer={current.includeAnswer}
-    />
-  );
-}
-
 function ttsAudioUrl(path: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tts/${path}`;
-}
-
-function TtsPlayer({ streamId }: { streamId: string | null }) {
-  const { data: queue } = usePlayableTts(streamId);
-  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-
-  const current = (queue ?? []).find((t) => !doneIds.has(t.id)) ?? null;
-  if (!current) return null;
-
-  const finish = () => {
-    setDoneIds((prev) => {
-      const next = new Set(prev);
-      next.add(current.id);
-      return next;
-    });
-    markTtsPlayedAction(current.id).catch((e) => console.error(e));
-  };
-
-  return (
-    <TtsCard
-      authorName={current.authorName}
-      text={current.text}
-      audioSrc={ttsAudioUrl(current.audioPath)}
-      audioKey={current.id}
-      onDone={finish}
-    />
-  );
 }
 
 export default function OverlayPage({
@@ -95,45 +36,103 @@ export default function OverlayPage({
   const streamId = stream?.status === "live" ? stream.id : null;
   const { data: promoted } = usePromotedMessages(streamId);
   const { data: standings } = useStreamStandings(streamId);
+  const { data: ttsQueue } = usePlayableTts(streamId);
+  const { data: askQueue } = usePlayableAsk(streamId);
 
-  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
+  const [doneTts, setDoneTts] = useState<Set<string>>(new Set());
+  const [doneAsks, setDoneAsks] = useState<Set<string>>(new Set());
 
-  const current = streamId
-    ? promoted?.find((m) => !doneIds.has(m.id)) ?? null
+  // One shared slot: the highlight, TTS card, and ask exchange never render
+  // together — each waits until the slot is free.
+  const currentHighlight = streamId
+    ? promoted?.find((m) => !doneHighlights.has(m.id)) ?? null
     : null;
+  const currentTts = currentHighlight
+    ? null
+    : (ttsQueue ?? []).find((t) => !doneTts.has(t.id)) ?? null;
+  const currentAsk =
+    currentHighlight || currentTts
+      ? null
+      : (askQueue ?? []).find((a) => !doneAsks.has(a.id)) ?? null;
+  const currentAskId = currentAsk?.id ?? null;
+
+  useEffect(() => {
+    if (!currentAskId) return;
+    const timer = setTimeout(() => {
+      setDoneAsks((prev) => {
+        const next = new Set(prev);
+        next.add(currentAskId);
+        return next;
+      });
+      markAskShownAction(currentAskId).catch((e) => console.error(e));
+    }, ASK_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [currentAskId]);
 
   const standingMap = computeStandings(
     (standings ?? []).map((s) => ({ id: s.participant_key, score: s.total_score }))
   );
-  const participantKey = current
-    ? current.user_id ?? `${current.origin}:${current.external_author_id}`
-    : null;
-  const standing =
-    (participantKey ? standingMap.get(participantKey) : null) ?? {
-      rank: 99,
-      progress: 0,
-    };
+  const standingFor = (key: string | null) =>
+    (key ? standingMap.get(key) : null) ?? { rank: 99, progress: 0 };
+
+  const highlightStanding = standingFor(
+    currentHighlight
+      ? currentHighlight.user_id ??
+          `${currentHighlight.origin}:${currentHighlight.external_author_id}`
+      : null
+  );
+  const ttsStanding = standingFor(currentTts?.participantKey ?? null);
+  const askStanding = standingFor(currentAsk?.participantKey ?? null);
 
   return (
     <div style={{ width }}>
-      {current && (
+      {currentHighlight && (
         <HighlightedMessage
-          key={current.id}
-          author={current.author}
-          text={current.body ?? ""}
-          rank={standing.rank}
-          progress={standing.progress}
+          key={currentHighlight.id}
+          author={currentHighlight.author}
+          text={currentHighlight.body ?? ""}
+          rank={highlightStanding.rank}
+          progress={highlightStanding.progress}
           onDone={() =>
-            setDoneIds((prev) => {
+            setDoneHighlights((prev) => {
               const next = new Set(prev);
-              next.add(current.id);
+              next.add(currentHighlight.id);
               return next;
             })
           }
         />
       )}
-      <TtsPlayer streamId={streamId} />
-      <AskExchange streamId={streamId} />
+      {currentTts && (
+        <TtsCard
+          key={currentTts.id}
+          author={currentTts.author}
+          rank={ttsStanding.rank}
+          progress={ttsStanding.progress}
+          text={currentTts.text}
+          audioSrc={ttsAudioUrl(currentTts.audioPath)}
+          audioKey={currentTts.id}
+          onDone={() => {
+            setDoneTts((prev) => {
+              const next = new Set(prev);
+              next.add(currentTts.id);
+              return next;
+            });
+            markTtsPlayedAction(currentTts.id).catch((e) => console.error(e));
+          }}
+        />
+      )}
+      {currentAsk && (
+        <AskExchangeView
+          key={currentAsk.id}
+          author={currentAsk.author}
+          rank={askStanding.rank}
+          progress={askStanding.progress}
+          question={currentAsk.question}
+          answer={currentAsk.answer}
+          includeAnswer={currentAsk.includeAnswer}
+        />
+      )}
     </div>
   );
 }
