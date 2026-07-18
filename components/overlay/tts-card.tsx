@@ -22,12 +22,14 @@ export function TtsCard({
   return (
     <div className="w-full px-3">
       <div className="flex w-full items-start gap-3">
-        <AuthorColumn author={author} rank={rank} progress={progress} />
+        <AuthorColumn
+          author={author}
+          rank={rank}
+          progress={progress}
+          cornerIcon={<Volume2 className="h-[58%] w-[58%]" />}
+        />
         <SpeechBubble pointer="left">
-          <p className="whitespace-pre-wrap">
-            <Volume2 className="mr-1.5 inline h-4 w-4 align-[-2px] text-white" />
-            {text}
-          </p>
+          <p className="whitespace-pre-wrap">{text}</p>
         </SpeechBubble>
       </div>
       <audio

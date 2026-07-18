@@ -56,24 +56,44 @@ export function AuthorColumn({
   rank,
   progress,
   size = 72,
+  cornerIcon,
 }: {
   author: FeaturedAuthor | null;
   rank: number;
   progress: number;
   size?: number;
+  cornerIcon?: React.ReactNode;
 }) {
   const handle = author?.handle ? `@${author.handle}` : null;
   const name = author?.name ?? "viewer";
+  const badge = Math.round(size * 0.45);
   return (
     <div className="flex shrink-0 flex-col items-center" style={{ width: size }}>
-      <AvatarBubble
-        author={author}
-        progress={progress}
-        rank={rank}
-        size={size}
-        stroke={5}
-        showBadge={rank < 99}
-      />
+      <div className="relative">
+        <AvatarBubble
+          author={author}
+          progress={progress}
+          rank={rank}
+          size={size}
+          stroke={5}
+          showBadge={rank < 99}
+        />
+        {cornerIcon && (
+          <span
+            className="absolute flex items-center justify-center rounded-full text-white"
+            style={{
+              right: -4,
+              bottom: -4,
+              width: badge,
+              height: badge,
+              background: "#000",
+              border: "2px solid #fff",
+            }}
+          >
+            {cornerIcon}
+          </span>
+        )}
+      </div>
       {handle && (
         <span className="mt-1 max-w-full truncate text-base font-bold text-white drop-shadow">
           {handle}
