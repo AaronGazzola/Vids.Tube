@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   evaluateScheduleSave,
@@ -24,8 +25,12 @@ import {
 } from "@/lib/schedule-validation";
 import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DemoActivity } from "./demo-activity";
+import { DemoPreviewStage } from "./demo-preview";
+import { useDemoController, useDemoLayout } from "./demo.hooks";
+import { useDemoLayoutStore } from "./demo.stores";
 import { ActivityContent } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
 import {
@@ -119,6 +124,7 @@ function StatusToolbar({
   dirty,
   onSaveClick,
   saving,
+  demo,
 }: {
   state: StreamState;
   broadcast: Stream | null;
@@ -126,6 +132,7 @@ function StatusToolbar({
   dirty: boolean;
   onSaveClick: () => void;
   saving: boolean;
+  demo: boolean;
 }) {
   const goLive = useGoLive();
   const endStream = useEndStream();
@@ -154,26 +161,36 @@ function StatusToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-t bg-background px-4 py-2">
-      <Badge
-        variant={
-          state === "live"
-            ? "default"
-            : state === "preview"
-              ? "secondary"
-              : "outline"
-        }
-      >
-        {statusLabel[state]}
-      </Badge>
-      {state === "live" && (
-        <span className="text-xs text-muted-foreground">{count} watching</span>
-      )}
-      {state === "scheduled" && (
-        <span className="text-xs text-muted-foreground">{count} waiting</span>
+      {demo ? (
+        <Badge variant="secondary">Demo mode</Badge>
+      ) : (
+        <>
+          <Badge
+            variant={
+              state === "live"
+                ? "default"
+                : state === "preview"
+                  ? "secondary"
+                  : "outline"
+            }
+          >
+            {statusLabel[state]}
+          </Badge>
+          {state === "live" && (
+            <span className="text-xs text-muted-foreground">
+              {count} watching
+            </span>
+          )}
+          {state === "scheduled" && (
+            <span className="text-xs text-muted-foreground">
+              {count} waiting
+            </span>
+          )}
+        </>
       )}
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        {canDiscard && (
+        {!demo && canDiscard && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={discard.isPending}>
@@ -199,7 +216,7 @@ function StatusToolbar({
           </AlertDialog>
         )}
 
-        {state === "live" ? (
+        {!demo && (state === "live" ? (
           disconnected ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -278,7 +295,7 @@ function StatusToolbar({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        )}
+        ))}
 
         <Button size="sm" disabled={!dirty || saving} onClick={onSaveClick}>
           Save changes
@@ -304,6 +321,15 @@ export default function LivePage() {
   const [form, setForm] = useState<SettingsForm | null>(dbForm);
   const [syncedId, setSyncedId] = useState<string | null | undefined>(undefined);
   const [confirm, setConfirm] = useState<ScheduleSaveCheck | null>(null);
+  const [tab, setTab] = useState("settings");
+  const [demo, setDemo] = useState(false);
+  const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
+  const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
+
+  useDemoLayout(demo);
+  useDemoController(demo);
+
+  const demoGoals = settings?.goals ?? null;
 
   // Sync the form from the DB only when the active stream changes (not on every
   // background refetch), so in-progress edits are preserved.
@@ -377,7 +403,8 @@ export default function LivePage() {
   return (
     <div className="mx-auto flex h-[calc(100vh-3.5rem)] w-full max-w-6xl flex-col">
       <Tabs
-        defaultValue="settings"
+        value={tab}
+        onValueChange={setTab}
         className="flex min-h-0 flex-1 flex-col"
       >
         <div className="mx-4 mt-4 flex shrink-0 items-center justify-between gap-2">
@@ -386,23 +413,54 @@ export default function LivePage() {
             <TabsTrigger value="preview">Preview</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
-          {settings?.channelSlug && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              aria-label="Pop out the activity panel"
-              onClick={() =>
-                window.open(
-                  `/popout/${settings.channelSlug}?panel=all`,
-                  "vt-popout-all",
-                  "width=460,height=940"
-                )
-              }
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {settings?.channelSlug &&
+              !demo &&
+              (tab === "preview" || tab === "activity") && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label={`Pop out the ${tab} panel`}
+                  onClick={() =>
+                    tab === "preview"
+                      ? window.open(
+                          `/popout/${settings.channelSlug}?panel=preview`,
+                          "vt-popout-preview",
+                          "width=820,height=520"
+                        )
+                      : window.open(
+                          `/popout/${settings.channelSlug}?panel=all`,
+                          "vt-popout-all",
+                          "width=460,height=940"
+                        )
+                  }
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              {demo && tab === "preview" && !panelOpen && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="Show overlay controls"
+                  onClick={() => setPanelOpen(true)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                </Button>
+              )}
+              <span>Demo</span>
+              <Switch
+                checked={demo}
+                onCheckedChange={(v) => {
+                  setDemo(v);
+                  if (v) setTab("preview");
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -428,7 +486,9 @@ export default function LivePage() {
             value="preview"
             className="mt-0 h-full space-y-3 overflow-y-auto p-4 md:p-6"
           >
-            {previewSrc ? (
+            {demo ? (
+              <DemoPreviewStage goals={demoGoals} />
+            ) : previewSrc ? (
               <div className="relative">
                 <LivePlayer src={previewSrc} />
                 {disconnected && <DisconnectedOverlay />}
@@ -443,14 +503,16 @@ export default function LivePage() {
                 Start your encoder to see the private preview here.
               </div>
             )}
-            <TranscriptPanel streamId={streamId} live={state === "live"} />
+            {!demo && (
+              <TranscriptPanel streamId={streamId} live={state === "live"} />
+            )}
           </TabsContent>
 
           <TabsContent
             value="activity"
             className="mt-0 flex h-full min-h-0 flex-col p-4 md:p-6"
           >
-            <ActivityContent />
+            {demo ? <DemoActivity goals={demoGoals} /> : <ActivityContent />}
           </TabsContent>
         </div>
       </Tabs>
@@ -463,6 +525,7 @@ export default function LivePage() {
           dirty={dirty}
           onSaveClick={onSaveClick}
           saving={save.isPending}
+          demo={demo}
         />
       )}
 

@@ -66,6 +66,7 @@ export async function getOverlayContextAction(): Promise<OverlayContext> {
     .from("streams")
     .select("id, status, title, youtube_video_id")
     .eq("channel_id", channel.id)
+    .in("status", ["draft", "scheduled", "preview", "live"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
