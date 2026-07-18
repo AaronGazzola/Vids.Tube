@@ -78,6 +78,10 @@ export const BUILTIN_HANDLERS: Record<
       `Commands: ${list} — full guide: ${siteUrl()}/${ctx.stream.channelSlug}/commands`
     );
   },
+  me: async (ctx) => {
+    const { meHandler } = await import("./me-command");
+    await meHandler(ctx);
+  },
 };
 
 function commandParticipantKey(m: BufferedMessage): string {

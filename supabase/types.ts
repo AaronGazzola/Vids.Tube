@@ -525,6 +525,27 @@ export type Database = {
           },
         ]
       }
+      me_profiles: {
+        Row: {
+          generated_at: string
+          profile: string
+          profile_key: string
+          snapshot: Json
+        }
+        Insert: {
+          generated_at?: string
+          profile: string
+          profile_key: string
+          snapshot: Json
+        }
+        Update: {
+          generated_at?: string
+          profile?: string
+          profile_key?: string
+          snapshot?: Json
+        }
+        Relationships: []
+      }
       moderation_actions: {
         Row: {
           action: string
