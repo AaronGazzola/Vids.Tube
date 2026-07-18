@@ -25,6 +25,18 @@ async function buildGrounding(ctx: CommandContext): Promise<string> {
     .map((r) => `!${r.keyword} — ${r.description}: ${r.response}`)
     .join("\n");
 
+  const { data: projects } = await supabaseAdmin
+    .from("channel_projects")
+    .select("name, blurb, domain_url, repo_url")
+    .eq("channel_id", ctx.stream.channelId)
+    .order("sort_order", { ascending: true });
+  const projectFacts = (projects ?? [])
+    .map((p) => {
+      const links = [p.domain_url, p.repo_url].filter(Boolean).join(", ");
+      return `${p.name}${p.blurb ? ` — ${p.blurb}` : ""}${links ? ` (${links})` : ""}`;
+    })
+    .join("\n");
+
   const { data: segments } = await supabaseAdmin
     .from("transcript_segments")
     .select("text")
@@ -38,6 +50,9 @@ async function buildGrounding(ctx: CommandContext): Promise<string> {
 
   return [
     faq ? `Channel FAQ:\n${faq}` : "Channel FAQ: (none)",
+    projectFacts
+      ? `The streamer's projects:\n${projectFacts}`
+      : "The streamer's projects: (none configured)",
     transcript
       ? `Recent stream transcript:\n${transcript}`
       : "Recent stream transcript: (none yet)",

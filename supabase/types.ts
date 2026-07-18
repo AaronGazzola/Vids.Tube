@@ -165,6 +165,50 @@ export type Database = {
           },
         ]
       }
+      channel_projects: {
+        Row: {
+          blurb: string | null
+          channel_id: string
+          created_at: string
+          domain_url: string | null
+          id: string
+          name: string
+          repo_url: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          blurb?: string | null
+          channel_id: string
+          created_at?: string
+          domain_url?: string | null
+          id?: string
+          name: string
+          repo_url?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          blurb?: string | null
+          channel_id?: string
+          created_at?: string
+          domain_url?: string | null
+          id?: string
+          name?: string
+          repo_url?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_projects_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           avatar_path: string | null
@@ -314,38 +358,56 @@ export type Database = {
         Row: {
           ask_mode: string
           auto_display_featured: boolean
+          competition_status_enabled: boolean
           enabled: boolean
           highlighting_enabled: boolean
           last_scored_at: string | null
           locked_until: string | null
           moderation_mode: string
+          progress_update_enabled: boolean
           stream_id: string
           tts_mode: string
           updated_at: string
+          useful_info_enabled: boolean
+          wrapup_mvp_enabled: boolean
+          wrapup_summary_enabled: boolean
+          wrapup_thanks_enabled: boolean
         }
         Insert: {
           ask_mode?: string
           auto_display_featured?: boolean
+          competition_status_enabled?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
           moderation_mode?: string
+          progress_update_enabled?: boolean
           stream_id: string
           tts_mode?: string
           updated_at?: string
+          useful_info_enabled?: boolean
+          wrapup_mvp_enabled?: boolean
+          wrapup_summary_enabled?: boolean
+          wrapup_thanks_enabled?: boolean
         }
         Update: {
           ask_mode?: string
           auto_display_featured?: boolean
+          competition_status_enabled?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
           moderation_mode?: string
+          progress_update_enabled?: boolean
           stream_id?: string
           tts_mode?: string
           updated_at?: string
+          useful_info_enabled?: boolean
+          wrapup_mvp_enabled?: boolean
+          wrapup_summary_enabled?: boolean
+          wrapup_thanks_enabled?: boolean
         }
         Relationships: [
           {
@@ -923,6 +985,8 @@ export type Database = {
           thumbnail_path: string | null
           title: string | null
           waiting_room_chat: boolean
+          wrapup_done_at: string | null
+          wrapup_requested_at: string | null
           youtube_channel_id: string | null
           youtube_video_id: string | null
         }
@@ -944,6 +1008,8 @@ export type Database = {
           thumbnail_path?: string | null
           title?: string | null
           waiting_room_chat?: boolean
+          wrapup_done_at?: string | null
+          wrapup_requested_at?: string | null
           youtube_channel_id?: string | null
           youtube_video_id?: string | null
         }
@@ -965,6 +1031,8 @@ export type Database = {
           thumbnail_path?: string | null
           title?: string | null
           waiting_room_chat?: boolean
+          wrapup_done_at?: string | null
+          wrapup_requested_at?: string | null
           youtube_channel_id?: string | null
           youtube_video_id?: string | null
         }

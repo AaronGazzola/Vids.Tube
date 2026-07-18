@@ -874,3 +874,26 @@ export async function getClipMarkersAction(
     streamTitle,
   }));
 }
+
+export async function requestWrapupAction(
+  streamId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data, error } = await supabaseAdmin
+    .from("streams")
+    .update({ wrapup_requested_at: new Date().toISOString() })
+    .eq("id", streamId)
+    .is("wrapup_requested_at", null)
+    .select("id");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to request the wrap-up");
+  }
+  if (!data?.length) {
+    return { error: "Wrap-up was already requested for this stream." };
+  }
+  return { data: { ok: true } };
+}

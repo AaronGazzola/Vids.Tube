@@ -17,6 +17,7 @@ import {
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
 import { processCommands } from "../lib/commands";
+import { runProactiveMoments, runWrapupIfRequested } from "../lib/moments";
 import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
 import { pollYoutubeChat, resolveLiveChatId } from "../lib/youtube-chat";
@@ -445,6 +446,10 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       await processLinkVerifications(unmoderated);
       await synthesizePendingTts(stream.id);
       await deliverApprovedAskAnswers(stream.id);
+      if (channelId) {
+        await runProactiveMoments(stream, channelId);
+        await runWrapupIfRequested(stream, channelId);
+      }
       let batch = unmoderated;
       if (channelId) {
         const { data: prefs } = await supabaseAdmin

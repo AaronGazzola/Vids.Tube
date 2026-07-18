@@ -34,6 +34,12 @@ import {
   useDeleteCustomCommand,
   useUpdateCustomCommand,
 } from "./commands.hooks";
+import {
+  useChannelProjects,
+  useCreateProject,
+  useDeleteProject,
+  useUpdateProject,
+} from "./projects.hooks";
 
 const STREAM_HOST = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
 
@@ -48,6 +54,12 @@ export type SettingsForm = {
   ttsMode: "suggest" | "auto";
   askMode: "suggest" | "auto";
   highlightingEnabled: boolean;
+  usefulInfoEnabled: boolean;
+  competitionStatusEnabled: boolean;
+  progressUpdateEnabled: boolean;
+  wrapupMvpEnabled: boolean;
+  wrapupSummaryEnabled: boolean;
+  wrapupThanksEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
   disabledCommands: string[];
@@ -204,6 +216,167 @@ function ConnectionSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </Section>
+  );
+}
+
+type ProjectDialogState = {
+  id: string | null;
+  name: string;
+  blurb: string;
+  domainUrl: string;
+  repoUrl: string;
+};
+
+const EMPTY_PROJECT_DIALOG: ProjectDialogState = {
+  id: null,
+  name: "",
+  blurb: "",
+  domainUrl: "",
+  repoUrl: "",
+};
+
+function ProjectsSection() {
+  const { data: projects, isPending } = useChannelProjects();
+  const create = useCreateProject();
+  const update = useUpdateProject();
+  const remove = useDeleteProject();
+  const [dialog, setDialog] = useState<ProjectDialogState | null>(null);
+
+  const submit = () => {
+    if (!dialog) return;
+    const input = {
+      name: dialog.name,
+      blurb: dialog.blurb,
+      domainUrl: dialog.domainUrl,
+      repoUrl: dialog.repoUrl,
+    };
+    const done = { onSuccess: () => setDialog(null) };
+    if (dialog.id) {
+      update.mutate({ id: dialog.id, input }, done);
+    } else {
+      create.mutate(input, done);
+    }
+  };
+
+  return (
+    <Section title="Projects">
+      <p className="text-xs text-muted-foreground">
+        What you&apos;re building — used by progress updates, the wrap-up
+        message, and !ask answers (links included).
+      </p>
+      {isPending ? (
+        <Skeleton className="h-16 w-full" />
+      ) : (projects ?? []).length === 0 ? (
+        <p className="text-xs text-muted-foreground">No projects yet.</p>
+      ) : (
+        <ul className="divide-y rounded-md border">
+          {(projects ?? []).map((p) => (
+            <li key={p.id} className="flex items-center gap-3 p-2.5 text-sm">
+              <div className="min-w-0 flex-1">
+                <span className="font-medium">{p.name}</span>
+                {p.blurb && (
+                  <span className="text-muted-foreground"> — {p.blurb}</span>
+                )}
+                <span className="block truncate text-xs text-muted-foreground">
+                  {[p.domainUrl, p.repoUrl].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                onClick={() =>
+                  setDialog({
+                    id: p.id,
+                    name: p.name,
+                    blurb: p.blurb ?? "",
+                    domainUrl: p.domainUrl ?? "",
+                    repoUrl: p.repoUrl ?? "",
+                  })
+                }
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-destructive"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(p.id)}
+              >
+                Delete
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setDialog(EMPTY_PROJECT_DIALOG)}
+      >
+        Add project
+      </Button>
+      {dialog && (
+        <div className="space-y-3 rounded-md border p-3">
+          <p className="text-sm font-medium">
+            {dialog.id ? `Edit ${dialog.name}` : "New project"}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="proj-name">Name</Label>
+            <Input
+              id="proj-name"
+              value={dialog.name}
+              onChange={(e) => setDialog({ ...dialog, name: e.target.value })}
+              placeholder="Vids.Tube"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="proj-blurb">Blurb</Label>
+            <Input
+              id="proj-blurb"
+              value={dialog.blurb}
+              onChange={(e) => setDialog({ ...dialog, blurb: e.target.value })}
+              placeholder="A community-driven YouTube alternative"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="proj-domain">Domain URL</Label>
+            <Input
+              id="proj-domain"
+              value={dialog.domainUrl}
+              onChange={(e) =>
+                setDialog({ ...dialog, domainUrl: e.target.value })
+              }
+              placeholder="https://vids.tube"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="proj-repo">Repo URL</Label>
+            <Input
+              id="proj-repo"
+              value={dialog.repoUrl}
+              onChange={(e) =>
+                setDialog({ ...dialog, repoUrl: e.target.value })
+              }
+              placeholder="https://github.com/you/repo"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={create.isPending || update.isPending}
+              onClick={submit}
+            >
+              {dialog.id ? "Save project" : "Add project"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDialog(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </Section>
   );
 }
@@ -616,6 +789,52 @@ export function SettingsTab({
         channelSlug={channelSlug}
         workerRunning={workerRunning}
       />
+
+      <Section title="Bot moments">
+        <SwitchRow
+          label="Useful info"
+          description="When you wonder something aloud the bot confidently knows, it answers in chat."
+          checked={form.usefulInfoEnabled}
+          onCheckedChange={(v) => set({ usefulInfoEnabled: v })}
+        />
+        <SwitchRow
+          label="Competition status"
+          description="Periodic top-three leaderboard updates in chat."
+          checked={form.competitionStatusEnabled}
+          onCheckedChange={(v) => set({ competitionStatusEnabled: v })}
+        />
+        <SwitchRow
+          label="Progress update"
+          description="Periodic reminders of what you're building, with project links."
+          checked={form.progressUpdateEnabled}
+          onCheckedChange={(v) => set({ progressUpdateEnabled: v })}
+        />
+        <div className="my-1 h-px bg-border" />
+        <p className="text-xs text-muted-foreground">
+          Wrap-up messages — sent only when you press Wrap up in the Activity
+          tab.
+        </p>
+        <SwitchRow
+          label="MVP announcement"
+          description="Celebrate the top chatter of the stream."
+          checked={form.wrapupMvpEnabled}
+          onCheckedChange={(v) => set({ wrapupMvpEnabled: v })}
+        />
+        <SwitchRow
+          label="Achievement summary"
+          description="An AI recap of what got done, from the transcript."
+          checked={form.wrapupSummaryEnabled}
+          onCheckedChange={(v) => set({ wrapupSummaryEnabled: v })}
+        />
+        <SwitchRow
+          label="Thanks + project links"
+          description="A goodbye message pointing viewers at your projects."
+          checked={form.wrapupThanksEnabled}
+          onCheckedChange={(v) => set({ wrapupThanksEnabled: v })}
+        />
+      </Section>
+
+      <ProjectsSection />
 
       <Section title="Local worker">
         <div className="flex items-center gap-2">

@@ -21,6 +21,7 @@ import {
   hideMessageAction,
   manualHighlightAction,
   promoteHighlightAction,
+  requestWrapupAction,
   setModerationModeAction,
   unbanParticipantAction,
   unhideMessageAction,
@@ -276,5 +277,12 @@ export function useClipMarkers(streamId: string | null) {
     queryKey: ["clip-markers", streamId],
     queryFn: () => getClipMarkersAction(streamId),
     refetchInterval: 10_000,
+  });
+}
+
+export function useRequestWrapup(streamId: string | null) {
+  return useMutation({
+    mutationFn: async () => unwrap(await requestWrapupAction(streamId!)),
+    onError: errorToast("Couldn't start the wrap-up"),
   });
 }

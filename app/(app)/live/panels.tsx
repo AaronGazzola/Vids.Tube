@@ -18,6 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +62,7 @@ import {
   useOwnerChat,
   usePromoteHighlight,
   useReadThisQueue,
+  useRequestWrapup,
   useTtsFeed,
   useUnbanParticipant,
   useUnhideMessage,
@@ -636,6 +638,36 @@ function TtsRequestsPanel({ streamId }: { streamId: string }) {
   );
 }
 
+function WrapupButton({ streamId }: { streamId: string }) {
+  const wrapup = useRequestWrapup(streamId);
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" disabled={wrapup.isPending}>
+          Wrap up
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Send the wrap-up messages?</AlertDialogTitle>
+          <AlertDialogDescription>
+            The bot posts the end-of-stream messages you enabled in Settings
+            (MVP, achievement summary, thanks with project links) to both chats.
+            This happens once per stream.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => wrapup.mutate()}>
+            Wrap up
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function formatClipTime(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -978,6 +1010,9 @@ export function ActivityContent() {
 
       {streamId && (
         <div className="shrink-0 space-y-3">
+          <div className="flex justify-end">
+            <WrapupButton streamId={streamId} />
+          </div>
           <AskRequestsPanel streamId={streamId} />
           <TtsRequestsPanel streamId={streamId} />
           <ClipMarkersPanel streamId={streamId} />
