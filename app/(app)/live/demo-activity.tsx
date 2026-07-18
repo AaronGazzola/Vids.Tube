@@ -25,7 +25,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OriginBadge } from "@/components/origin-badge";
 import { computeGoalProgress, type Counts } from "@/lib/goals";
 import { useChatAutoScroll } from "@/lib/use-chat-autoscroll";
@@ -295,16 +294,47 @@ function ChatRow({ msg }: { msg: DemoMessage }) {
   return <ViewerChatRow msg={msg} />;
 }
 
+function RequestStatusChip({
+  status,
+  tone,
+}: {
+  status: string;
+  tone: "violet" | "sky";
+}) {
+  return (
+    <span
+      className={cn(
+        "ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] font-semibold uppercase align-middle",
+        tone === "violet"
+          ? "bg-violet-400/15 text-violet-600 dark:text-violet-300"
+          : "bg-sky-400/15 text-sky-600 dark:text-sky-300"
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
 function ViewerChatRow({ msg }: { msg: DemoMessage }) {
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const unhide = useDemoGeneratorStore((s) => s.unhideMessage);
   const hide = useDemoGeneratorStore((s) => s.hideMessage);
   const highlight = useDemoGeneratorStore((s) => s.highlightMessage);
   const dismiss = useDemoGeneratorStore((s) => s.dismissMessage);
+  const ttsRequests = useDemoGeneratorStore((s) => s.tts);
+  const askRequests = useDemoGeneratorStore((s) => s.asks);
+  const clips = useDemoGeneratorStore((s) => s.clips);
+  const approveTts = useDemoGeneratorStore((s) => s.approveTts);
+  const dismissTts = useDemoGeneratorStore((s) => s.dismissTts);
+  const approveAsk = useDemoGeneratorStore((s) => s.approveAsk);
+  const dismissAsk = useDemoGeneratorStore((s) => s.dismissAsk);
   const [revealed, setRevealed] = useState(false);
   const viewer = viewers.find((v) => v.key === msg.viewerKey);
   const label = labelOf(viewer);
 
+  const tts = ttsRequests.find((t) => t.messageId === msg.id);
+  const ask = askRequests.find((a) => a.messageId === msg.id);
+  const clip = clips.find((c) => c.messageId === msg.id);
   const suggested = msg.featured && !msg.promoted && !msg.dismissed;
 
   const author = (
@@ -349,6 +379,79 @@ function ViewerChatRow({ msg }: { msg: DemoMessage }) {
           </Button>
           <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => unhide(msg.id)}>
             Unhide
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  if (tts?.status === "suggested") {
+    return (
+      <li className="rounded-md border border-violet-400/50 bg-violet-400/10 p-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {author}
+            <span className="mt-1 block text-sm">{msg.text}</span>
+          </div>
+          <MessageMenu msg={msg} viewer={viewer} />
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => approveTts(tts.id)}
+          >
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            onClick={() => dismissTts(tts.id)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  if (ask?.status === "suggested") {
+    return (
+      <li className="rounded-md border border-sky-400/50 bg-sky-400/10 p-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {author}
+            <span className="mt-1 block text-sm">{msg.text}</span>
+            <span className="mt-0.5 block text-sm text-sky-700 dark:text-sky-300">
+              ↳ {ask.answer}
+            </span>
+          </div>
+          <MessageMenu msg={msg} viewer={viewer} />
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => approveAsk(ask.id, true)}
+          >
+            Answer
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            onClick={() => approveAsk(ask.id, false)}
+          >
+            Question only
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            onClick={() => dismissAsk(ask.id)}
+          >
+            Dismiss
           </Button>
         </div>
       </li>
@@ -404,12 +507,20 @@ function ViewerChatRow({ msg }: { msg: DemoMessage }) {
     <li
       className={cn(
         "flex items-start gap-2 rounded px-1 py-1 hover:bg-muted",
-        msg.featured && "bg-muted/50"
+        msg.featured && "bg-muted/50",
+        clip && "border-l-2 border-emerald-400 bg-emerald-400/5 pl-2"
       )}
     >
       <div className="min-w-0 flex-1">
         {author}
+        {clip && (
+          <code className="mr-1 rounded bg-emerald-400/15 px-1 py-0.5 font-mono text-[10px] font-semibold text-emerald-700 align-middle dark:text-emerald-300">
+            {clip.at}
+          </code>
+        )}
         <span className="text-sm">{msg.text}</span>
+        {tts && <RequestStatusChip status={tts.status} tone="violet" />}
+        {ask && <RequestStatusChip status={ask.status} tone="sky" />}
         {msg.featured && msg.score != null && (
           <span className="ml-1 align-middle">
             <ScoreBadge score={msg.score} reason={msg.reason} />
@@ -554,179 +665,7 @@ function ModBotActions() {
 
 // ── VidsBot actions ────────────────────────────────────────────────────────
 
-function TtsRequests() {
-  const tts = useDemoGeneratorStore((s) => s.tts);
-  const viewers = useDemoGeneratorStore((s) => s.viewers);
-  const approve = useDemoGeneratorStore((s) => s.approveTts);
-  const dismiss = useDemoGeneratorStore((s) => s.dismissTts);
-  const active = tts.filter((t) => t.status !== "dismissed");
-
-  return (
-    <div>
-      {active.length === 0 ? (
-        <p className="px-1 py-2 text-xs text-muted-foreground">
-          No TTS requests yet.
-        </p>
-      ) : (
-        <ul className="space-y-1">
-          {active.map((t) => {
-            const viewer = viewers.find((v) => v.key === t.viewerKey);
-            return (
-              <li
-                key={t.id}
-                className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
-              >
-                <div className="min-w-0 flex-1">
-                  <span className="font-semibold">{labelOf(viewer)}</span>
-                  <span className="block text-muted-foreground">“{t.text}”</span>
-                </div>
-                {t.status === "suggested" ? (
-                  <>
-                    <Button
-                      size="sm"
-                      className="h-5 px-1.5 text-[10px]"
-                      onClick={() => approve(t.id)}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-5 px-1.5 text-[10px]"
-                      onClick={() => dismiss(t.id)}
-                    >
-                      Dismiss
-                    </Button>
-                  </>
-                ) : (
-                  <Badge variant="secondary" className="text-[10px] capitalize">
-                    {t.status}
-                  </Badge>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function AskRequests() {
-  const asks = useDemoGeneratorStore((s) => s.asks);
-  const viewers = useDemoGeneratorStore((s) => s.viewers);
-  const approve = useDemoGeneratorStore((s) => s.approveAsk);
-  const dismiss = useDemoGeneratorStore((s) => s.dismissAsk);
-  const [withheld, setWithheld] = useState<Set<string>>(new Set());
-  const active = asks.filter((a) => a.status !== "dismissed");
-
-  return (
-    <div>
-      {active.length === 0 ? (
-        <p className="px-1 py-2 text-xs text-muted-foreground">
-          No questions yet.
-        </p>
-      ) : (
-        <ul className="space-y-1">
-          {active.map((a) => {
-            const viewer = viewers.find((v) => v.key === a.viewerKey);
-            return (
-              <li key={a.id} className="rounded border px-2 py-1.5 text-xs">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="font-semibold">{labelOf(viewer)}</span>
-                    <span className="block">“{a.question}”</span>
-                    <span className="mt-0.5 block text-muted-foreground">
-                      Bot answer: {a.answer}
-                    </span>
-                  </div>
-                  {a.status === "suggested" ? (
-                    <>
-                      <Button
-                        size="sm"
-                        className="h-5 px-1.5 text-[10px]"
-                        onClick={() => approve(a.id, !withheld.has(a.id))}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-5 px-1.5 text-[10px]"
-                        onClick={() => dismiss(a.id)}
-                      >
-                        Dismiss
-                      </Button>
-                    </>
-                  ) : (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] capitalize"
-                    >
-                      {a.status}
-                    </Badge>
-                  )}
-                </div>
-                {a.status === "suggested" && (
-                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Checkbox
-                      className="h-3.5 w-3.5"
-                      checked={!withheld.has(a.id)}
-                      onCheckedChange={(v) =>
-                        setWithheld((prev) => {
-                          const next = new Set(prev);
-                          if (v === true) next.delete(a.id);
-                          else next.add(a.id);
-                          return next;
-                        })
-                      }
-                    />
-                    Include AI answer
-                  </label>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function ClipMarkers() {
-  const clips = useDemoGeneratorStore((s) => s.clips);
-  const viewers = useDemoGeneratorStore((s) => s.viewers);
-
-  return (
-    <div>
-      {clips.length === 0 ? (
-        <p className="px-1 py-2 text-xs text-muted-foreground">
-          No clip markers yet.
-        </p>
-      ) : (
-        <ul className="space-y-1">
-          {clips.map((c) => {
-            const viewer = viewers.find((v) => v.key === c.viewerKey);
-            return (
-              <li
-                key={c.id}
-                className="flex items-baseline gap-2 rounded border px-2 py-1.5 text-xs"
-              >
-                <span className="font-mono font-semibold tabular-nums">
-                  {c.at}
-                </span>
-                <span className="min-w-0 flex-1 truncate">“{c.note}”</span>
-                <span className="text-muted-foreground">{labelOf(viewer)}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function WrapupButton() {
+export function DemoWrapupButton() {
   const wrapupDone = useDemoGeneratorStore((s) => s.wrapupDone);
   const runWrapup = useDemoGeneratorStore((s) => s.runWrapup);
   const [open, setOpen] = useState(false);
@@ -763,55 +702,6 @@ function WrapupButton() {
   );
 }
 
-function VidsBotActions() {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>VidsBot actions</span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="border-t p-2">
-          <Tabs defaultValue="tts">
-            <TabsList className="mb-2 h-8">
-              <TabsTrigger value="tts" className="px-2 text-xs">
-                TTS
-              </TabsTrigger>
-              <TabsTrigger value="ask" className="px-2 text-xs">
-                Ask
-              </TabsTrigger>
-              <TabsTrigger value="clips" className="px-2 text-xs">
-                Clips
-              </TabsTrigger>
-              <TabsTrigger value="wrapup" className="px-2 text-xs">
-                Wrap up
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="tts">
-              <TtsRequests />
-            </TabsContent>
-            <TabsContent value="ask">
-              <AskRequests />
-            </TabsContent>
-            <TabsContent value="clips">
-              <ClipMarkers />
-            </TabsContent>
-            <TabsContent value="wrapup">
-              <WrapupButton />
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Activity ───────────────────────────────────────────────────────────────
 
 export function DemoActivity({ goals }: { goals: Counts | null }) {
@@ -823,9 +713,6 @@ export function DemoActivity({ goals }: { goals: Counts | null }) {
       </div>
       <div className="shrink-0">
         <ModBotActions />
-      </div>
-      <div className="shrink-0">
-        <VidsBotActions />
       </div>
       <ChatPanel />
     </div>

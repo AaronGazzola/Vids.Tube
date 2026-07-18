@@ -87,23 +87,14 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   ).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  const vbPanel = page.locator("div.rounded-lg.border", {
-    hasText: "VidsBot actions",
+  const ttsRow = page
+    .locator("li", { hasText: "!tts big shoutout to the mods" })
+    .first();
+  await expect(ttsRow).toBeVisible({ timeout: 15_000 });
+  await ttsRow.getByRole("button", { name: "Approve" }).click();
+  await expect(ttsRow.getByText(/approved|played/)).toBeVisible({
+    timeout: 5_000,
   });
-  await expect(vbPanel.getByRole("tab", { name: "TTS" })).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(
-    vbPanel
-      .getByText("big shoutout to the mods, you keep this place cozy")
-      .first()
-  ).toBeVisible({ timeout: 15_000 });
-
-  await vbPanel
-    .locator("li", { hasText: "big shoutout" })
-    .first()
-    .getByRole("button", { name: "Approve" })
-    .click();
 
   await page.getByRole("tab", { name: "Preview" }).click();
   const stageTts = stage.getByText(
@@ -113,12 +104,11 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await expect(stageTts).toHaveCount(0, { timeout: 25_000 });
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  await vbPanel.getByRole("tab", { name: "Ask" }).click();
-  const ask1 = vbPanel
-    .locator("li", { hasText: "what editor theme is that?" })
+  const ask1 = page
+    .locator("li", { hasText: "!ask what editor theme is that?" })
     .first();
   await expect(ask1).toBeVisible({ timeout: 10_000 });
-  await ask1.getByRole("button", { name: "Approve" }).click();
+  await ask1.getByRole("button", { name: "Answer" }).click();
 
   await page.getByRole("tab", { name: "Preview" }).click();
   await expect(stage.getByText("what editor theme is that?")).toBeVisible({
@@ -132,12 +122,10 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   });
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  await vbPanel.getByRole("tab", { name: "Ask" }).click();
-  const ask2 = vbPanel
+  const ask2 = page
     .locator("li", { hasText: "how long have you been building" })
     .first();
-  await ask2.locator('button[role="checkbox"]').click();
-  await ask2.getByRole("button", { name: "Approve" }).click();
+  await ask2.getByRole("button", { name: "Question only" }).click();
 
   await page.getByRole("tab", { name: "Preview" }).click();
   await expect(
@@ -157,11 +145,13 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   ).toBeVisible();
 
   await page.getByRole("tab", { name: "Activity" }).click();
-  await vbPanel.getByRole("tab", { name: "Clips" }).click();
-  await expect(vbPanel.getByText("that overlay reveal").first()).toBeVisible();
+  const clipRow = page
+    .locator("li", { hasText: "!clip that overlay reveal" })
+    .first();
+  await expect(clipRow).toBeVisible({ timeout: 10_000 });
+  await expect(clipRow.locator("code")).toHaveText("17:59");
 
-  await vbPanel.getByRole("tab", { name: "Wrap up" }).click();
-  await vbPanel.getByRole("button", { name: "Wrap up", exact: true }).click();
+  await page.getByRole("button", { name: "Wrap up", exact: true }).click();
   await expect(page.getByText("Send the wrap-up messages?")).toBeVisible();
   await page
     .getByRole("alertdialog")

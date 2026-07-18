@@ -59,11 +59,23 @@ test("the owner approves a suggested ask with the include-answer checkbox", asyn
   test.setTimeout(120_000);
 
   const streamId = await seedLive(`E2E ask panel ${stamp}`);
+  const { data: chatMsg } = await admin
+    .from("chat_messages")
+    .insert({
+      stream_id: streamId,
+      origin: "youtube",
+      external_author_id: "UC_ASK_E2E",
+      author_name: "AskFan",
+      body: `!ask E2E what rig ${stamp}`,
+    })
+    .select("id")
+    .single();
   const { data: request } = await admin
     .from("ask_requests")
     .insert({
       channel_id: ownerChannelId,
       stream_id: streamId,
+      chat_message_id: chatMsg!.id,
       participant_key: "youtube:UC_ASK_E2E",
       origin: "youtube",
       author_name: "AskFan",
@@ -84,13 +96,13 @@ test("the owner approves a suggested ask with the include-answer checkbox", asyn
 
     await page.goto("/live");
     await page.getByRole("tab", { name: "Activity" }).click();
-    await page.getByRole("button", { name: /Ask requests/ }).click();
-    await expect(page.getByText(`E2E what rig ${stamp}`)).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByText(`E2E a mighty rig ${stamp}`)).toBeVisible();
-    await expect(page.getByText("Include AI response")).toBeVisible();
-    await page.getByRole("button", { name: "Approve" }).click();
+    const card = page
+      .locator("li", { hasText: `!ask E2E what rig ${stamp}` })
+      .first();
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(`E2E a mighty rig ${stamp}`)).toBeVisible();
+    await expect(card.getByText("Grounded in the FAQ")).toBeVisible();
+    await card.getByRole("button", { name: "Answer" }).click();
 
     await expect
       .poll(
@@ -105,8 +117,10 @@ test("the owner approves a suggested ask with the include-answer checkbox", asyn
         { timeout: 15_000 }
       )
       .toBe("approved:true");
+    await expect(card.getByText("approved")).toBeVisible({ timeout: 10_000 });
   } finally {
     await admin.from("ask_requests").delete().eq("stream_id", streamId);
+    await admin.from("chat_messages").delete().eq("stream_id", streamId);
     await admin.from("streams").delete().eq("id", streamId);
   }
 });

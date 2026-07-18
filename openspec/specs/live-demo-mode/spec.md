@@ -131,13 +131,14 @@ be owner-scoped.
 ### Requirement: Simulated activity
 
 While demo is on, the system SHALL render the Activity tab — header (goal progress and
-competition), mod bot actions, VidsBot actions, and live chat — from a client-side
-generator using the same presentational components as the live Activity tab. Simulated
-messages SHALL arrive over time with a subset scored, a few featured/highlighted, and
-the leaderboard and goal counts updating, using the production standings and goal math.
-The collapsed competition section SHALL show only the top-3 badges and expand chevron;
-its "Competition" title SHALL appear only in the expanded state. The demo SHALL
-simulate the overlays' outputs, not the AI's decision quality.
+competition), mod bot actions, and live chat with inline request handling — from a
+client-side generator using the same presentational components as the live Activity
+tab. Simulated messages SHALL arrive over time with a subset scored, a few
+featured/highlighted, and the leaderboard and goal counts updating, using the
+production standings and goal math. The collapsed competition section SHALL show only
+the top-3 badges and expand chevron; its "Competition" title SHALL appear only in the
+expanded state. The demo SHALL simulate the overlays' outputs, not the AI's decision
+quality.
 
 #### Scenario: Simulated chat populates activity
 
@@ -229,31 +230,33 @@ hold timer ends.
 The demo SHALL simulate the chat-interactivity request flows end to end: the
 generator seeds one suggested !tts request, two suggested !ask requests, and
 one clip marker immediately and continues producing them intermittently, each
-accompanied by the visible `!command` message and a VidsBot ack row in the
-demo chat. The demo Activity view SHALL group the owner controls in a single
-collapsible **"VidsBot actions"** component with one tab per flow — TTS
-requests (approve/dismiss), Ask requests (approve with a per-row "Include AI
-answer" checkbox, dismiss), Clip markers, and Wrap up (confirmation dialog →
-MVP naming the top demo scorer, an achievement summary, and a thanks message
-as VidsBot rows, exactly once). Approving a TTS or ask request SHALL still
-play it on the stage.
+linked to its visible `!command` message (plus a VidsBot ack row) in the demo
+chat. Requests SHALL be handled inline in the demo chat exactly as in the
+real Activity tab: suggested TTS messages render as violet cards with
+Approve/Dismiss; suggested asks as sky cards with Answer / Question only /
+Dismiss; clip messages with emerald accenting and their timestamp; handled
+requests relax to normal styling with a color-matched status chip. There
+SHALL be no separate demo request panels. The demo wrap-up button SHALL sit
+in the bottom toolbar (where End stream sits outside demo) with the same
+confirmation dialog, posting the MVP (top demo scorer), an achievement
+summary, and a thanks message as VidsBot rows exactly once. Approving a TTS
+or ask request SHALL still play it on the stage.
 
-#### Scenario: Tabbed VidsBot actions
+#### Scenario: Inline demo TTS approval
 
-- **WHEN** the owner opens the VidsBot actions component in the demo Activity
-  tab
-- **THEN** TTS requests, Ask requests, Clip markers, and Wrap up are separate
-  tabs inside the one collapsible panel
+- **WHEN** the owner approves a suggested TTS card in the demo chat
+- **THEN** the card relaxes to a violet status chip and the TTS plays on the
+  stage
 
-#### Scenario: Approving a TTS request
+#### Scenario: Inline demo ask choices
 
-- **WHEN** the owner approves a suggested TTS request in the TTS tab
-- **THEN** its status changes, it plays on the stage, and it is marked played
-  when the clip ends
+- **WHEN** the owner clicks Answer (or Question only) on a demo ask card
+- **THEN** the stage shows the exchange with (or without) the answer and the
+  card shows its status chip
 
-#### Scenario: Wrap-up fires once
+#### Scenario: Demo wrap-up from the toolbar
 
-- **WHEN** the owner confirms the demo Wrap up dialog
+- **WHEN** the owner confirms the demo Wrap up button in the toolbar
 - **THEN** three VidsBot messages (MVP naming the top scorer, summary,
   thanks) appear in the demo chat and the button becomes a disabled
   "Wrap-up sent" state

@@ -635,6 +635,7 @@ export async function getModerationFeedAction(
 
 export type TtsFeedItem = {
   id: string;
+  chatMessageId: string | null;
   authorName: string | null;
   origin: string;
   text: string;
@@ -653,7 +654,9 @@ export async function getTtsFeedAction(
   }
   const { data, error } = await supabaseAdmin
     .from("tts_requests")
-    .select("id, author_name, origin, text, status, reason, audio_path, created_at")
+    .select(
+      "id, chat_message_id, author_name, origin, text, status, reason, audio_path, created_at"
+    )
     .eq("stream_id", streamId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -663,6 +666,7 @@ export async function getTtsFeedAction(
   }
   return (data ?? []).map((r) => ({
     id: r.id,
+    chatMessageId: r.chat_message_id,
     authorName: r.author_name,
     origin: r.origin,
     text: r.text,
@@ -721,6 +725,7 @@ export async function dismissTtsAction(
 
 export type AskFeedItem = {
   id: string;
+  chatMessageId: string | null;
   authorName: string | null;
   origin: string;
   question: string;
@@ -741,7 +746,7 @@ export async function getAskFeedAction(
   const { data, error } = await supabaseAdmin
     .from("ask_requests")
     .select(
-      "id, author_name, origin, question, answer, reason, status, include_answer, created_at"
+      "id, chat_message_id, author_name, origin, question, answer, reason, status, include_answer, created_at"
     )
     .eq("stream_id", streamId)
     .order("created_at", { ascending: false })
@@ -752,6 +757,7 @@ export async function getAskFeedAction(
   }
   return (data ?? []).map((r) => ({
     id: r.id,
+    chatMessageId: r.chat_message_id,
     authorName: r.author_name,
     origin: r.origin,
     question: r.question,
@@ -816,6 +822,7 @@ export async function dismissAskAction(
 
 export type ClipMarker = {
   id: string;
+  chatMessageId: string | null;
   authorName: string | null;
   origin: string;
   streamTimeS: number;
@@ -856,7 +863,9 @@ export async function getClipMarkersAction(
 
   const { data, error } = await supabaseAdmin
     .from("clip_markers")
-    .select("id, author_name, origin, stream_time_s, snippet, created_at")
+    .select(
+      "id, chat_message_id, author_name, origin, stream_time_s, snippet, created_at"
+    )
     .eq("stream_id", targetStreamId)
     .order("stream_time_s", { ascending: true })
     .limit(100);
@@ -866,6 +875,7 @@ export async function getClipMarkersAction(
   }
   return (data ?? []).map((r) => ({
     id: r.id,
+    chatMessageId: r.chat_message_id,
     authorName: r.author_name,
     origin: r.origin,
     streamTimeS: r.stream_time_s,

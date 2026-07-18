@@ -28,11 +28,11 @@ import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { ExternalLink, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
-import { DemoActivity } from "./demo-activity";
+import { DemoActivity, DemoWrapupButton } from "./demo-activity";
 import { DemoPreviewStage } from "./demo-preview";
 import { useDemoController, useDemoLayout } from "./demo.hooks";
 import { useDemoLayoutStore } from "./demo.stores";
-import { ActivityContent } from "./panels";
+import { ActivityContent, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
 import {
   useCurrentBroadcast,
@@ -227,6 +227,10 @@ function StatusToolbar({
           </AlertDialog>
         )}
 
+        {!demo && state === "live" && streamId && (
+          <WrapupButton streamId={streamId} />
+        )}
+        {demo && <DemoWrapupButton />}
         {!demo && (state === "live" ? (
           disconnected ? (
             <AlertDialog>

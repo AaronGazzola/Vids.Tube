@@ -67,6 +67,11 @@ import {
   useUnbanParticipant,
   useUnhideMessage,
 } from "./page.hooks";
+import type {
+  AskFeedItem,
+  ClipMarker,
+  TtsFeedItem,
+} from "./page.actions";
 
 function initials(s: string): string {
   return s.replace(/^@/, "").slice(0, 2).toUpperCase() || "?";
@@ -214,32 +219,41 @@ function Competition({ streamId }: { streamId: string | null }) {
     <div className="rounded-lg border">
       <button
         onClick={() => setExpanded((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2"
       >
-        <span>Competition</span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
-        />
-      </button>
-      <div className="border-t px-3 py-2">
-        {isPending && streamId ? (
-          <Skeleton className="h-8 w-full" />
+        {expanded ? (
+          <span className="text-sm font-semibold">Competition</span>
+        ) : isPending && streamId ? (
+          <Skeleton className="h-6 w-40" />
         ) : rows.length === 0 ? (
-          <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
-        ) : expanded ? (
-          <ul>
-            {rows.map((v, i) => (
-              <CompetitionRow key={v.participant_key} v={v} rank={i + 1} />
-            ))}
-          </ul>
+          <span className="text-xs text-muted-foreground">No scores yet.</span>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <span className="flex flex-wrap gap-2">
             {top3.map((v, i) => (
               <CompetitorBadge key={v.participant_key} v={v} rank={i + 1} />
             ))}
-          </div>
+          </span>
         )}
-      </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform",
+            expanded && "rotate-180"
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t px-3 py-2">
+          {rows.length === 0 ? (
+            <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+          ) : (
+            <ul>
+              {rows.map((v, i) => (
+                <CompetitionRow key={v.participant_key} v={v} rank={i + 1} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -355,18 +369,49 @@ function MessageMenu({
   );
 }
 
+function StatusChip({
+  status,
+  tone,
+}: {
+  status: string;
+  tone: "violet" | "sky";
+}) {
+  return (
+    <span
+      className={cn(
+        "ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] font-semibold uppercase align-middle",
+        tone === "violet"
+          ? "bg-violet-400/15 text-violet-600 dark:text-violet-300"
+          : "bg-sky-400/15 text-sky-600 dark:text-sky-300"
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
 function ChatMessageRow({
   msg,
   featured,
+  tts,
+  ask,
+  clip,
   streamId,
 }: {
   msg: ChatMessage;
   featured: FeaturedMessageWithAuthor | undefined;
+  tts: TtsFeedItem | undefined;
+  ask: AskFeedItem | undefined;
+  clip: ClipMarker | undefined;
   streamId: string;
 }) {
   const unhide = useUnhideMessage(streamId);
   const promote = usePromoteHighlight(streamId);
   const dismiss = useDismissSuggestion(streamId);
+  const approveTts = useApproveTts(streamId);
+  const dismissTts = useDismissTts(streamId);
+  const approveAsk = useApproveAsk(streamId);
+  const dismissAsk = useDismissAsk(streamId);
   const [revealed, setRevealed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -418,6 +463,100 @@ function ChatMessageRow({
             onClick={() => unhide.mutate(msg.id)}
           >
             Unhide
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  // Suggested TTS request → violet card with inline Approve / Dismiss.
+  if (tts?.status === "suggested") {
+    return (
+      <li className="rounded-md border border-violet-400/50 bg-violet-400/10 p-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <ChatAuthor message={msg} size="chat" className="mr-1" />
+            <ChatText text={msg.body} className="mt-1 block text-sm" />
+            {tts.reason && (
+              <span className="block text-[10px] italic text-muted-foreground">
+                {tts.reason}
+              </span>
+            )}
+          </div>
+          <MessageMenu msg={msg} streamId={streamId} />
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            disabled={approveTts.isPending}
+            onClick={() => approveTts.mutate(tts.id)}
+          >
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            disabled={dismissTts.isPending}
+            onClick={() => dismissTts.mutate(tts.id)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  // Suggested ask → sky card with the AI answer preview and three choices.
+  if (ask?.status === "suggested") {
+    return (
+      <li className="rounded-md border border-sky-400/50 bg-sky-400/10 p-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <ChatAuthor message={msg} size="chat" className="mr-1" />
+            <ChatText text={msg.body} className="mt-1 block text-sm" />
+            {ask.answer && (
+              <span className="mt-0.5 block text-sm text-sky-700 dark:text-sky-300">
+                ↳ {ask.answer}
+              </span>
+            )}
+            {ask.reason && (
+              <span className="block text-[10px] italic text-muted-foreground">
+                {ask.reason}
+              </span>
+            )}
+          </div>
+          <MessageMenu msg={msg} streamId={streamId} />
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            disabled={approveAsk.isPending}
+            onClick={() => approveAsk.mutate({ id: ask.id, includeAnswer: true })}
+          >
+            Answer
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            disabled={approveAsk.isPending}
+            onClick={() =>
+              approveAsk.mutate({ id: ask.id, includeAnswer: false })
+            }
+          >
+            Question only
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            disabled={dismissAsk.isPending}
+            onClick={() => dismissAsk.mutate(ask.id)}
+          >
+            Dismiss
           </Button>
         </div>
       </li>
@@ -476,19 +615,29 @@ function ChatMessageRow({
     );
   }
 
-  // Normal (incl. already highlighted/dismissed → secondary styling). The
-  // three-dot menu stays visible so highlighted messages keep their actions;
-  // bot rows are the bot's own output and carry no moderation or scoring.
+  // Normal (incl. already highlighted/dismissed → secondary styling; handled
+  // tts/ask rows carry a color-matched status chip; clip requests carry an
+  // emerald accent with the marker timestamp). The three-dot menu stays
+  // visible so highlighted messages keep their actions; bot rows are the
+  // bot's own output and carry no moderation or scoring.
   return (
     <li
       className={cn(
         "flex items-start gap-2 rounded px-1 py-1 hover:bg-muted",
-        featured && "bg-muted/50"
+        featured && "bg-muted/50",
+        clip && "border-l-2 border-emerald-400 bg-emerald-400/5 pl-2"
       )}
     >
       <div className="min-w-0 flex-1">
         <ChatAuthor message={msg} size="chat" className="mr-1" />
+        {clip && (
+          <code className="mr-1 rounded bg-emerald-400/15 px-1 py-0.5 font-mono text-[10px] font-semibold text-emerald-700 align-middle dark:text-emerald-300">
+            {formatClipTime(clip.streamTimeS)}
+          </code>
+        )}
         <ChatText text={msg.body} className="text-sm" />
+        {tts && <StatusChip status={tts.status} tone="violet" />}
+        {ask && <StatusChip status={ask.status} tone="sky" />}
         {featured && msg.origin !== "bot" && (
           <span className="ml-1 align-middle">
             <ScoreBadge score={featured.score} reason={featured.reason} />
@@ -503,6 +652,9 @@ function ChatMessageRow({
 function ChatPanel({ streamId }: { streamId: string }) {
   const { data: chat, isPending } = useOwnerChat(streamId);
   const { data: featured } = useReadThisQueue(streamId);
+  const { data: ttsFeed } = useTtsFeed(streamId);
+  const { data: askFeed } = useAskFeed(streamId);
+  const { data: clipMarkers } = useClipMarkers(streamId);
   const { scrollRef, contentRef, onScroll } = useChatAutoScroll(
     chat?.length ?? 0
   );
@@ -510,6 +662,18 @@ function ChatPanel({ streamId }: { streamId: string }) {
   const featuredByMsg = new Map<string, FeaturedMessageWithAuthor>();
   for (const f of featured ?? []) {
     if (f.chat_message_id) featuredByMsg.set(f.chat_message_id, f);
+  }
+  const ttsByMsg = new Map<string, TtsFeedItem>();
+  for (const t of ttsFeed ?? []) {
+    if (t.chatMessageId) ttsByMsg.set(t.chatMessageId, t);
+  }
+  const askByMsg = new Map<string, AskFeedItem>();
+  for (const a of askFeed ?? []) {
+    if (a.chatMessageId) askByMsg.set(a.chatMessageId, a);
+  }
+  const clipByMsg = new Map<string, ClipMarker>();
+  for (const c of clipMarkers ?? []) {
+    if (c.chatMessageId) clipByMsg.set(c.chatMessageId, c);
   }
 
   return (
@@ -534,6 +698,9 @@ function ChatPanel({ streamId }: { streamId: string }) {
                   key={m.id}
                   msg={m}
                   featured={featuredByMsg.get(m.id)}
+                  tts={ttsByMsg.get(m.id)}
+                  ask={askByMsg.get(m.id)}
+                  clip={clipByMsg.get(m.id)}
                   streamId={streamId}
                 />
               ))}
@@ -547,98 +714,7 @@ function ChatPanel({ streamId }: { streamId: string }) {
 
 // ── Mod bot actions component ─────────────────────────────────────────────
 
-function TtsRequestsPanel({ streamId }: { streamId: string }) {
-  const { data: feed } = useTtsFeed(streamId);
-  const approve = useApproveTts(streamId);
-  const dismiss = useDismissTts(streamId);
-  const [open, setOpen] = useState(false);
-
-  const items = feed ?? [];
-  const suggested = items.filter((t) => t.status === "suggested");
-  const rest = items.filter((t) => t.status !== "suggested").slice(0, 10);
-
-  return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
-          TTS requests
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {suggested.length} pending
-          </span>
-        </span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="border-t p-2">
-          {items.length === 0 ? (
-            <p className="px-1 py-2 text-xs text-muted-foreground">
-              No TTS requests yet.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {suggested.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-start gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-2 py-1.5 text-xs"
-                >
-                  <div className="min-w-0 flex-1">
-                    <OriginBadge origin={t.origin} className="mr-1" />
-                    <span className="font-semibold">{t.authorName ?? "viewer"}</span>
-                    <span className="text-muted-foreground"> “{t.text}”</span>
-                    {t.reason && (
-                      <span className="block text-[10px] italic text-muted-foreground">
-                        {t.reason}
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="h-5 px-1.5 text-[10px]"
-                    disabled={approve.isPending}
-                    onClick={() => approve.mutate(t.id)}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-5 px-1.5 text-[10px] text-muted-foreground"
-                    disabled={dismiss.isPending}
-                    onClick={() => dismiss.mutate(t.id)}
-                  >
-                    Dismiss
-                  </Button>
-                </li>
-              ))}
-              {rest.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
-                >
-                  <div className="min-w-0 flex-1">
-                    <OriginBadge origin={t.origin} className="mr-1" />
-                    <span className="font-semibold">{t.authorName ?? "viewer"}</span>
-                    <span className="text-muted-foreground"> “{t.text}”</span>
-                  </div>
-                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
-                    {t.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WrapupButton({ streamId }: { streamId: string }) {
+export function WrapupButton({ streamId }: { streamId: string }) {
   const wrapup = useRequestWrapup(streamId);
 
   return (
@@ -727,131 +803,6 @@ function ClipMarkersPanel({ streamId }: { streamId: string | null }) {
                       </span>
                     )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AskRequestsPanel({ streamId }: { streamId: string }) {
-  const { data: feed } = useAskFeed(streamId);
-  const approve = useApproveAsk(streamId);
-  const dismiss = useDismissAsk(streamId);
-  const [open, setOpen] = useState(false);
-  const [withheld, setWithheld] = useState<Set<string>>(new Set());
-
-  const items = feed ?? [];
-  const suggested = items.filter((a) => a.status === "suggested");
-  const rest = items.filter((a) => a.status !== "suggested").slice(0, 10);
-
-  const toggleWithhold = (id: string, include: boolean) => {
-    setWithheld((prev) => {
-      const next = new Set(prev);
-      if (include) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
-          Ask requests
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {suggested.length} pending
-          </span>
-        </span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="border-t p-2">
-          {items.length === 0 ? (
-            <p className="px-1 py-2 text-xs text-muted-foreground">
-              No questions yet.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {suggested.map((a) => (
-                <li
-                  key={a.id}
-                  className="rounded border border-amber-400/50 bg-amber-400/10 px-2 py-1.5 text-xs"
-                >
-                  <div className="min-w-0">
-                    <OriginBadge origin={a.origin} className="mr-1" />
-                    <span className="font-semibold">{a.authorName ?? "viewer"}</span>
-                    <span className="text-muted-foreground"> “{a.question}”</span>
-                    {a.answer && (
-                      <span className="mt-0.5 block text-indigo-500">
-                        ↳ {a.answer}
-                      </span>
-                    )}
-                    {a.reason && (
-                      <span className="block text-[10px] italic text-muted-foreground">
-                        {a.reason}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <label className="flex items-center gap-1 text-[10px]">
-                      <input
-                        type="checkbox"
-                        className="h-3 w-3 accent-primary"
-                        checked={!withheld.has(a.id)}
-                        onChange={(e) => toggleWithhold(a.id, e.target.checked)}
-                      />
-                      Include AI response
-                    </label>
-                    <Button
-                      size="sm"
-                      className="h-5 px-1.5 text-[10px]"
-                      disabled={approve.isPending}
-                      onClick={() =>
-                        approve.mutate({
-                          id: a.id,
-                          includeAnswer: !withheld.has(a.id),
-                        })
-                      }
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-1.5 text-[10px] text-muted-foreground"
-                      disabled={dismiss.isPending}
-                      onClick={() => dismiss.mutate(a.id)}
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </li>
-              ))}
-              {rest.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
-                >
-                  <div className="min-w-0 flex-1">
-                    <OriginBadge origin={a.origin} className="mr-1" />
-                    <span className="font-semibold">{a.authorName ?? "viewer"}</span>
-                    <span className="text-muted-foreground"> “{a.question}”</span>
-                  </div>
-                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
-                    {a.status}
-                  </span>
                 </li>
               ))}
             </ul>
@@ -1010,12 +961,6 @@ export function ActivityContent() {
 
       {streamId && (
         <div className="shrink-0 space-y-3">
-          <div className="flex justify-end">
-            <WrapupButton streamId={streamId} />
-          </div>
-          <AskRequestsPanel streamId={streamId} />
-          <TtsRequestsPanel streamId={streamId} />
-          <ClipMarkersPanel streamId={streamId} />
           <ModBotActions streamId={streamId} />
         </div>
       )}

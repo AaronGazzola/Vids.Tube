@@ -59,11 +59,23 @@ test("the owner approves a suggested TTS request from the Activity panel", async
     .select("id")
     .single();
 
+  const { data: chatMsg } = await admin
+    .from("chat_messages")
+    .insert({
+      stream_id: live!.id,
+      origin: "youtube",
+      external_author_id: "UC_TTS_E2E",
+      author_name: "TtsFan",
+      body: `!tts E2E speak this ${stamp}`,
+    })
+    .select("id")
+    .single();
   const { data: request } = await admin
     .from("tts_requests")
     .insert({
       channel_id: ownerChannelId,
       stream_id: live!.id,
+      chat_message_id: chatMsg!.id,
       participant_key: "youtube:UC_TTS_E2E",
       origin: "youtube",
       author_name: "TtsFan",
@@ -83,12 +95,12 @@ test("the owner approves a suggested TTS request from the Activity panel", async
 
     await page.goto("/live");
     await page.getByRole("tab", { name: "Activity" }).click();
-    await page.getByRole("button", { name: /TTS requests/ }).click();
-    await expect(page.getByText(`E2E speak this ${stamp}`)).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByText("Friendly test message")).toBeVisible();
-    await page.getByRole("button", { name: "Approve" }).click();
+    const card = page
+      .locator("li", { hasText: `!tts E2E speak this ${stamp}` })
+      .first();
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText("Friendly test message")).toBeVisible();
+    await card.getByRole("button", { name: "Approve" }).click();
 
     await expect
       .poll(
@@ -103,8 +115,10 @@ test("the owner approves a suggested TTS request from the Activity panel", async
         { timeout: 15_000 }
       )
       .toBe("approved");
+    await expect(card.getByText("approved")).toBeVisible({ timeout: 10_000 });
   } finally {
     await admin.from("tts_requests").delete().eq("stream_id", live!.id);
+    await admin.from("chat_messages").delete().eq("stream_id", live!.id);
     await admin.from("streams").delete().eq("id", live!.id);
   }
 });

@@ -94,6 +94,7 @@ export type DemoMessage = {
 
 export type DemoTtsRequest = {
   id: string;
+  messageId: string | null;
   viewerKey: string;
   text: string;
   status: "suggested" | "approved" | "dismissed" | "played";
@@ -101,6 +102,7 @@ export type DemoTtsRequest = {
 
 export type DemoAskRequest = {
   id: string;
+  messageId: string | null;
   viewerKey: string;
   question: string;
   answer: string;
@@ -110,6 +112,7 @@ export type DemoAskRequest = {
 
 export type DemoClipMarker = {
   id: string;
+  messageId: string | null;
   viewerKey: string;
   note: string;
   at: string;
@@ -325,6 +328,7 @@ function seededInteractivity() {
   const tts: DemoTtsRequest[] = [
     {
       id: "tts-seed-1",
+      messageId: "dm-seed-tts",
       viewerKey: ttsViewer.key,
       text: TTS_LINES[0],
       status: "suggested" as const,
@@ -333,6 +337,7 @@ function seededInteractivity() {
   const asks: DemoAskRequest[] = [
     {
       id: "ask-seed-1",
+      messageId: "dm-seed-ask-1",
       viewerKey: askViewer1.key,
       question: ASK_QAS[0].q,
       answer: ASK_QAS[0].a,
@@ -341,6 +346,7 @@ function seededInteractivity() {
     },
     {
       id: "ask-seed-2",
+      messageId: "dm-seed-ask-2",
       viewerKey: askViewer2.key,
       question: ASK_QAS[1].q,
       answer: ASK_QAS[1].a,
@@ -351,6 +357,7 @@ function seededInteractivity() {
   const clips: DemoClipMarker[] = [
     {
       id: "clip-seed-1",
+      messageId: "dm-seed-clip",
       viewerKey: clipViewer.key,
       note: CLIP_NOTES[0],
       at: clipTime(7),
@@ -422,7 +429,13 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
           const text = pick(TTS_LINES);
           extras.tts = [
             ...s.tts,
-            { id: `tts-${seq}`, viewerKey: viewer.key, text, status: "suggested" as const },
+            {
+              id: `tts-${seq}`,
+              messageId: id,
+              viewerKey: viewer.key,
+              text,
+              status: "suggested" as const,
+            },
           ].slice(-20);
           rows = [
             viewerMessage(id, viewer.key, `!tts ${text}`),
@@ -437,6 +450,7 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
             ...s.asks,
             {
               id: `ask-${seq}`,
+              messageId: id,
               viewerKey: viewer.key,
               question: qa.q,
               answer: qa.a,
@@ -456,7 +470,7 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
           const at = clipTime(seq);
           extras.clips = [
             ...s.clips,
-            { id: `clip-${seq}`, viewerKey: viewer.key, note, at },
+            { id: `clip-${seq}`, messageId: id, viewerKey: viewer.key, note, at },
           ].slice(-20);
           rows = [
             viewerMessage(id, viewer.key, `!clip ${note}`),
@@ -685,6 +699,7 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
           ...s.tts,
           {
             id: `tts-play-${seq}`,
+            messageId: null,
             viewerKey: viewer.key,
             text: pick(TTS_LINES),
             status: "approved" as const,
@@ -703,6 +718,7 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
           ...s.asks,
           {
             id: `ask-play-${seq}`,
+            messageId: null,
             viewerKey: viewer.key,
             question: qa.q,
             answer: qa.a,
