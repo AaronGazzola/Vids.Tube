@@ -122,6 +122,62 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_commands: {
+        Row: {
+          builtin_key: string | null
+          channel_id: string
+          cooldown_s: number
+          created_at: string
+          description: string
+          enabled: boolean
+          id: string
+          keyword: string
+          kind: string
+          max_per_stream: number | null
+          response: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          builtin_key?: string | null
+          channel_id: string
+          cooldown_s?: number
+          created_at?: string
+          description: string
+          enabled?: boolean
+          id?: string
+          keyword: string
+          kind: string
+          max_per_stream?: number | null
+          response?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          builtin_key?: string | null
+          channel_id?: string
+          cooldown_s?: number
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          keyword?: string
+          kind?: string
+          max_per_stream?: number | null
+          response?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_commands_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           author_avatar_url: string | null
@@ -211,6 +267,70 @@ export type Database = {
             foreignKeyName: "chat_scoring_state_stream_id_fkey"
             columns: ["stream_id"]
             isOneToOne: true
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      command_events: {
+        Row: {
+          args: string | null
+          channel_id: string
+          chat_message_id: string | null
+          created_at: string
+          id: string
+          keyword: string
+          origin: string
+          participant_key: string
+          reply: string | null
+          status: string
+          stream_id: string
+        }
+        Insert: {
+          args?: string | null
+          channel_id: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          keyword: string
+          origin: string
+          participant_key: string
+          reply?: string | null
+          status: string
+          stream_id: string
+        }
+        Update: {
+          args?: string | null
+          channel_id?: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          keyword?: string
+          origin?: string
+          participant_key?: string
+          reply?: string | null
+          status?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "command_events_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "command_events_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "command_events_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
             referencedRelation: "streams"
             referencedColumns: ["id"]
           },

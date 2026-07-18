@@ -15,6 +15,7 @@ import {
   renewLock,
   upsertWorkerHeartbeat,
 } from "../lib/streams";
+import { processCommands } from "../lib/commands";
 import { pollYoutubeChat, resolveLiveChatId } from "../lib/youtube-chat";
 import { workerConfig } from "../config";
 import { supabaseAdmin } from "../supabase";
@@ -359,6 +360,16 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
   const youtubeVideoId = streamRow?.youtube_video_id ?? null;
   const channelId = streamRow?.channel_id ?? null;
 
+  let channelSlug = "";
+  if (channelId) {
+    const { data: channelRow } = await supabaseAdmin
+      .from("channels")
+      .select("slug")
+      .eq("id", channelId)
+      .maybeSingle();
+    channelSlug = channelRow?.slug ?? "";
+  }
+
   const ytBuffer: BufferedMessage[] = [];
   let stopped = false;
 
@@ -425,9 +436,15 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       const bannedKeys = channelId
         ? await fetchBannedKeys(channelId)
         : new Set<string>();
-      const batch = [...vid, ...yt].filter(
+      const unmoderated = [...vid, ...yt].filter(
         (m) => !bannedKeys.has(participantKey(m))
       );
+      const batch = channelId
+        ? await processCommands(
+            { id: stream.id, channelId, channelSlug },
+            unmoderated
+          )
+        : unmoderated;
 
       if (batch.length) {
         const transcript = await fetchTranscriptWindow(stream.id);
