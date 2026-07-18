@@ -75,11 +75,11 @@ export function AuthorColumn({
         showBadge={rank < 99}
       />
       {handle && (
-        <span className="mt-1 max-w-full truncate text-sm font-bold text-white drop-shadow">
+        <span className="mt-1 max-w-full truncate text-base font-bold text-white drop-shadow">
           {handle}
         </span>
       )}
-      <span className="max-w-full truncate text-xs text-white/80 drop-shadow">
+      <span className="max-w-full truncate text-sm text-white/80 drop-shadow">
         {name}
       </span>
     </div>

@@ -40,7 +40,7 @@ export function AskExchangeView({
             >
               <Bot className="h-7 w-7" />
             </span>
-            <span className="mt-1 text-xs font-bold text-white drop-shadow">
+            <span className="mt-1 text-base font-bold text-white drop-shadow">
               VidsBot
             </span>
           </div>
