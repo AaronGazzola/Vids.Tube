@@ -1,6 +1,7 @@
 "use client";
 
-import { useRequireOwner, useWaitingCount } from "@/app/layout.hooks";
+import { useMyChannel, useRequireOwner, useWaitingCount } from "@/app/layout.hooks";
+import { channelAssetUrl } from "@/lib/storage";
 import { DisconnectedOverlay } from "@/components/live-stage";
 import { LivePlayer } from "@/components/live-player";
 import {
@@ -323,10 +324,14 @@ export default function LivePage() {
   const [confirm, setConfirm] = useState<ScheduleSaveCheck | null>(null);
   const [tab, setTab] = useState("settings");
   const [demo, setDemo] = useState(false);
+  const [previewPortrait, setPreviewPortrait] = useState<boolean | null>(null);
   const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
+  const mobileChrome = useDemoLayoutStore((s) => s.config.mobileChrome);
+  const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
+  const { data: myChannel } = useMyChannel();
 
-  useDemoLayout(demo);
+  useDemoLayout(true);
   useDemoController(demo);
 
   const demoGoals = settings?.goals ?? null;
@@ -490,13 +495,38 @@ export default function LivePage() {
               <DemoPreviewStage goals={demoGoals} />
             ) : previewSrc ? (
               <div className="relative">
-                <LivePlayer src={previewSrc} />
+                <LivePlayer
+                  src={previewSrc}
+                  mobileChrome={
+                    mobileChrome
+                      ? {
+                          handle: myChannel?.handle ?? null,
+                          avatarUrl: channelAssetUrl(
+                            myChannel?.avatar_path ?? null
+                          ),
+                        }
+                      : null
+                  }
+                  onPortraitChange={setPreviewPortrait}
+                />
                 {disconnected && <DisconnectedOverlay />}
                 {state === "preview" && (
                   <Badge variant="secondary" className="absolute left-2 top-2">
                     Preview — only you can see this
                   </Badge>
                 )}
+                <div className="absolute right-2 top-2 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                  <span>
+                    {previewPortrait === false
+                      ? "Mobile layout (vertical streams only)"
+                      : "Mobile layout"}
+                  </span>
+                  <Switch
+                    checked={mobileChrome}
+                    onCheckedChange={setMobileChrome}
+                    disabled={previewPortrait === false}
+                  />
+                </div>
               </div>
             ) : (
               <div className="flex aspect-video w-full items-center justify-center rounded-lg border text-sm text-muted-foreground">

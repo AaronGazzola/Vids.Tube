@@ -1,10 +1,19 @@
 "use client";
 
 import type { FeaturedAuthor, GoalMetric, MetricProgress } from "@/app/layout.types";
+import { useMyChannel } from "@/app/layout.hooks";
+import {
+  CHROME_ABOVE,
+  CHROME_BELOW,
+  MOBILE_CHROME_REF_WIDTH,
+  MobileChromeOverlay,
+  MobileChromeTopBar,
+} from "@/components/mobile-chrome";
 import { AvatarBubble } from "@/components/overlay/avatar-bubble";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { Switch } from "@/components/ui/switch";
+import { channelAssetUrl } from "@/lib/storage";
 import { computeGoalProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { cn } from "@/lib/utils";
@@ -219,10 +228,26 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
   const toggleVisible = useDemoLayoutStore((s) => s.toggleVisible);
   const setGoalProgressFull = useDemoLayoutStore((s) => s.setGoalProgressFull);
   const setBackground = useDemoLayoutStore((s) => s.setBackground);
+  const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
   const resetLayout = useDemoLayoutStore((s) => s.resetLayout);
   const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
   const counts = useDemoGeneratorStore((s) => s.counts);
+  const { data: myChannel } = useMyChannel();
+
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) setStageSize({ w: rect.width, h: rect.height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -254,55 +279,114 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
   const frame = frames[safeIndex] ?? null;
   const bg = config.background;
 
-  return (
-    <div className="relative h-full w-full overflow-hidden rounded-lg bg-black">
-      {/* background */}
-      {bg === "gradient" ? (
-        <div className="absolute inset-0" style={{ background: GRADIENT }} />
-      ) : bg === "slideshow" && frame ? (
-        <img
-          src={frame}
-          alt=""
-          className="absolute inset-0 h-full w-full object-contain"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-black" />
-      )}
+  // Mobile-chrome geometry: anchor to the centered 9:16 video area and shrink
+  // the whole stream stage just enough to fit the top bar above and the chat
+  // input below, so every overlay keeps its position relative to the video.
+  const chromeOn =
+    config.mobileChrome && stageSize.w > 0 && stageSize.h > 0;
+  const videoW = chromeOn
+    ? Math.min(stageSize.w, (stageSize.h * 9) / 16)
+    : 0;
+  const chromeScale = videoW / MOBILE_CHROME_REF_WIDTH;
+  const k = chromeOn
+    ? stageSize.h /
+      (stageSize.h + (CHROME_ABOVE + CHROME_BELOW) * chromeScale)
+    : 1;
+  const dy = chromeOn
+    ? CHROME_ABOVE * chromeScale * k - (stageSize.h * (1 - k)) / 2
+    : 0;
+  const effScale = chromeScale * k;
+  const videoWScaled = videoW * k;
+  const gapTop = CHROME_ABOVE * chromeScale * k;
 
-      {bg === "slideshow" && frames.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
-          No published VODs yet — the overlays still render over a plain
-          background.
+  return (
+    <div
+      ref={stageRef}
+      className="relative h-full w-full overflow-hidden rounded-lg bg-black"
+    >
+      <div
+        className="absolute inset-0"
+        style={
+          chromeOn
+            ? { transform: `translate(0px, ${dy}px) scale(${k})` }
+            : undefined
+        }
+      >
+        {/* background */}
+        {bg === "gradient" ? (
+          <div className="absolute inset-0" style={{ background: GRADIENT }} />
+        ) : bg === "slideshow" && frame ? (
+          <img
+            src={frame}
+            alt=""
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-black" />
+        )}
+
+        {bg === "slideshow" && frames.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
+            No published VODs yet — the overlays still render over a plain
+            background.
+          </div>
+        )}
+
+        {/* full-stage overlays */}
+        {config.visible.highlight && <HighlightField />}
+
+        {/* positioned box overlays */}
+        {config.visible.goalSubs && (
+          <DraggableBox boxKey="goalSubs">
+            <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
+          </DraggableBox>
+        )}
+        {config.visible.goalLikes && (
+          <DraggableBox boxKey="goalLikes">
+            <GoalBox boxKey="goalLikes" data={metricFor("likes")} />
+          </DraggableBox>
+        )}
+        {config.visible.goalViewers && (
+          <DraggableBox boxKey="goalViewers">
+            <GoalBox boxKey="goalViewers" data={metricFor("viewers")} />
+          </DraggableBox>
+        )}
+        {config.visible.competition && (
+          <DraggableBox boxKey="competition">
+            <CompetitionField />
+          </DraggableBox>
+        )}
+      </div>
+
+      {/* mobile chrome anchored to the (scaled) video rect */}
+      {chromeOn && (
+        <div
+          className="pointer-events-none absolute"
+          style={{
+            left: (stageSize.w - videoWScaled) / 2,
+            top: gapTop,
+            width: videoWScaled,
+            height: stageSize.h * k,
+          }}
+        >
+          <div className="absolute bottom-full left-0 right-0">
+            <MobileChromeTopBar
+              scale={effScale}
+              handle={myChannel?.handle ?? null}
+              avatarUrl={channelAssetUrl(myChannel?.avatar_path ?? null)}
+            />
+          </div>
+          <MobileChromeOverlay scale={effScale} />
         </div>
       )}
 
-      {/* full-stage overlays */}
-      {config.visible.highlight && <HighlightField />}
-
-      {/* positioned box overlays */}
-      {config.visible.goalSubs && (
-        <DraggableBox boxKey="goalSubs">
-          <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
-        </DraggableBox>
-      )}
-      {config.visible.goalLikes && (
-        <DraggableBox boxKey="goalLikes">
-          <GoalBox boxKey="goalLikes" data={metricFor("likes")} />
-        </DraggableBox>
-      )}
-      {config.visible.goalViewers && (
-        <DraggableBox boxKey="goalViewers">
-          <GoalBox boxKey="goalViewers" data={metricFor("viewers")} />
-        </DraggableBox>
-      )}
-      {config.visible.competition && (
-        <DraggableBox boxKey="competition">
-          <CompetitionField />
-        </DraggableBox>
-      )}
-
       {/* slideshow controls */}
-      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-white backdrop-blur-sm">
+      <div
+        className={cn(
+          "absolute bottom-3 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-white backdrop-blur-sm",
+          chromeOn ? "left-3" : "left-1/2 -translate-x-1/2"
+        )}
+      >
         <button
           onClick={() => step(-1)}
           className="rounded p-1 hover:bg-white/15"
@@ -359,6 +443,13 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           <Switch
             checked={config.goalProgressFull}
             onCheckedChange={(v) => setGoalProgressFull(v === true)}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span>Mobile layout</span>
+          <Switch
+            checked={config.mobileChrome}
+            onCheckedChange={(v) => setMobileChrome(v === true)}
           />
         </label>
         <div className="flex items-center gap-1">

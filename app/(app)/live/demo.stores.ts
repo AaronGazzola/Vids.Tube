@@ -25,6 +25,7 @@ type LayoutState = {
   toggleVisible: (key: DemoOverlayKey) => void;
   setGoalProgressFull: (v: boolean) => void;
   setBackground: (bg: DemoBackground) => void;
+  setMobileChrome: (v: boolean) => void;
   resetLayout: () => void;
 };
 
@@ -49,6 +50,8 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
     set((s) => ({ config: { ...s.config, goalProgressFull: v } })),
   setBackground: (bg) =>
     set((s) => ({ config: { ...s.config, background: bg } })),
+  setMobileChrome: (v) =>
+    set((s) => ({ config: { ...s.config, mobileChrome: v } })),
   resetLayout: () =>
     set((s) => ({
       config: { ...s.config, boxes: DEFAULT_DEMO_LAYOUT.boxes },

@@ -11,6 +11,7 @@ export type DemoLayoutConfig = {
   visible: Record<DemoOverlayKey, boolean>;
   goalProgressFull: boolean;
   background: DemoBackground;
+  mobileChrome: boolean;
 };
 
 export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
@@ -45,6 +46,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   },
   goalProgressFull: false,
   background: "slideshow",
+  mobileChrome: false,
 };
 
 // The counts the demo drives its goal bars toward. Real saved targets are layered
@@ -61,5 +63,6 @@ export function mergeDemoLayout(
     goalProgressFull:
       partial.goalProgressFull ?? DEFAULT_DEMO_LAYOUT.goalProgressFull,
     background: partial.background ?? DEFAULT_DEMO_LAYOUT.background,
+    mobileChrome: partial.mobileChrome ?? DEFAULT_DEMO_LAYOUT.mobileChrome,
   };
 }
