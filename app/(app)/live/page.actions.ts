@@ -632,3 +632,89 @@ export async function getModerationFeedAction(
 
   return { mode, actions };
 }
+
+export type TtsFeedItem = {
+  id: string;
+  authorName: string | null;
+  origin: string;
+  text: string;
+  status: string;
+  reason: string | null;
+  audioPath: string | null;
+  createdAt: string;
+};
+
+export async function getTtsFeedAction(
+  streamId: string
+): Promise<TtsFeedItem[]> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { data, error } = await supabaseAdmin
+    .from("tts_requests")
+    .select("id, author_name, origin, text, status, reason, audio_path, created_at")
+    .eq("stream_id", streamId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load TTS requests");
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorName: r.author_name,
+    origin: r.origin,
+    text: r.text,
+    status: r.status,
+    reason: r.reason,
+    audioPath: r.audio_path,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function approveTtsAction(
+  id: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data, error } = await supabaseAdmin
+    .from("tts_requests")
+    .update({ status: "approved", approved_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "suggested")
+    .select("id");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to approve");
+  }
+  if (!data?.length) {
+    return { error: "That request is no longer pending." };
+  }
+  return { data: { ok: true } };
+}
+
+export async function dismissTtsAction(
+  id: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data, error } = await supabaseAdmin
+    .from("tts_requests")
+    .update({ status: "dismissed" })
+    .eq("id", id)
+    .eq("status", "suggested")
+    .select("id");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to dismiss");
+  }
+  if (!data?.length) {
+    return { error: "That request is no longer pending." };
+  }
+  return { data: { ok: true } };
+}

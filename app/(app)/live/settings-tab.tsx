@@ -45,6 +45,7 @@ export type SettingsForm = {
   goals: { subs: string; likes: string; viewers: string };
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
+  ttsMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
@@ -571,6 +572,12 @@ export function SettingsTab({
           description="On: the bot bans automatically. Off: it only suggests bans."
           checked={form.banMode === "auto"}
           onCheckedChange={(v) => set({ banMode: v ? "auto" : "suggest" })}
+        />
+        <SwitchRow
+          label="Auto-TTS (vs suggest)"
+          description="On: moderation-passed !tts requests play without a click. Off: you approve each one."
+          checked={form.ttsMode === "auto"}
+          onCheckedChange={(v) => set({ ttsMode: v ? "auto" : "suggest" })}
         />
         <SwitchRow
           label="Featured highlighting"

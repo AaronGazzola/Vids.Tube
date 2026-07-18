@@ -47,14 +47,17 @@ import {
 } from "./overlay.hooks";
 import {
   useApproveSuggestion,
+  useApproveTts,
   useBanParticipant,
   useDismissSuggestion,
+  useDismissTts,
   useHideMessage,
   useManualHighlight,
   useModerationFeed,
   useOwnerChat,
   usePromoteHighlight,
   useReadThisQueue,
+  useTtsFeed,
   useUnbanParticipant,
   useUnhideMessage,
 } from "./page.hooks";
@@ -538,6 +541,97 @@ function ChatPanel({ streamId }: { streamId: string }) {
 
 // ── Mod bot actions component ─────────────────────────────────────────────
 
+function TtsRequestsPanel({ streamId }: { streamId: string }) {
+  const { data: feed } = useTtsFeed(streamId);
+  const approve = useApproveTts(streamId);
+  const dismiss = useDismissTts(streamId);
+  const [open, setOpen] = useState(false);
+
+  const items = feed ?? [];
+  const suggested = items.filter((t) => t.status === "suggested");
+  const rest = items.filter((t) => t.status !== "suggested").slice(0, 10);
+
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+      >
+        <span>
+          TTS requests
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {suggested.length} pending
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="border-t p-2">
+          {items.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-muted-foreground">
+              No TTS requests yet.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {suggested.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-start gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-2 py-1.5 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <OriginBadge origin={t.origin} className="mr-1" />
+                    <span className="font-semibold">{t.authorName ?? "viewer"}</span>
+                    <span className="text-muted-foreground"> “{t.text}”</span>
+                    {t.reason && (
+                      <span className="block text-[10px] italic text-muted-foreground">
+                        {t.reason}
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-5 px-1.5 text-[10px]"
+                    disabled={approve.isPending}
+                    onClick={() => approve.mutate(t.id)}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 px-1.5 text-[10px] text-muted-foreground"
+                    disabled={dismiss.isPending}
+                    onClick={() => dismiss.mutate(t.id)}
+                  >
+                    Dismiss
+                  </Button>
+                </li>
+              ))}
+              {rest.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <OriginBadge origin={t.origin} className="mr-1" />
+                    <span className="font-semibold">{t.authorName ?? "viewer"}</span>
+                    <span className="text-muted-foreground"> “{t.text}”</span>
+                  </div>
+                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                    {t.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModBotActions({ streamId }: { streamId: string }) {
   const { data: feed } = useModerationFeed(streamId);
   const approve = useApproveSuggestion(streamId);
@@ -683,6 +777,7 @@ export function ActivityContent() {
 
       {streamId && (
         <div className="shrink-0">
+          <TtsRequestsPanel streamId={streamId} />
           <ModBotActions streamId={streamId} />
         </div>
       )}

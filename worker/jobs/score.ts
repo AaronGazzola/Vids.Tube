@@ -16,6 +16,7 @@ import {
   upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { processCommands } from "../lib/commands";
+import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
 import { pollYoutubeChat, resolveLiveChatId } from "../lib/youtube-chat";
 import { workerConfig } from "../config";
@@ -441,6 +442,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         (m) => !bannedKeys.has(participantKey(m))
       );
       await processLinkVerifications(unmoderated);
+      await synthesizePendingTts(stream.id);
       let batch = unmoderated;
       if (channelId) {
         const { data: prefs } = await supabaseAdmin

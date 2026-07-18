@@ -9,7 +9,13 @@ export default defineConfig({
   // The platform has a single owner channel and a one-active-stream unique
   // index, so spec files must never run concurrently against the shared DB.
   workers: 1,
-  use: { baseURL },
+  use: {
+    baseURL,
+    // OBS browser sources autoplay audio; tests match that behavior.
+    launchOptions: {
+      args: ["--autoplay-policy=no-user-gesture-required"],
+    },
+  },
   webServer: {
     command: `npm run dev -- -p ${PORT}`,
     url: baseURL,

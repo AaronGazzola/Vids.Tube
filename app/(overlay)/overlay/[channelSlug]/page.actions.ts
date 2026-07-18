@@ -79,3 +79,47 @@ export async function getStreamStandingsAction(
 
   return data;
 }
+
+export type PlayableTts = {
+  id: string;
+  authorName: string | null;
+  text: string;
+  audioPath: string;
+};
+
+export async function getPlayableTtsAction(
+  streamId: string
+): Promise<PlayableTts[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tts_requests")
+    .select("id, author_name, text, audio_path, status")
+    .eq("stream_id", streamId)
+    .eq("status", "approved")
+    .not("audio_path", "is", null)
+    .order("approved_at", { ascending: true })
+    .limit(10);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch TTS queue");
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorName: r.author_name,
+    text: r.text,
+    audioPath: r.audio_path!,
+  }));
+}
+
+export async function markTtsPlayedAction(id: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/supabase/admin-client");
+  const { error } = await supabaseAdmin
+    .from("tts_requests")
+    .update({ status: "played", played_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "approved");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to mark TTS as played");
+  }
+}

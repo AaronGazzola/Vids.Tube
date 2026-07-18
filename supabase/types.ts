@@ -240,6 +240,7 @@ export type Database = {
           locked_until: string | null
           moderation_mode: string
           stream_id: string
+          tts_mode: string
           updated_at: string
         }
         Insert: {
@@ -250,6 +251,7 @@ export type Database = {
           locked_until?: string | null
           moderation_mode?: string
           stream_id: string
+          tts_mode?: string
           updated_at?: string
         }
         Update: {
@@ -260,6 +262,7 @@ export type Database = {
           locked_until?: string | null
           moderation_mode?: string
           stream_id?: string
+          tts_mode?: string
           updated_at?: string
         }
         Relationships: [
@@ -860,6 +863,79 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "transcript_segments_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tts_requests: {
+        Row: {
+          approved_at: string | null
+          audio_path: string | null
+          author_name: string | null
+          channel_id: string
+          chat_message_id: string | null
+          created_at: string
+          id: string
+          origin: string
+          participant_key: string
+          played_at: string | null
+          reason: string | null
+          status: string
+          stream_id: string
+          text: string
+        }
+        Insert: {
+          approved_at?: string | null
+          audio_path?: string | null
+          author_name?: string | null
+          channel_id: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          origin: string
+          participant_key: string
+          played_at?: string | null
+          reason?: string | null
+          status: string
+          stream_id: string
+          text: string
+        }
+        Update: {
+          approved_at?: string | null
+          audio_path?: string | null
+          author_name?: string | null
+          channel_id?: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          origin?: string
+          participant_key?: string
+          played_at?: string | null
+          reason?: string | null
+          status?: string
+          stream_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tts_requests_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tts_requests_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tts_requests_stream_id_fkey"
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"

@@ -455,6 +455,7 @@ export type StreamSettings = {
   goals: { subs: number; likes: number; viewers: number };
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
+  ttsMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
@@ -470,6 +471,7 @@ export type StreamSettingsInput = {
   goals: { subs: number; likes: number; viewers: number };
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
+  ttsMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
@@ -517,6 +519,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       goals: { ...DEFAULT_GOAL_TARGETS },
       scoringEnabled: false,
       banMode: "suggest",
+      ttsMode: "suggest",
       highlightingEnabled: true,
       autoDisplayFeatured: false,
       waitingRoomChat: false,
@@ -533,7 +536,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
   const { data: scoring } = await supabaseAdmin
     .from("chat_scoring_state")
     .select(
-      "enabled, moderation_mode, highlighting_enabled, auto_display_featured"
+      "enabled, moderation_mode, tts_mode, highlighting_enabled, auto_display_featured"
     )
     .eq("stream_id", stream.id)
     .maybeSingle();
@@ -553,6 +556,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     },
     scoringEnabled: scoring?.enabled ?? false,
     banMode: scoring?.moderation_mode === "auto" ? "auto" : "suggest",
+    ttsMode: scoring?.tts_mode === "auto" ? "auto" : "suggest",
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
@@ -708,6 +712,7 @@ export async function saveStreamSettingsAction(
         stream_id: streamId,
         enabled: input.scoringEnabled,
         moderation_mode: input.banMode === "auto" ? "auto" : "manual",
+        tts_mode: input.ttsMode === "auto" ? "auto" : "suggest",
         highlighting_enabled: input.highlightingEnabled,
         auto_display_featured: input.autoDisplayFeatured,
         updated_at: new Date().toISOString(),

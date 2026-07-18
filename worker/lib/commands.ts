@@ -99,6 +99,10 @@ export const BUILTIN_HANDLERS: Record<
     const { uptimeHandler } = await import("./info-commands");
     await uptimeHandler(ctx);
   },
+  tts: async (ctx) => {
+    const { ttsHandler } = await import("./tts");
+    await ttsHandler(ctx);
+  },
 };
 
 function commandParticipantKey(m: BufferedMessage): string {

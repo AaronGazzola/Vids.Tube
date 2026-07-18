@@ -6,10 +6,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   approveSuggestionAction,
+  approveTtsAction,
   banParticipantAction,
   dismissSuggestionAction,
+  dismissTtsAction,
   getModerationFeedAction,
   getOwnerChatMessagesAction,
+  getTtsFeedAction,
   getViewerReasoningAction,
   hideMessageAction,
   manualHighlightAction,
@@ -192,5 +195,39 @@ export function useDismissSuggestion(streamId: string | null) {
       unwrap(await dismissSuggestionAction(actionId)),
     onSuccess: () => invalidate(streamId),
     onError: errorToast("Couldn't dismiss suggestion"),
+  });
+}
+
+export function useTtsFeed(streamId: string | null) {
+  return useQuery({
+    queryKey: ["tts-feed", streamId],
+    queryFn: () => getTtsFeedAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 5000,
+  });
+}
+
+function useTtsInvalidator() {
+  const queryClient = useQueryClient();
+  return (streamId: string | null) => {
+    queryClient.invalidateQueries({ queryKey: ["tts-feed", streamId] });
+  };
+}
+
+export function useApproveTts(streamId: string | null) {
+  const invalidate = useTtsInvalidator();
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await approveTtsAction(id)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't approve the TTS request"),
+  });
+}
+
+export function useDismissTts(streamId: string | null) {
+  const invalidate = useTtsInvalidator();
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await dismissTtsAction(id)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't dismiss the TTS request"),
   });
 }

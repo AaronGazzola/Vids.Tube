@@ -47,7 +47,7 @@ const contentSecurityPolicy = [
     ...imageCdns,
     ...youtubeAvatarHosts
   ),
-  directive("media-src", "'self'", "blob:", streamHost, vodBase),
+  directive("media-src", "'self'", "blob:", streamHost, vodBase, supabaseOrigin),
   directive(
     "connect-src",
     "'self'",
