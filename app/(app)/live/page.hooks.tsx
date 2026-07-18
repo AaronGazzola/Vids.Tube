@@ -5,11 +5,14 @@ import { CustomToast } from "@/components/CustomToast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  approveAskAction,
   approveSuggestionAction,
   approveTtsAction,
   banParticipantAction,
+  dismissAskAction,
   dismissSuggestionAction,
   dismissTtsAction,
+  getAskFeedAction,
   getModerationFeedAction,
   getOwnerChatMessagesAction,
   getTtsFeedAction,
@@ -229,5 +232,40 @@ export function useDismissTts(streamId: string | null) {
     mutationFn: async (id: string) => unwrap(await dismissTtsAction(id)),
     onSuccess: () => invalidate(streamId),
     onError: errorToast("Couldn't dismiss the TTS request"),
+  });
+}
+
+export function useAskFeed(streamId: string | null) {
+  return useQuery({
+    queryKey: ["ask-feed", streamId],
+    queryFn: () => getAskFeedAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 5000,
+  });
+}
+
+function useAskInvalidator() {
+  const queryClient = useQueryClient();
+  return (streamId: string | null) => {
+    queryClient.invalidateQueries({ queryKey: ["ask-feed", streamId] });
+  };
+}
+
+export function useApproveAsk(streamId: string | null) {
+  const invalidate = useAskInvalidator();
+  return useMutation({
+    mutationFn: async (vars: { id: string; includeAnswer: boolean }) =>
+      unwrap(await approveAskAction(vars.id, vars.includeAnswer)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't approve the question"),
+  });
+}
+
+export function useDismissAsk(streamId: string | null) {
+  const invalidate = useAskInvalidator();
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await dismissAskAction(id)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't dismiss the question"),
   });
 }

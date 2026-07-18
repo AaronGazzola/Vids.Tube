@@ -123,3 +123,48 @@ export async function markTtsPlayedAction(id: string): Promise<void> {
     throw new Error("Failed to mark TTS as played");
   }
 }
+
+export type PlayableAsk = {
+  id: string;
+  authorName: string | null;
+  question: string;
+  answer: string | null;
+  includeAnswer: boolean;
+};
+
+export async function getPlayableAskAction(
+  streamId: string
+): Promise<PlayableAsk[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ask_requests")
+    .select("id, author_name, question, answer, include_answer, status")
+    .eq("stream_id", streamId)
+    .eq("status", "approved")
+    .order("approved_at", { ascending: true })
+    .limit(10);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch ask queue");
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorName: r.author_name,
+    question: r.question,
+    answer: r.answer,
+    includeAnswer: r.include_answer,
+  }));
+}
+
+export async function markAskShownAction(id: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/supabase/admin-client");
+  const { error } = await supabaseAdmin
+    .from("ask_requests")
+    .update({ status: "shown", shown_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "approved");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to mark ask as shown");
+  }
+}

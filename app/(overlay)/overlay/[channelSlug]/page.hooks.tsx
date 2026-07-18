@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
   getFeaturedMessagesAction,
+  getPlayableAskAction,
   getPlayableTtsAction,
   getPromotedMessagesAction,
   getStreamStandingsAction,
@@ -112,6 +113,15 @@ export function usePlayableTts(streamId: string | null) {
   return useQuery({
     queryKey: ["tts-playable", streamId],
     queryFn: () => getPlayableTtsAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 2000,
+  });
+}
+
+export function usePlayableAsk(streamId: string | null) {
+  return useQuery({
+    queryKey: ["ask-playable", streamId],
+    queryFn: () => getPlayableAskAction(streamId!),
     enabled: !!streamId,
     refetchInterval: 2000,
   });

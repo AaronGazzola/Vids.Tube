@@ -39,6 +39,85 @@ export type Database = {
   }
   public: {
     Tables: {
+      ask_requests: {
+        Row: {
+          answer: string | null
+          answer_delivered_at: string | null
+          approved_at: string | null
+          author_name: string | null
+          channel_id: string
+          chat_message_id: string | null
+          created_at: string
+          id: string
+          include_answer: boolean
+          origin: string
+          participant_key: string
+          question: string
+          reason: string | null
+          shown_at: string | null
+          status: string
+          stream_id: string
+        }
+        Insert: {
+          answer?: string | null
+          answer_delivered_at?: string | null
+          approved_at?: string | null
+          author_name?: string | null
+          channel_id: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          include_answer?: boolean
+          origin: string
+          participant_key: string
+          question: string
+          reason?: string | null
+          shown_at?: string | null
+          status: string
+          stream_id: string
+        }
+        Update: {
+          answer?: string | null
+          answer_delivered_at?: string | null
+          approved_at?: string | null
+          author_name?: string | null
+          channel_id?: string
+          chat_message_id?: string | null
+          created_at?: string
+          id?: string
+          include_answer?: boolean
+          origin?: string
+          participant_key?: string
+          question?: string
+          reason?: string | null
+          shown_at?: string | null
+          status?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ask_requests_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ask_requests_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ask_requests_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banned_participants: {
         Row: {
           author_name: string | null
@@ -233,6 +312,7 @@ export type Database = {
       }
       chat_scoring_state: {
         Row: {
+          ask_mode: string
           auto_display_featured: boolean
           enabled: boolean
           highlighting_enabled: boolean
@@ -244,6 +324,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ask_mode?: string
           auto_display_featured?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean
@@ -255,6 +336,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ask_mode?: string
           auto_display_featured?: boolean
           enabled?: boolean
           highlighting_enabled?: boolean

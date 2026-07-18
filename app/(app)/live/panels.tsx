@@ -46,9 +46,12 @@ import {
   useViewerLeaderboard,
 } from "./overlay.hooks";
 import {
+  useApproveAsk,
   useApproveSuggestion,
   useApproveTts,
+  useAskFeed,
   useBanParticipant,
+  useDismissAsk,
   useDismissSuggestion,
   useDismissTts,
   useHideMessage,
@@ -632,6 +635,131 @@ function TtsRequestsPanel({ streamId }: { streamId: string }) {
   );
 }
 
+function AskRequestsPanel({ streamId }: { streamId: string }) {
+  const { data: feed } = useAskFeed(streamId);
+  const approve = useApproveAsk(streamId);
+  const dismiss = useDismissAsk(streamId);
+  const [open, setOpen] = useState(false);
+  const [withheld, setWithheld] = useState<Set<string>>(new Set());
+
+  const items = feed ?? [];
+  const suggested = items.filter((a) => a.status === "suggested");
+  const rest = items.filter((a) => a.status !== "suggested").slice(0, 10);
+
+  const toggleWithhold = (id: string, include: boolean) => {
+    setWithheld((prev) => {
+      const next = new Set(prev);
+      if (include) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+      >
+        <span>
+          Ask requests
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {suggested.length} pending
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="border-t p-2">
+          {items.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-muted-foreground">
+              No questions yet.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {suggested.map((a) => (
+                <li
+                  key={a.id}
+                  className="rounded border border-amber-400/50 bg-amber-400/10 px-2 py-1.5 text-xs"
+                >
+                  <div className="min-w-0">
+                    <OriginBadge origin={a.origin} className="mr-1" />
+                    <span className="font-semibold">{a.authorName ?? "viewer"}</span>
+                    <span className="text-muted-foreground"> “{a.question}”</span>
+                    {a.answer && (
+                      <span className="mt-0.5 block text-indigo-500">
+                        ↳ {a.answer}
+                      </span>
+                    )}
+                    {a.reason && (
+                      <span className="block text-[10px] italic text-muted-foreground">
+                        {a.reason}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <label className="flex items-center gap-1 text-[10px]">
+                      <input
+                        type="checkbox"
+                        className="h-3 w-3 accent-primary"
+                        checked={!withheld.has(a.id)}
+                        onChange={(e) => toggleWithhold(a.id, e.target.checked)}
+                      />
+                      Include AI response
+                    </label>
+                    <Button
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px]"
+                      disabled={approve.isPending}
+                      onClick={() =>
+                        approve.mutate({
+                          id: a.id,
+                          includeAnswer: !withheld.has(a.id),
+                        })
+                      }
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 text-[10px] text-muted-foreground"
+                      disabled={dismiss.isPending}
+                      onClick={() => dismiss.mutate(a.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </li>
+              ))}
+              {rest.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <OriginBadge origin={a.origin} className="mr-1" />
+                    <span className="font-semibold">{a.authorName ?? "viewer"}</span>
+                    <span className="text-muted-foreground"> “{a.question}”</span>
+                  </div>
+                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                    {a.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModBotActions({ streamId }: { streamId: string }) {
   const { data: feed } = useModerationFeed(streamId);
   const approve = useApproveSuggestion(streamId);
@@ -777,6 +905,7 @@ export function ActivityContent() {
 
       {streamId && (
         <div className="shrink-0">
+          <AskRequestsPanel streamId={streamId} />
           <TtsRequestsPanel streamId={streamId} />
           <ModBotActions streamId={streamId} />
         </div>

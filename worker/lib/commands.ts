@@ -103,6 +103,14 @@ export const BUILTIN_HANDLERS: Record<
     const { ttsHandler } = await import("./tts");
     await ttsHandler(ctx);
   },
+  ask: async (ctx) => {
+    const { askHandler } = await import("./ask-command");
+    await askHandler(ctx);
+  },
+  catchup: async (ctx) => {
+    const { catchupHandler } = await import("./catchup-command");
+    await catchupHandler(ctx);
+  },
 };
 
 function commandParticipantKey(m: BufferedMessage): string {

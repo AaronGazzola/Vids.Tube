@@ -718,3 +718,98 @@ export async function dismissTtsAction(
   }
   return { data: { ok: true } };
 }
+
+export type AskFeedItem = {
+  id: string;
+  authorName: string | null;
+  origin: string;
+  question: string;
+  answer: string | null;
+  reason: string | null;
+  status: string;
+  includeAnswer: boolean;
+  createdAt: string;
+};
+
+export async function getAskFeedAction(
+  streamId: string
+): Promise<AskFeedItem[]> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { data, error } = await supabaseAdmin
+    .from("ask_requests")
+    .select(
+      "id, author_name, origin, question, answer, reason, status, include_answer, created_at"
+    )
+    .eq("stream_id", streamId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load ask requests");
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorName: r.author_name,
+    origin: r.origin,
+    question: r.question,
+    answer: r.answer,
+    reason: r.reason,
+    status: r.status,
+    includeAnswer: r.include_answer,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function approveAskAction(
+  id: string,
+  includeAnswer: boolean
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data, error } = await supabaseAdmin
+    .from("ask_requests")
+    .update({
+      status: "approved",
+      include_answer: includeAnswer,
+      approved_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "suggested")
+    .select("id");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to approve");
+  }
+  if (!data?.length) {
+    return { error: "That question is no longer pending." };
+  }
+  return { data: { ok: true } };
+}
+
+export async function dismissAskAction(
+  id: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data, error } = await supabaseAdmin
+    .from("ask_requests")
+    .update({ status: "dismissed" })
+    .eq("id", id)
+    .eq("status", "suggested")
+    .select("id");
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to dismiss");
+  }
+  if (!data?.length) {
+    return { error: "That question is no longer pending." };
+  }
+  return { data: { ok: true } };
+}

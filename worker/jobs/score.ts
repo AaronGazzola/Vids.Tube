@@ -15,6 +15,7 @@ import {
   renewLock,
   upsertWorkerHeartbeat,
 } from "../lib/streams";
+import { deliverApprovedAskAnswers } from "../lib/ask-command";
 import { processCommands } from "../lib/commands";
 import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
@@ -443,6 +444,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       );
       await processLinkVerifications(unmoderated);
       await synthesizePendingTts(stream.id);
+      await deliverApprovedAskAnswers(stream.id);
       let batch = unmoderated;
       if (channelId) {
         const { data: prefs } = await supabaseAdmin

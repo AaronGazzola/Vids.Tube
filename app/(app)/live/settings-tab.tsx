@@ -46,6 +46,7 @@ export type SettingsForm = {
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
   ttsMode: "suggest" | "auto";
+  askMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
@@ -578,6 +579,12 @@ export function SettingsTab({
           description="On: moderation-passed !tts requests play without a click. Off: you approve each one."
           checked={form.ttsMode === "auto"}
           onCheckedChange={(v) => set({ ttsMode: v ? "auto" : "suggest" })}
+        />
+        <SwitchRow
+          label="Auto-answer !ask (vs suggest)"
+          description="On: grounded answers post without a click. Off: you approve each Q&A."
+          checked={form.askMode === "auto"}
+          onCheckedChange={(v) => set({ askMode: v ? "auto" : "suggest" })}
         />
         <SwitchRow
           label="Featured highlighting"
