@@ -1,3 +1,9 @@
+import {
+  forceNightbotRefresh,
+  getNightbotToken,
+  nightbotConfigured,
+} from "./nightbot-token";
+
 const NIGHTBOT_SEND_URL = "https://api.nightbot.tv/1/channel/send";
 const MAX_YOUTUBE_CHARS = 400;
 
@@ -22,13 +28,14 @@ function sendSpacingMs(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 5200;
 }
 
-type NightbotSender = (text: string) => Promise<Response>;
+type NightbotSender = (text: string, token: string) => Promise<Response>;
+type NightbotTokenFn = () => Promise<string | null>;
 
-const defaultSender: NightbotSender = (text) =>
+const defaultSender: NightbotSender = (text, token) =>
   fetch(NIGHTBOT_SEND_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.NIGHTBOT_CHANNEL_SEND_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({ message: text }).toString(),
@@ -42,7 +49,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function drainQueue(sender: NightbotSender, wait: typeof sleep) {
+async function drainQueue(
+  sender: NightbotSender,
+  wait: typeof sleep,
+  tokenFn: NightbotTokenFn,
+  refreshFn: NightbotTokenFn
+) {
   if (draining) {
     return;
   }
@@ -51,10 +63,22 @@ async function drainQueue(sender: NightbotSender, wait: typeof sleep) {
     while (queue.length) {
       const text = queue.shift()!;
       try {
-        const res = await sender(text);
+        let token = await tokenFn();
+        if (!token) {
+          console.error("nightbot token unavailable — dropping YouTube reply");
+          continue;
+        }
+        let res = await sender(text, token);
+        if (res.status === 401) {
+          const fresh = await refreshFn();
+          if (fresh && fresh !== token) {
+            token = fresh;
+            res = await sender(text, token);
+          }
+        }
         if (res.status === 429) {
           await wait(sendSpacingMs());
-          const retry = await sender(text);
+          const retry = await sender(text, token);
           if (!retry.ok) {
             console.error(
               `nightbot send retry failed (${retry.status}): ${await retry.text()}`
@@ -80,19 +104,21 @@ async function drainQueue(sender: NightbotSender, wait: typeof sleep) {
 export function enqueueNightbotSend(
   text: string,
   sender: NightbotSender = defaultSender,
-  wait: typeof sleep = sleep
+  wait: typeof sleep = sleep,
+  tokenFn: NightbotTokenFn = getNightbotToken,
+  refreshFn: NightbotTokenFn = forceNightbotRefresh
 ): void {
-  if (!process.env.NIGHTBOT_CHANNEL_SEND_TOKEN) {
+  if (!nightbotConfigured()) {
     if (!warnedMissingToken) {
       warnedMissingToken = true;
       console.error(
-        "NIGHTBOT_CHANNEL_SEND_TOKEN is not set — skipping YouTube replies"
+        "Nightbot is not configured (no token or refresh credentials) — skipping YouTube replies"
       );
     }
     return;
   }
   queue.push(truncateForYoutube(text));
-  void drainQueue(sender, wait);
+  void drainQueue(sender, wait, tokenFn, refreshFn);
 }
 
 export async function deliverReply(delivery: ReplyDelivery): Promise<void> {

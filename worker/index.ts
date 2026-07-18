@@ -1,4 +1,9 @@
 import { workerConfig } from "./config";
+import {
+  getNightbotToken,
+  nightbotConfigured,
+  nightbotTokenDaysRemaining,
+} from "./lib/nightbot-token";
 import { runScoringJob } from "./jobs/score";
 import { runTranscriptionJob } from "./jobs/transcribe";
 import {
@@ -44,8 +49,25 @@ async function tick(): Promise<void> {
   }
 }
 
+async function primeNightbotToken(): Promise<void> {
+  if (!nightbotConfigured()) {
+    console.error("nightbot not configured — YouTube replies will be skipped");
+    return;
+  }
+  const token = await getNightbotToken();
+  const days = nightbotTokenDaysRemaining();
+  if (token) {
+    console.error(
+      `nightbot token ready${days === null ? "" : ` (${days.toFixed(1)} days remaining)`}`
+    );
+  } else {
+    console.error("nightbot token unavailable after refresh attempt");
+  }
+}
+
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
+  await primeNightbotToken();
   for (;;) {
     try {
       await tick();
