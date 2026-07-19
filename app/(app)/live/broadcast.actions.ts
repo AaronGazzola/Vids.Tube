@@ -172,6 +172,52 @@ export async function getCurrentBroadcastAction(): Promise<Stream | null> {
   return data;
 }
 
+export async function setBreakAction(
+  minutes: number | null
+): Promise<ActionResult<{ breakEndsAt: string | null }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  if (minutes !== null && (!Number.isFinite(minutes) || minutes < 1 || minutes > 720)) {
+    return { error: "Break length must be between 1 and 720 minutes." };
+  }
+
+  const { data: active, error } = await supabaseAdmin
+    .from("streams")
+    .select("id")
+    .eq("channel_id", channel.id)
+    .in("status", ["draft", "scheduled", "preview", "live"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load broadcast");
+  }
+  if (!active) {
+    return { error: "No active broadcast." };
+  }
+
+  const breakEndsAt =
+    minutes === null
+      ? null
+      : new Date(Date.now() + minutes * 60_000).toISOString();
+
+  const { error: updateError } = await supabaseAdmin
+    .from("streams")
+    .update({ break_ends_at: breakEndsAt })
+    .eq("id", active.id);
+  if (updateError) {
+    console.error(updateError);
+    throw new Error("Failed to update break");
+  }
+
+  return { data: { breakEndsAt } };
+}
+
 // Capture the subs-goal baseline (current subscriber count) once, if not already
 // captured at schedule time. Best-effort: a YouTube read failure must not block
 // going live — the baseline defaults to 0 and can be re-derived. Likes/viewers

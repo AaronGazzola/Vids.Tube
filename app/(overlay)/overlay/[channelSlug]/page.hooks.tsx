@@ -6,17 +6,86 @@ import type {
   FeaturedMessage,
   FeaturedMessageWithAuthor,
 } from "@/app/layout.types";
+import {
+  DEMO_OVERLAY_EVENT,
+  DEMO_OVERLAY_STALE_MS,
+  demoOverlayChannelName,
+  type DemoOverlayEventPayload,
+  type DemoOverlaySnapshot,
+} from "@/lib/demo-overlay";
 import { vidstubeAuthor, youtubeAuthor } from "@/lib/featured-author";
+import { playOverlayChime } from "@/lib/overlay-chime";
 import { supabase } from "@/supabase/browser-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getFeaturedMessagesAction,
+  getOverlayLayoutAction,
   getPlayableAskAction,
   getPlayableTtsAction,
   getPromotedMessagesAction,
   getStreamStandingsAction,
 } from "./page.actions";
+
+// The saved demo-preview layout doubles as the OBS layout: each overlay page
+// positions and scales itself from its box on the 1080x1920 canvas.
+export function useOverlayLayout(channelSlug: string) {
+  return useQuery({
+    queryKey: ["overlay-layout", channelSlug],
+    queryFn: () => getOverlayLayoutAction(channelSlug),
+    refetchInterval: 15_000,
+  });
+}
+
+// While the owner has demo mode on in /live, snapshots of the demo state are
+// broadcast on a realtime channel. Any overlay that receives a fresh snapshot
+// renders it instead of real data; silence (demo off / tab closed) falls back.
+export function useDemoOverlaySnapshot(channelSlug: string) {
+  const [snapshot, setSnapshot] = useState<DemoOverlaySnapshot | null>(null);
+  const lastAtRef = useRef(0);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(demoOverlayChannelName(channelSlug))
+      .on("broadcast", { event: DEMO_OVERLAY_EVENT }, ({ payload }) => {
+        const data = payload as DemoOverlayEventPayload | undefined;
+        if (data?.active) {
+          lastAtRef.current = Date.now();
+          setSnapshot(data);
+        } else {
+          lastAtRef.current = 0;
+          setSnapshot(null);
+        }
+      })
+      .subscribe();
+    const timer = setInterval(() => {
+      if (
+        lastAtRef.current &&
+        Date.now() - lastAtRef.current > DEMO_OVERLAY_STALE_MS
+      ) {
+        lastAtRef.current = 0;
+        setSnapshot(null);
+      }
+    }, 2000);
+    return () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [channelSlug]);
+
+  return snapshot;
+}
+
+// Rings a short bell whenever a new item takes the shared overlay slot, so
+// OBS audio signals that a highlight/TTS/ask is starting.
+export function useOverlayChime(slotKey: string | null) {
+  const lastKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!slotKey || slotKey === lastKeyRef.current) return;
+    lastKeyRef.current = slotKey;
+    playOverlayChime();
+  }, [slotKey]);
+}
 
 export function useFeaturedMessages(streamId: string | null) {
   const queryClient = useQueryClient();

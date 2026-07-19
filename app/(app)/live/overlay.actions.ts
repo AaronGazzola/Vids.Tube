@@ -336,7 +336,6 @@ export async function getViewerLeaderboardAction(
     .from("viewer_scores")
     .select("*")
     .eq("stream_id", streamId)
-    .order("features_count", { ascending: false })
     .order("total_score", { ascending: false })
     .limit(10);
 

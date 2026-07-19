@@ -90,6 +90,72 @@ Return ONLY a JSON object, no prose, of this exact shape:
 Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "m3"). Include every message in "scores". Keep "featured" small and "moderation" usually empty.`;
 }
 
+export type HighlightPick = FeaturedPick & AuthorScoreDelta;
+
+const HIGHLIGHT_RUBRIC = `You score live-stream chat messages that the stream OWNER hand-picked to
+highlight on the overlay. You are given the recent stream transcript (what the streamer
+is saying) and the picked messages, from two sources: "vidstube" (the native Vids.Tube
+audience) and "youtube" (simulcast YouTube chat). Vids.Tube participation matters MORE
+than YouTube — rate vidstube messages more generously.
+
+For each message, rate three dimensions 0-100:
+- engagement: relevance and responsiveness to what's happening on stream
+- humour: how funny/entertaining it is
+- contribution: insight, helpfulness, or moving the conversation forward
+
+Also give each message an overall highlight score 0-100, a short reason it stands out,
+and 1-3 category tags from: engagement, humour, contribution, insight, hype, question.
+The owner already chose to feature these messages, so score every one of them — never
+skip or reject a message.`;
+
+export function buildHighlightScoringPrompt(input: ScoringInput): string {
+  const messageLines = input.messages
+    .map((m, i) => `[m${i}] (${m.origin}) ${m.author}: ${m.text}`)
+    .join("\n");
+
+  return `${HIGHLIGHT_RUBRIC}
+
+## Recent transcript
+${input.transcript || "(no transcript yet)"}
+
+## Owner-picked messages
+${messageLines || "(none)"}
+
+## Output
+Return ONLY a JSON object, no prose, of this exact shape:
+{
+  "highlights": [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ]
+}
+Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "m3"). Include every message.`;
+}
+
+export function parseHighlightResult(raw: string): HighlightPick[] {
+  let parsed: unknown;
+  try {
+    parsed = extractJson(raw);
+  } catch {
+    return [];
+  }
+  const obj = parsed as { highlights?: unknown[] };
+  if (!Array.isArray(obj.highlights)) {
+    return [];
+  }
+  return obj.highlights
+    .map((h) => h as Record<string, unknown>)
+    .filter((h) => typeof h.ref === "string")
+    .map((h) => ({
+      ref: normalizeRef(h.ref),
+      score: clampScore(h.score),
+      categories: Array.isArray(h.categories)
+        ? (h.categories as unknown[]).map(String)
+        : [],
+      reason: typeof h.reason === "string" ? h.reason : "",
+      engagement: clampScore(h.engagement),
+      humour: clampScore(h.humour),
+      contribution: clampScore(h.contribution),
+    }));
+}
+
 function normalizeRef(raw: unknown): string {
   return String(raw)
     .trim()

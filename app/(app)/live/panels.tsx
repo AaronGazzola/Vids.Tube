@@ -58,6 +58,7 @@ import {
   useDismissTts,
   useHideMessage,
   useManualHighlight,
+  useManualTts,
   useModerationFeed,
   useOwnerChat,
   usePromoteHighlight,
@@ -292,6 +293,7 @@ function MessageMenu({
   const hide = useHideMessage(streamId);
   const ban = useBanParticipant(streamId);
   const highlight = useManualHighlight(streamId);
+  const speak = useManualTts(streamId);
   const [banOpen, setBanOpen] = useState(false);
   const [hidePast, setHidePast] = useState(true);
   const label = msg.author?.handle
@@ -315,6 +317,12 @@ function MessageMenu({
             onClick={() => highlight.mutate(msg.id)}
           >
             Highlight on overlay
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={speak.isPending}
+            onClick={() => speak.mutate(msg.id)}
+          >
+            Read aloud (TTS)
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={hide.isPending}
@@ -530,24 +538,26 @@ function ChatMessageRow({
           <MessageMenu msg={msg} streamId={streamId} />
         </div>
         <div className="mt-1 flex items-center gap-2">
+          {ask.answer && (
+            <Button
+              size="sm"
+              className="h-6 px-2 text-xs"
+              disabled={approveAsk.isPending}
+              onClick={() => approveAsk.mutate({ id: ask.id, includeAnswer: true })}
+            >
+              Answer
+            </Button>
+          )}
           <Button
             size="sm"
-            className="h-6 px-2 text-xs"
-            disabled={approveAsk.isPending}
-            onClick={() => approveAsk.mutate({ id: ask.id, includeAnswer: true })}
-          >
-            Answer
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
+            variant={ask.answer ? "outline" : "default"}
             className="h-6 px-2 text-xs"
             disabled={approveAsk.isPending}
             onClick={() =>
               approveAsk.mutate({ id: ask.id, includeAnswer: false })
             }
           >
-            Question only
+            {ask.answer ? "Question only" : "Show question"}
           </Button>
           <Button
             size="sm"
@@ -954,17 +964,20 @@ export function ActivityContent() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="shrink-0 space-y-3 rounded-lg border p-3">
+      <div className="shrink-0 rounded-lg border p-3">
         <GoalsHeader channelSlug={ctx?.channelSlug ?? ""} />
-        <Competition streamId={streamId} />
       </div>
 
+      {streamId && <ChatPanel streamId={streamId} />}
+
+      <div className="shrink-0 rounded-lg border p-3">
+        <Competition streamId={streamId} />
+      </div>
       {streamId && (
         <div className="shrink-0 space-y-3">
           <ModBotActions streamId={streamId} />
         </div>
       )}
-      {streamId && <ChatPanel streamId={streamId} />}
     </div>
   );
 }

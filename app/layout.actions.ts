@@ -317,13 +317,14 @@ export async function getChatMessagesAction(
     .from("chat_messages")
     .select("*")
     .eq("stream_id", streamId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(200);
 
   if (error) {
     console.error(error);
     throw new Error("Failed to fetch chat messages");
   }
+  data.reverse();
 
   const authorByUser = await resolveAuthorIdentities(
     supabase,

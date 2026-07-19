@@ -12,6 +12,38 @@ const INACTIVE = (isLive: boolean): GoalProgressResponse => ({
   metrics: null,
 });
 
+// One YouTube fetch per video per minute, shared by every overlay source
+// polling this action. liveChat quota is the scarce resource; without this,
+// each OBS goal source costs 2 units per poll.
+const YT_COUNTS_TTL_MS = 60_000;
+type YtCounts = { subs: number; likes: number; viewers: number };
+const ytCountsCache = new Map<
+  string,
+  { at: number; promise: Promise<YtCounts> }
+>();
+
+function fetchCountsShared(
+  videoId: string,
+  youtubeChannelId: string | null
+): Promise<YtCounts> {
+  const hit = ytCountsCache.get(videoId);
+  if (hit && Date.now() - hit.at < YT_COUNTS_TTL_MS) {
+    return hit.promise;
+  }
+  const promise = (async () => {
+    const video = await fetchVideoData(videoId);
+    const subs = await fetchSubs(youtubeChannelId || video.channelId);
+    return {
+      subs,
+      likes: video.likeCount,
+      viewers: video.concurrentViewers,
+    };
+  })();
+  ytCountsCache.set(videoId, { at: Date.now(), promise });
+  promise.catch(() => ytCountsCache.delete(videoId));
+  return promise;
+}
+
 export async function getGoalProgressAction(
   channelSlug: string
 ): Promise<GoalProgressResponse> {
@@ -49,10 +81,12 @@ export async function getGoalProgressAction(
   }
 
   try {
-    const video = await fetchVideoData(stream.youtube_video_id);
-    const subs = await fetchSubs(stream.youtube_channel_id || video.channelId);
+    const counts = await fetchCountsShared(
+      stream.youtube_video_id,
+      stream.youtube_channel_id
+    );
     const metrics = computeGoalProgress(
-      { subs, likes: video.likeCount, viewers: video.concurrentViewers },
+      counts,
       {
         subs: goals.baseline_subs ?? 0,
         likes: goals.baseline_likes ?? 0,

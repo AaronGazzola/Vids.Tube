@@ -25,7 +25,7 @@ type LayoutState = {
   persist: Record<DemoPersistKey, boolean>;
   setPersist: (key: DemoPersistKey, v: boolean) => void;
   setPanelOpen: (v: boolean) => void;
-  hydrate: (c: DemoLayoutConfig) => void;
+  hydrate: (c: DemoLayoutConfig | null) => void;
   setBox: (key: DemoBoxKey, box: DemoBox) => void;
   toggleVisible: (key: DemoOverlayKey) => void;
   setGoalProgressFull: (v: boolean) => void;

@@ -21,6 +21,14 @@ function fromAbsolute(now: number, goal: number): MetricProgress {
   return { current: now, target: goal, total: now, goal, pct, reached: pct >= 100 };
 }
 
+export function reachedProgress(m: MetricProgress): MetricProgress {
+  return { ...m, current: m.target || m.goal, pct: 100, reached: true };
+}
+
+export function idleProgress(goal: number): MetricProgress {
+  return { current: 0, target: goal, total: 0, goal, pct: 0, reached: false };
+}
+
 export function computeGoalProgress(
   counts: Counts,
   baseline: Counts | null,

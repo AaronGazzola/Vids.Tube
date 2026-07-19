@@ -1,9 +1,43 @@
 "use server";
 
+import {
+  mergeDemoLayout,
+  type DemoLayoutConfig,
+} from "@/app/(app)/live/demo.types";
 import type { FeaturedMessageWithAuthor } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { authorFromRow } from "@/lib/featured-author";
+import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
+
+export async function getOverlayLayoutAction(
+  channelSlug: string
+): Promise<DemoLayoutConfig | null> {
+  const { data: channel, error: channelError } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", channelSlug)
+    .maybeSingle();
+  if (channelError) {
+    console.error(channelError);
+    throw new Error("Failed to fetch channel");
+  }
+  if (!channel) {
+    return null;
+  }
+  const { data, error } = await supabaseAdmin
+    .from("demo_layouts")
+    .select("config")
+    .eq("channel_id", channel.id)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch overlay layout");
+  }
+  return mergeDemoLayout(
+    (data?.config as Partial<DemoLayoutConfig> | null) ?? null
+  );
+}
 
 export async function getFeaturedMessagesAction(
   streamId: string
@@ -43,6 +77,7 @@ export async function getPromotedMessagesAction(
     .select("*")
     .eq("stream_id", streamId)
     .not("promoted_at", "is", null)
+    .is("shown_at", null)
     .order("promoted_at", { ascending: true })
     .limit(50);
 
@@ -87,6 +122,7 @@ export type PlayableTts = {
   participantKey: string;
   text: string;
   audioPath: string;
+  approvedAt: string | null;
 };
 
 type RequestAuthorRow = {
@@ -146,7 +182,7 @@ export async function getPlayableTtsAction(
   const { data, error } = await supabase
     .from("tts_requests")
     .select(
-      "id, author_name, origin, participant_key, chat_message_id, text, audio_path, status"
+      "id, author_name, origin, participant_key, chat_message_id, text, audio_path, status, approved_at"
     )
     .eq("stream_id", streamId)
     .eq("status", "approved")
@@ -166,7 +202,21 @@ export async function getPlayableTtsAction(
     participantKey: r.participant_key,
     text: r.text,
     audioPath: r.audio_path!,
+    approvedAt: r.approved_at,
   }));
+}
+
+export async function markHighlightShownAction(id: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/supabase/admin-client");
+  const { error } = await supabaseAdmin
+    .from("featured_messages")
+    .update({ shown_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("shown_at", null);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to mark highlight as shown");
+  }
 }
 
 export async function markTtsPlayedAction(id: string): Promise<void> {

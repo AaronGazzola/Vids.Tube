@@ -4,6 +4,9 @@ import { useMyChannel, useRequireOwner, useWaitingCount } from "@/app/layout.hoo
 import { channelAssetUrl } from "@/lib/storage";
 import { DisconnectedOverlay } from "@/components/live-stage";
 import { LivePlayer } from "@/components/live-player";
+import { formatRemaining } from "@/components/overlay/break-card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,10 +30,14 @@ import {
 import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { ExternalLink, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DemoActivity, DemoWrapupButton } from "./demo-activity";
 import { DemoPreviewStage } from "./demo-preview";
-import { useDemoController, useDemoLayout } from "./demo.hooks";
+import {
+  useDemoController,
+  useDemoLayout,
+  useDemoOverlayBroadcast,
+} from "./demo.hooks";
 import { useDemoLayoutStore } from "./demo.stores";
 import { ActivityContent, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
@@ -40,6 +47,7 @@ import {
   useEndStream,
   useGoLive,
   useSaveStreamSettings,
+  useSetBreak,
   useStreamSettings,
   useTranscript,
 } from "./broadcast.hooks";
@@ -128,6 +136,80 @@ function TranscriptPanel({
   );
 }
 
+function BreakButton({ breakEndsAt }: { breakEndsAt: string | null }) {
+  const setBreak = useSetBreak();
+  const [minutes, setMinutes] = useState("10");
+  const [now, setNow] = useState(() => Date.now());
+
+  const endsAtMs = breakEndsAt ? new Date(breakEndsAt).getTime() : null;
+  const active = endsAtMs !== null && endsAtMs > now;
+
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [active]);
+
+  if (active) {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="tabular-nums"
+        disabled={setBreak.isPending}
+        onClick={() => setBreak.mutate(null)}
+      >
+        {formatRemaining(endsAtMs - now)}
+      </Button>
+    );
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" disabled={setBreak.isPending}>
+          Break
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Start a break?</AlertDialogTitle>
+          <AlertDialogDescription>
+            The break overlay shows a &quot;Back soon&quot; countdown until the
+            timer ends or you click the countdown button to end it early.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="break-minutes">Minutes</Label>
+          <Input
+            id="break-minutes"
+            type="number"
+            min={1}
+            max={720}
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={!(Number(minutes) >= 1)}
+            onClick={() => {
+              const m = Number(minutes);
+              if (m >= 1) {
+                setNow(Date.now());
+                setBreak.mutate(m);
+              }
+            }}
+          >
+            Start break
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function StatusToolbar({
   state,
   broadcast,
@@ -152,10 +234,9 @@ function StatusToolbar({
   const streamId = broadcast?.id ?? null;
   // Observe-only: the owner's control page must not count itself as audience or
   // take a viewer-cap slot.
-  const count = useWaitingCount(
-    state === "live" || state === "scheduled" ? streamId : null,
-    { track: false }
-  );
+  const count = useWaitingCount(state === "scheduled" ? streamId : null, {
+    track: false,
+  });
 
   const disconnected = broadcast ? isFeedDisconnected(broadcast) : false;
   const canGoLive = state === "preview";
@@ -187,11 +268,6 @@ function StatusToolbar({
           >
             {statusLabel[state]}
           </Badge>
-          {state === "live" && (
-            <span className="text-xs text-muted-foreground">
-              {count} watching
-            </span>
-          )}
           {state === "scheduled" && (
             <span className="text-xs text-muted-foreground">
               {count} waiting
@@ -227,6 +303,9 @@ function StatusToolbar({
           </AlertDialog>
         )}
 
+        {!demo && (state === "live" || state === "preview") && broadcast && (
+          <BreakButton breakEndsAt={broadcast.break_ends_at} />
+        )}
         {!demo && state === "live" && streamId && (
           <WrapupButton streamId={streamId} />
         )}
@@ -345,10 +424,11 @@ export default function LivePage() {
   const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
   const { data: myChannel } = useMyChannel();
 
+  const demoGoals = settings?.goals ?? null;
+
   useDemoLayout(true);
   useDemoController(demo);
-
-  const demoGoals = settings?.goals ?? null;
+  useDemoOverlayBroadcast(demo, settings?.channelSlug ?? null, demoGoals);
 
   // Sync the form from the DB only when the active stream changes (not on every
   // background refetch), so in-progress edits are preserved.

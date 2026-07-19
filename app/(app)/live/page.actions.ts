@@ -23,12 +23,13 @@ export async function getOwnerChatMessagesAction(
     .from("chat_messages")
     .select("*")
     .eq("stream_id", streamId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(200);
   if (error) {
     console.error(error);
     throw new Error("Failed to load chat");
   }
+  data?.reverse();
 
   const authorByUser = await resolveAuthorIdentities(
     supabaseAdmin,
@@ -94,6 +95,68 @@ export async function manualHighlightAction(
     if (error) {
       console.error(error);
       throw new Error("Failed to highlight message");
+    }
+  }
+  return { data: { ok: true } };
+}
+
+// Speak any chat message on the overlay, even one nobody requested via !tts. If a
+// request already exists for the message it is re-approved (replaying existing audio
+// without re-synthesis); otherwise a new approved one is created and the worker
+// synthesizes it on the next pass.
+export async function manualTtsAction(
+  chatMessageId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) return { error: owned.error };
+
+  const { data: msg } = await supabaseAdmin
+    .from("chat_messages")
+    .select("id, stream_id, user_id, origin, external_author_id, author_name, body")
+    .eq("id", chatMessageId)
+    .maybeSingle();
+  if (!msg) return { error: "That message no longer exists." };
+  const ok = await assertStreamOwned(msg.stream_id, owned.data.id);
+  if ("error" in ok) return { error: ok.error };
+  if (msg.body.length > 200) {
+    return { error: "That message is too long for TTS (max 200 characters)." };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: existing } = await supabaseAdmin
+    .from("tts_requests")
+    .select("id")
+    .eq("chat_message_id", chatMessageId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from("tts_requests")
+      .update({ status: "approved", approved_at: nowIso, played_at: null })
+      .eq("id", existing.id);
+    if (error) {
+      console.error(error);
+      throw new Error("Failed to queue TTS");
+    }
+  } else {
+    const { error } = await supabaseAdmin.from("tts_requests").insert({
+      channel_id: owned.data.id,
+      stream_id: msg.stream_id,
+      chat_message_id: msg.id,
+      participant_key:
+        msg.origin === "vidstube"
+          ? String(msg.user_id)
+          : `youtube:${msg.external_author_id}`,
+      origin: msg.origin === "vidstube" ? "vidstube" : "youtube",
+      author_name: msg.author_name,
+      text: msg.body,
+      status: "approved",
+      reason: null,
+      approved_at: nowIso,
+    });
+    if (error) {
+      console.error(error);
+      throw new Error("Failed to queue TTS");
     }
   }
   return { data: { ok: true } };

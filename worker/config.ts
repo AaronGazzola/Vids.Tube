@@ -41,6 +41,9 @@ export const workerConfig = {
     pollMs: num("WORKER_POLL_MS", 10_000),
     lockLeaseMs: num("WORKER_LOCK_LEASE_MS", 60_000),
   },
+  // Floor on the YouTube chat poll interval. liveChatMessages.list costs 5
+  // quota units per call; YouTube suggests ~3s, which burns ~6k units/hour.
+  youtubeChatPollMs: num("YT_CHAT_POLL_MS", 0),
   hlsUrl(): string {
     return `${this.streamHost.replace(/\/$/, "")}/${this.mtxPath}/index.m3u8`;
   },

@@ -14,6 +14,7 @@ import {
   goLiveAction,
   regenerateStreamKeyAction,
   saveStreamSettingsAction,
+  setBreakAction,
   type StreamSettingsInput,
   uploadBroadcastThumbnailAction,
   upsertBroadcastAction,
@@ -35,6 +36,28 @@ export function useCurrentBroadcast() {
     queryKey: broadcastKey,
     queryFn: () => getCurrentBroadcastAction(),
     refetchInterval: 10000,
+  });
+}
+
+export function useSetBreak() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (minutes: number | null) => {
+      const res = await setBreakAction(minutes);
+      if ("error" in res) {
+        throw new Error(res.error);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: broadcastKey });
+    },
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast variant="error" title="Break" message={error.message} />
+      ));
+    },
   });
 }
 

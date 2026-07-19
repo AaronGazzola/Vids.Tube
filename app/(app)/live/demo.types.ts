@@ -5,13 +5,19 @@ export type DemoBoxKey =
   | "goalLikes"
   | "goalViewers"
   | "competition"
-  | "highlight";
+  | "highlight"
+  | "break";
 export type DemoOverlayKey = DemoBoxKey | "tts" | "ask";
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
 export type DemoBox = { x: number; y: number; scale: number };
 
+// Bumped when the meaning of box coordinates changes; saved layouts from an
+// older version keep their toggles but fall back to the default boxes.
+export const DEMO_LAYOUT_VERSION = 2;
+
 export type DemoLayoutConfig = {
+  version: number;
   boxes: Record<DemoBoxKey, DemoBox>;
   visible: Record<DemoOverlayKey, boolean>;
   goalProgressFull: boolean;
@@ -27,6 +33,7 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
   "highlight",
   "tts",
   "ask",
+  "break",
 ];
 
 export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
@@ -37,15 +44,20 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
   highlight: "Highlight",
   tts: "TTS card",
   ask: "!ask exchange",
+  break: "Break timer",
 };
 
+// Box coordinates live on the 1080x1920 vertical stream canvas, so a saved
+// layout renders identically in the preview and in a full-canvas OBS source.
 export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
+  version: DEMO_LAYOUT_VERSION,
   boxes: {
-    goalSubs: { x: 24, y: 24, scale: 1 },
-    goalLikes: { x: 24, y: 120, scale: 1 },
-    goalViewers: { x: 300, y: 24, scale: 1 },
-    competition: { x: 24, y: 220, scale: 1 },
-    highlight: { x: 160, y: 40, scale: 1 },
+    goalSubs: { x: 48, y: 64, scale: 2 },
+    goalLikes: { x: 48, y: 380, scale: 2 },
+    goalViewers: { x: 700, y: 64, scale: 2 },
+    competition: { x: 48, y: 720, scale: 2 },
+    highlight: { x: 120, y: 1260, scale: 2 },
+    break: { x: 220, y: 860, scale: 2 },
   },
   visible: {
     goalSubs: true,
@@ -55,6 +67,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     highlight: true,
     tts: true,
     ask: true,
+    break: false,
   },
   goalProgressFull: false,
   background: "slideshow",
@@ -69,8 +82,12 @@ export function mergeDemoLayout(
   partial: Partial<DemoLayoutConfig> | null | undefined
 ): DemoLayoutConfig {
   if (!partial) return DEFAULT_DEMO_LAYOUT;
+  const boxesCurrent = partial.version === DEMO_LAYOUT_VERSION;
   return {
-    boxes: { ...DEFAULT_DEMO_LAYOUT.boxes, ...(partial.boxes ?? {}) },
+    version: DEMO_LAYOUT_VERSION,
+    boxes: boxesCurrent
+      ? { ...DEFAULT_DEMO_LAYOUT.boxes, ...(partial.boxes ?? {}) }
+      : DEFAULT_DEMO_LAYOUT.boxes,
     visible: { ...DEFAULT_DEMO_LAYOUT.visible, ...(partial.visible ?? {}) },
     goalProgressFull:
       partial.goalProgressFull ?? DEFAULT_DEMO_LAYOUT.goalProgressFull,

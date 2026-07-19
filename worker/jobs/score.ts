@@ -1,8 +1,10 @@
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { runClaude } from "../lib/claude";
 import {
+  buildHighlightScoringPrompt,
   buildScoringPrompt,
   type ModerationFlag,
+  parseHighlightResult,
   parseScoreResult,
   pointsFor,
   type ScoreResult,
@@ -237,6 +239,7 @@ export async function applyScoreResult(
         categories: f.categories,
         reason: f.reason,
         ring_level: ring,
+        scored_at: nowIso,
         // Auto-display promotes featured messages straight to the overlay;
         // otherwise the owner promotes them manually with "Highlight".
         promoted_at: settings.autoDisplay ? nowIso : null,
@@ -254,6 +257,169 @@ export async function applyScoreResult(
         metadata: { reasons: p.features.map((f) => f.reason), items: p.items },
       });
     }
+  }
+
+  // Marks the batch as scored so a later manual highlight of one of these
+  // messages doesn't award its author points a second time.
+  const scoredIds = batch
+    .map((m) => m.chatMessageId)
+    .filter((id): id is string => !!id);
+  if (scoredIds.length) {
+    await supabaseAdmin
+      .from("chat_messages")
+      .update({ scored_at: nowIso })
+      .in("id", scoredIds);
+  }
+}
+
+// Owner-picked highlights (three-dot menu → "Highlight on overlay") are created with
+// no score. Each tick, score them with the AI and fold them into the competition
+// exactly like an AI-featured message: feature count, ring level, score events, and —
+// if the message was never batch-scored — leaderboard points.
+export async function scoreManualHighlights(streamId: string): Promise<void> {
+  const { data: pending } = await supabaseAdmin
+    .from("featured_messages")
+    .select(
+      "id, chat_message_id, user_id, origin, external_author_id, author_name, author_avatar_url, body"
+    )
+    .eq("stream_id", streamId)
+    .is("scored_at", null)
+    .order("featured_at", { ascending: true })
+    .limit(5);
+  if (!pending?.length) {
+    return;
+  }
+
+  const identities = await resolveAuthorIdentities(
+    supabaseAdmin,
+    pending.map((r) => r.user_id).filter((id): id is string => !!id)
+  );
+  const messages: ScoringMessage[] = pending.map((r, i) => {
+    const origin: ScoringOrigin = r.origin === "youtube" ? "youtube" : "vidstube";
+    return {
+      ref: `m${i}`,
+      origin,
+      author:
+        origin === "vidstube"
+          ? (r.user_id ? identities.get(r.user_id)?.handle : null) ?? "viewer"
+          : r.author_name ?? "viewer",
+      text: r.body ?? "",
+    };
+  });
+
+  const transcript = await fetchTranscriptWindow(streamId);
+  console.error(`[score] scoring ${pending.length} manual highlight(s)`);
+  let raw = "";
+  try {
+    raw = await runClaude(buildHighlightScoringPrompt({ transcript, messages }));
+  } catch (e) {
+    console.error("claude highlight scoring failed:", e);
+    return;
+  }
+  if (!raw) {
+    return;
+  }
+  const picks = parseHighlightResult(raw);
+  const byRef = new Map(picks.map((p) => [p.ref, p]));
+  const nowIso = new Date().toISOString();
+
+  for (let i = 0; i < pending.length; i++) {
+    const row = pending[i];
+    const pick = byRef.get(`m${i}`) ?? byRef.get(String(i));
+    if (!pick) {
+      continue;
+    }
+    const origin: ScoringOrigin =
+      row.origin === "youtube" ? "youtube" : "vidstube";
+    const pkey =
+      origin === "vidstube"
+        ? String(row.user_id)
+        : `youtube:${row.external_author_id}`;
+
+    let points = 0;
+    if (row.chat_message_id) {
+      const { data: msg } = await supabaseAdmin
+        .from("chat_messages")
+        .select("scored_at")
+        .eq("id", row.chat_message_id)
+        .maybeSingle();
+      if (msg && !msg.scored_at) {
+        points = pointsFor(pick, origin);
+        await supabaseAdmin
+          .from("chat_messages")
+          .update({ scored_at: nowIso })
+          .eq("id", row.chat_message_id);
+      }
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from("viewer_scores")
+      .select("total_score, features_count")
+      .eq("stream_id", streamId)
+      .eq("participant_key", pkey)
+      .maybeSingle();
+    const prevFeatures = existing?.features_count ?? 0;
+
+    if (existing) {
+      await supabaseAdmin
+        .from("viewer_scores")
+        .update({
+          total_score: (existing.total_score ?? 0) + points,
+          features_count: prevFeatures + 1,
+          last_featured_at: nowIso,
+        })
+        .eq("stream_id", streamId)
+        .eq("participant_key", pkey);
+    } else {
+      await supabaseAdmin.from("viewer_scores").insert({
+        stream_id: streamId,
+        user_id: row.user_id,
+        origin,
+        external_author_id: row.external_author_id,
+        author_name: row.author_name,
+        author_avatar_url: row.author_avatar_url,
+        total_score: points,
+        features_count: 1,
+        last_featured_at: nowIso,
+      });
+    }
+
+    await supabaseAdmin
+      .from("featured_messages")
+      .update({
+        score: pick.score,
+        categories: pick.categories,
+        reason: pick.reason,
+        ring_level: prevFeatures + 1,
+        scored_at: nowIso,
+      })
+      .eq("id", row.id);
+
+    await supabaseAdmin.from("score_events").insert({
+      stream_id: streamId,
+      user_id: row.user_id,
+      origin,
+      external_author_id: row.external_author_id,
+      type: "score",
+      points,
+      metadata: {
+        reasons: [pick.reason],
+        items: points
+          ? [
+              {
+                text: (row.body ?? "").slice(0, 200),
+                engagement: pick.engagement,
+                humour: pick.humour,
+                contribution: pick.contribution,
+                points,
+              },
+            ]
+          : [],
+      },
+    });
+    console.error(
+      `[score]   ★ manual highlight scored (${pick.score}) "${(row.body ?? "").slice(0, 60)}"${pick.reason ? ` — ${pick.reason}` : ""}`
+    );
   }
 }
 
@@ -402,7 +568,13 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         })
         .select("id")
         .maybeSingle();
-      if (error && error.code !== "23505") {
+      // A unique violation means a previous worker run already ingested and
+      // processed this message (YouTube replays full history on reconnect) —
+      // don't re-buffer it for scoring or commands.
+      if (error?.code === "23505") {
+        continue;
+      }
+      if (error) {
         console.error("persist youtube chat failed:", error.message);
       }
       chatMessageId = row?.id ?? null;
@@ -447,6 +619,7 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
       await processLinkVerifications(unmoderated);
       await synthesizePendingTts(stream.id);
       await deliverApprovedAskAnswers(stream.id);
+      await scoreManualHighlights(stream.id);
       if (channelId) {
         await runProactiveMoments(stream, channelId);
         await runWrapupIfRequested(stream, channelId);

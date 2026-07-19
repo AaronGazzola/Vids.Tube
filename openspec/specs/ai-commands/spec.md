@@ -2,8 +2,9 @@
 
 ## Purpose
 
-AI-grounded viewer commands: !ask answers questions strictly from the channel
-FAQ and live transcript with suggest/auto gating and answer withholding, shown
+AI-grounded viewer commands: !ask answers general-knowledge questions from
+model knowledge and channel/streamer questions strictly from the channel FAQ
+and live transcript, with suggest/auto gating and answer withholding, shown
 on the overlay as a mirrored Q&A; !catchup serves a cached summary of the
 stream so far.
 
@@ -12,12 +13,14 @@ stream so far.
 ### Requirement: Grounded moderated !ask
 
 The system SHALL answer `!ask <question>` with a single AI pass that both
-moderates the question and answers it strictly from the provided grounding —
-the channel's enabled custom-command content and the recent transcript window.
+moderates the question and answers it. General-knowledge questions MAY be
+answered from model knowledge; facts about the streamer, the channel, their
+projects, or the stream SHALL come strictly from the provided grounding — the
+channel's enabled custom-command content and the recent transcript window.
 Questions failing moderation SHALL be dismissed silently with the reason
-recorded; groundable answers SHALL follow the ask mode; ungroundable questions
-SHALL receive a friendly can't-answer reply. Answers SHALL contain no links
-that are not present in the grounding.
+recorded; answerable questions SHALL follow the ask mode; unanswerable
+questions SHALL receive a friendly can't-answer reply. Answers SHALL contain
+no links that are not present in the grounding.
 
 #### Scenario: Groundable question in auto mode
 
@@ -26,9 +29,16 @@ that are not present in the grounding.
 - **THEN** the bot replies with the grounded answer in the viewer's chat and the
   exchange is queued for the overlay
 
+#### Scenario: General-knowledge question
+
+- **WHEN** a viewer asks a benign general-knowledge question not covered by
+  the grounding (e.g. "how many legs does an ant have")
+- **THEN** the bot answers from model knowledge, following the ask mode
+
 #### Scenario: Ungroundable question
 
-- **WHEN** the grounding contains no answer
+- **WHEN** the question needs a streamer/channel/stream fact the grounding
+  does not contain
 - **THEN** the reply says the bot doesn't have that one and no exchange is
   queued
 

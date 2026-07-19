@@ -20,6 +20,7 @@ import {
   getViewerReasoningAction,
   hideMessageAction,
   manualHighlightAction,
+  manualTtsAction,
   promoteHighlightAction,
   requestWrapupAction,
   setModerationModeAction,
@@ -225,6 +226,16 @@ export function useApproveTts(streamId: string | null) {
     mutationFn: async (id: string) => unwrap(await approveTtsAction(id)),
     onSuccess: () => invalidate(streamId),
     onError: errorToast("Couldn't approve the TTS request"),
+  });
+}
+
+export function useManualTts(streamId: string | null) {
+  const invalidate = useTtsInvalidator();
+  return useMutation({
+    mutationFn: async (chatMessageId: string) =>
+      unwrap(await manualTtsAction(chatMessageId)),
+    onSuccess: () => invalidate(streamId),
+    onError: errorToast("Couldn't queue the message for TTS"),
   });
 }
 

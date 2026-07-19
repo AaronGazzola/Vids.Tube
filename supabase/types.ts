@@ -313,6 +313,7 @@ export type Database = {
           hidden_by: string | null
           id: string
           origin: string
+          scored_at: string | null
           stream_id: string
           user_id: string | null
         }
@@ -327,6 +328,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           origin?: string
+          scored_at?: string | null
           stream_id: string
           user_id?: string | null
         }
@@ -341,6 +343,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           origin?: string
+          scored_at?: string | null
           stream_id?: string
           user_id?: string | null
         }
@@ -682,6 +685,8 @@ export type Database = {
           reason: string | null
           ring_level: number
           score: number
+          scored_at: string | null
+          shown_at: string | null
           stream_id: string
           user_id: string | null
         }
@@ -699,6 +704,8 @@ export type Database = {
           reason?: string | null
           ring_level?: number
           score: number
+          scored_at?: string | null
+          shown_at?: string | null
           stream_id: string
           user_id?: string | null
         }
@@ -716,6 +723,8 @@ export type Database = {
           reason?: string | null
           ring_level?: number
           score?: number
+          scored_at?: string | null
+          shown_at?: string | null
           stream_id?: string
           user_id?: string | null
         }
@@ -971,6 +980,7 @@ export type Database = {
       }
       streams: {
         Row: {
+          break_ends_at: string | null
           channel_id: string
           created_at: string
           created_in_ui: boolean
@@ -994,6 +1004,7 @@ export type Database = {
           youtube_video_id: string | null
         }
         Insert: {
+          break_ends_at?: string | null
           channel_id: string
           created_at?: string
           created_in_ui?: boolean
@@ -1017,6 +1028,7 @@ export type Database = {
           youtube_video_id?: string | null
         }
         Update: {
+          break_ends_at?: string | null
           channel_id?: string
           created_at?: string
           created_in_ui?: boolean

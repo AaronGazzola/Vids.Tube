@@ -10,13 +10,21 @@ import {
   MobileChromeTopBar,
 } from "@/components/mobile-chrome";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
+import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
 import { Switch } from "@/components/ui/switch";
+import {
+  OVERLAY_CANVAS_H,
+  OVERLAY_CANVAS_W,
+  OVERLAY_FEED_WIDTH,
+  OVERLAY_GOAL_HEIGHT,
+  OVERLAY_LADDER_SIZE,
+} from "@/lib/demo-overlay";
 import { channelAssetUrl } from "@/lib/storage";
-import { computeGoalProgress, type Counts } from "@/lib/goals";
+import { computeGoalProgress, reachedProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { cn } from "@/lib/utils";
 import {
@@ -48,17 +56,15 @@ function authorOf(v: DemoViewer): FeaturedAuthor {
   return { name: v.name, handle: v.handle, avatarUrl: v.avatarUrl, avatarPath: null };
 }
 
-function reached(m: MetricProgress): MetricProgress {
-  return { ...m, current: m.target || m.goal, pct: 100, reached: true };
-}
-
 // ── Draggable / resizable box ──────────────────────────────────────────────
 
 function DraggableBox({
   boxKey,
+  pxScale,
   children,
 }: {
   boxKey: DemoBoxKey;
+  pxScale: number;
   children: React.ReactNode;
 }) {
   const box = useDemoLayoutStore((s) => s.config.boxes[boxKey]);
@@ -66,12 +72,13 @@ function DraggableBox({
 
   function startDrag(e: React.PointerEvent) {
     e.preventDefault();
+    if (pxScale <= 0) return;
     const start = { px: e.clientX, py: e.clientY, x: box.x, y: box.y };
     const move = (ev: PointerEvent) =>
       setBox(boxKey, {
         ...box,
-        x: start.x + (ev.clientX - start.px),
-        y: start.y + (ev.clientY - start.py),
+        x: start.x + (ev.clientX - start.px) / pxScale,
+        y: start.y + (ev.clientY - start.py) / pxScale,
       });
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -87,8 +94,8 @@ function DraggableBox({
     const start = { py: e.clientY, scale: box.scale };
     const move = (ev: PointerEvent) => {
       const scale = Math.max(
-        0.4,
-        Math.min(3, start.scale + (ev.clientY - start.py) / 220)
+        0.25,
+        Math.min(6, start.scale + (ev.clientY - start.py) / 110)
       );
       setBox(boxKey, { ...box, scale });
     };
@@ -115,6 +122,12 @@ function DraggableBox({
       <div
         onPointerDown={startResize}
         className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize rounded-full border border-white bg-black/70"
+        style={{
+          transform: `scale(${
+            pxScale > 0 ? 1 / (pxScale * box.scale) : 1
+          })`,
+          transformOrigin: "bottom right",
+        }}
       />
     </div>
   );
@@ -132,7 +145,21 @@ function CompetitionField() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 18);
 
-  return <CompetitionLadder entries={entries} size={52} />;
+  return <CompetitionLadder entries={entries} size={OVERLAY_LADDER_SIZE} />;
+}
+
+// ── Break timer (looping 5-minute demo countdown) ──────────────────────────
+
+const DEMO_BREAK_MS = 5 * 60_000;
+
+function DemoBreak() {
+  const [endsAt, setEndsAt] = useState(() => Date.now() + DEMO_BREAK_MS);
+  return (
+    <BreakCard
+      endsAt={endsAt}
+      onDone={() => setEndsAt(Date.now() + DEMO_BREAK_MS)}
+    />
+  );
 }
 
 // ── Single-slot overlay feed ───────────────────────────────────────────────
@@ -197,7 +224,7 @@ function DemoOverlayFeed() {
   };
 
   return (
-    <div style={{ width: 420 }}>
+    <div style={{ width: OVERLAY_FEED_WIDTH }}>
       {currentHighlight ? (
         <HighlightedMessage
           key={currentHighlight.id}
@@ -257,7 +284,7 @@ function DemoOverlayFeed() {
 // ── Goal box ───────────────────────────────────────────────────────────────
 
 const BOX_METRIC: Record<
-  Exclude<DemoBoxKey, "competition" | "highlight">,
+  Exclude<DemoBoxKey, "competition" | "highlight" | "break">,
   GoalMetric
 > = {
   goalSubs: "subs",
@@ -266,8 +293,11 @@ const BOX_METRIC: Record<
 };
 
 function GoalBox({ boxKey, data }: { boxKey: DemoBoxKey; data: MetricProgress }) {
-  if (boxKey === "competition" || boxKey === "highlight") return null;
-  return <GoalBar metric={BOX_METRIC[boxKey]} data={data} height={110} />;
+  if (boxKey === "competition" || boxKey === "highlight" || boxKey === "break")
+    return null;
+  return (
+    <GoalBar metric={BOX_METRIC[boxKey]} data={data} height={OVERLAY_GOAL_HEIGHT} />
+  );
 }
 
 // ── Stage ──────────────────────────────────────────────────────────────────
@@ -333,20 +363,26 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
     targets as Counts
   );
   const metricFor = (m: GoalMetric) =>
-    config.goalProgressFull ? reached(progress[m]) : progress[m];
+    config.goalProgressFull ? reachedProgress(progress[m]) : progress[m];
 
   const safeIndex = frames.length ? index % frames.length : 0;
   const frame = frames[safeIndex] ?? null;
   const bg = config.background;
+
+  // The stage renders a fixed 1080x1920 virtual canvas (the vertical stream)
+  // scaled to fit on screen, so box coordinates match a full-canvas OBS source.
+  const canvasOnScreenW =
+    stageSize.w > 0 && stageSize.h > 0
+      ? Math.min(stageSize.w, (stageSize.h * 9) / 16)
+      : 0;
+  const canvasScale = canvasOnScreenW / OVERLAY_CANVAS_W;
 
   // Mobile-chrome geometry: anchor to the centered 9:16 video area and shrink
   // the whole stream stage just enough to fit the top bar above and the chat
   // input below, so every overlay keeps its position relative to the video.
   const chromeOn =
     config.mobileChrome && stageSize.w > 0 && stageSize.h > 0;
-  const videoW = chromeOn
-    ? Math.min(stageSize.w, (stageSize.h * 9) / 16)
-    : 0;
+  const videoW = chromeOn ? canvasOnScreenW : 0;
   const chromeScale = videoW / MOBILE_CHROME_REF_WIDTH;
   const k = chromeOn
     ? stageSize.h /
@@ -373,54 +409,71 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
             : undefined
         }
       >
-        {/* background */}
-        {bg === "gradient" ? (
-          <div className="absolute inset-0" style={{ background: GRADIENT }} />
-        ) : bg === "slideshow" && frame ? (
-          <img
-            src={frame}
-            alt=""
-            className="absolute inset-0 h-full w-full object-contain"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-black" />
-        )}
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: (stageSize.w - OVERLAY_CANVAS_W * canvasScale) / 2,
+            top: (stageSize.h - OVERLAY_CANVAS_H * canvasScale) / 2,
+            width: OVERLAY_CANVAS_W,
+            height: OVERLAY_CANVAS_H,
+            transform: `scale(${canvasScale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          {/* background */}
+          {bg === "gradient" ? (
+            <div className="absolute inset-0" style={{ background: GRADIENT }} />
+          ) : bg === "slideshow" && frame ? (
+            <img
+              src={frame}
+              alt=""
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-black" />
+          )}
 
-        {bg === "slideshow" && frames.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
-            No published VODs yet — the overlays still render over a plain
-            background.
-          </div>
-        )}
+          {bg === "slideshow" && frames.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center px-16 text-center text-3xl text-white/70">
+              No published VODs yet — the overlays still render over a plain
+              background.
+            </div>
+          )}
 
-        {/* positioned box overlays */}
-        {(config.visible.highlight ||
-          config.visible.tts ||
-          config.visible.ask) && (
-          <DraggableBox boxKey="highlight">
-            <DemoOverlayFeed />
-          </DraggableBox>
-        )}
-        {config.visible.goalSubs && (
-          <DraggableBox boxKey="goalSubs">
-            <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
-          </DraggableBox>
-        )}
-        {config.visible.goalLikes && (
-          <DraggableBox boxKey="goalLikes">
-            <GoalBox boxKey="goalLikes" data={metricFor("likes")} />
-          </DraggableBox>
-        )}
-        {config.visible.goalViewers && (
-          <DraggableBox boxKey="goalViewers">
-            <GoalBox boxKey="goalViewers" data={metricFor("viewers")} />
-          </DraggableBox>
-        )}
-        {config.visible.competition && (
-          <DraggableBox boxKey="competition">
-            <CompetitionField />
-          </DraggableBox>
-        )}
+          {/* positioned box overlays */}
+          {(config.visible.highlight ||
+            config.visible.tts ||
+            config.visible.ask) && (
+            <DraggableBox boxKey="highlight" pxScale={canvasScale * k}>
+              <DemoOverlayFeed />
+            </DraggableBox>
+          )}
+          {config.visible.goalSubs && (
+            <DraggableBox boxKey="goalSubs" pxScale={canvasScale * k}>
+              <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
+            </DraggableBox>
+          )}
+          {config.visible.goalLikes && (
+            <DraggableBox boxKey="goalLikes" pxScale={canvasScale * k}>
+              <GoalBox boxKey="goalLikes" data={metricFor("likes")} />
+            </DraggableBox>
+          )}
+          {config.visible.goalViewers && (
+            <DraggableBox boxKey="goalViewers" pxScale={canvasScale * k}>
+              <GoalBox boxKey="goalViewers" data={metricFor("viewers")} />
+            </DraggableBox>
+          )}
+          {config.visible.competition && (
+            <DraggableBox boxKey="competition" pxScale={canvasScale * k}>
+              <CompetitionField />
+            </DraggableBox>
+          )}
+          {config.visible.break && (
+            <DraggableBox boxKey="break" pxScale={canvasScale * k}>
+              <DemoBreak />
+            </DraggableBox>
+          )}
+        </div>
       </div>
 
       {/* mobile chrome anchored to the (scaled) video rect */}

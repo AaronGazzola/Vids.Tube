@@ -34,10 +34,12 @@ async function getOwnedChannelId(): Promise<ActionResult<string>> {
   return { data: channel.id };
 }
 
-export async function getDemoLayoutAction(): Promise<DemoLayoutConfig> {
+// Returns null when the channel has no saved layout yet; the client falls back
+// to the default for display only and never persists it unedited.
+export async function getDemoLayoutAction(): Promise<DemoLayoutConfig | null> {
   const owned = await getOwnedChannelId();
   if ("error" in owned) {
-    return mergeDemoLayout(null);
+    throw new Error(owned.error);
   }
   const { data, error } = await supabaseAdmin
     .from("demo_layouts")
@@ -48,9 +50,10 @@ export async function getDemoLayoutAction(): Promise<DemoLayoutConfig> {
     console.error(error);
     throw new Error("Failed to load demo layout");
   }
-  return mergeDemoLayout(
-    (data?.config as Partial<DemoLayoutConfig> | null) ?? null
-  );
+  if (!data?.config) {
+    return null;
+  }
+  return mergeDemoLayout(data.config as Partial<DemoLayoutConfig>);
 }
 
 export async function saveDemoLayoutAction(

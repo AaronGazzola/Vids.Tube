@@ -1,5 +1,6 @@
 import type { YouTubeChatMessage } from "@/app/layout.types";
 import { fetchLiveChatPage, fetchVideoData } from "@/lib/youtube";
+import { workerConfig } from "../config";
 
 export type YoutubeChatMessage = YouTubeChatMessage & { origin: "youtube" };
 
@@ -46,6 +47,8 @@ export async function* pollYoutubeChat(
       return;
     }
     pageToken = page.nextPageToken;
-    await sleep(Math.max(1000, page.pollingIntervalMillis));
+    await sleep(
+      Math.max(1000, workerConfig.youtubeChatPollMs, page.pollingIntervalMillis)
+    );
   }
 }

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { OVERLAY_BASE_DIMS } from "@/lib/demo-overlay";
 import { vodAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
@@ -40,8 +41,13 @@ import {
   useDeleteProject,
   useUpdateProject,
 } from "./projects.hooks";
+import { useDemoLayoutStore } from "./demo.stores";
 
 const STREAM_HOST = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
+
+function scaledDims(base: { w: number; h: number }, scale: number): string {
+  return `${Math.round(base.w * scale)} × ${Math.round(base.h * scale)}`;
+}
 
 export type SettingsForm = {
   title: string;
@@ -598,6 +604,7 @@ export function SettingsTab({
 }) {
   const uploadThumbnail = useUploadBroadcastThumbnail();
   const [opacityPct, setOpacityPct] = useState(90);
+  const boxes = useDemoLayoutStore((s) => s.config.boxes);
   const thumbnailUrl = vodAssetUrl(thumbnailPath);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -703,14 +710,43 @@ export function SettingsTab({
       </Section>
 
       <Section title="OBS overlays">
-        <CopyRow label="Highlights" url={base} dimensions="460 × 400" />
-        <CopyRow label="Goal · Subs" url={`${base}/goals/subs`} dimensions="160 × 160" />
-        <CopyRow label="Goal · Likes" url={`${base}/goals/likes`} dimensions="160 × 160" />
-        <CopyRow label="Goal · Viewers" url={`${base}/goals/viewers`} dimensions="160 × 160" />
+        <p className="text-xs text-muted-foreground">
+          Each overlay renders at the size you gave it in the demo preview. Add
+          it as a browser source at the dimensions shown, then position it on
+          your canvas in OBS — no scaling needed there.
+        </p>
+        <CopyRow
+          label="Highlights"
+          url={base}
+          dimensions={scaledDims(OVERLAY_BASE_DIMS.highlight, boxes.highlight.scale)}
+        />
+        <CopyRow
+          label="Goal · Subs"
+          url={`${base}/goals/subs`}
+          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalSubs.scale)}
+        />
+        <CopyRow
+          label="Goal · Likes"
+          url={`${base}/goals/likes`}
+          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalLikes.scale)}
+        />
+        <CopyRow
+          label="Goal · Viewers"
+          url={`${base}/goals/viewers`}
+          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalViewers.scale)}
+        />
         <CopyRow
           label="Competition"
           url={`${base}/competition?opacity=${(opacityPct / 100).toFixed(2)}`}
-          dimensions="120 × 520"
+          dimensions={scaledDims(
+            OVERLAY_BASE_DIMS.competition,
+            boxes.competition.scale
+          )}
+        />
+        <CopyRow
+          label="Break timer"
+          url={`${base}/break`}
+          dimensions={scaledDims(OVERLAY_BASE_DIMS.break, boxes.break.scale)}
         />
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between">
