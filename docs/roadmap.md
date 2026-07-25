@@ -108,10 +108,11 @@ interactions never stop playback; one-tap fullscreen with YouTube parity).
 Single-frame overlay + Preview-tab live editor + token + sounds; cut old URLs.
 `stream_metrics` (worker samples per origin every 60s: concurrent viewers,
 chat rate) + combined goals strip + per-platform popover charts + per-stream
-history. AZ-167 quota calibration (10s chat poll floor, 4h + padding) — the
-quota-increase application itself is deferred to multi-streamer prep (AZ-193
-holds the quota facts: per-project ownership, 50:1 metrics batching, adaptive
-polling). Activity chat-centric redesign.
+history. AZ-167 quota calibration (10s chat poll floor, 4h + padding); the
+quota-increase application (AZ-193) files early — as soon as AZ-30
+(privacy policy + terms) ships, since the audit requires it — benefiting solo
+streaming now and easing the later multi-streamer increase. Activity
+chat-centric redesign.
 
 ### V3 — Play & economy
 XP/Credits/Level ledger on memberships; streak flat bonus; `credit_cost` on
