@@ -26,10 +26,13 @@
     "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts",
     "dryrun": "doppler run -- tsx scripts/dryrun-stream.ts",
     "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts",
-    "backfill:youtube-chat": "doppler run -- tsx scripts/backfill-youtube-chat.ts"
+    "backfill:youtube-chat": "doppler run -- tsx scripts/backfill-youtube-chat.ts",
+    "backfill:youtube-transcripts": "doppler run -- tsx scripts/backfill-youtube-transcripts.ts",
+    "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
+    "@aws-sdk/lib-storage": "^3.1094.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
     "@tanstack/react-query": "^5.100.13",

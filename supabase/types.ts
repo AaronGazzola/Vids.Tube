@@ -1373,27 +1373,68 @@ export type Database = {
         }
         Relationships: []
       }
+      youtube_transcripts: {
+        Row: {
+          created_at: string
+          end_s: number
+          id: string
+          start_s: number
+          text: string
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_s: number
+          id?: string
+          start_s: number
+          text: string
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          end_s?: number
+          id?: string
+          start_s?: number
+          text?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_transcripts_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_vods"
+            referencedColumns: ["video_id"]
+          },
+        ]
+      }
       youtube_vods: {
         Row: {
           backfilled_at: string
+          like_count: number | null
           message_count: number
           published_at: string | null
           title: string | null
           video_id: string
+          view_count: number | null
         }
         Insert: {
           backfilled_at?: string
+          like_count?: number | null
           message_count?: number
           published_at?: string | null
           title?: string | null
           video_id: string
+          view_count?: number | null
         }
         Update: {
           backfilled_at?: string
+          like_count?: number | null
           message_count?: number
           published_at?: string | null
           title?: string | null
           video_id?: string
+          view_count?: number | null
         }
         Relationships: []
       }
