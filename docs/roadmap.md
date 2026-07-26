@@ -91,9 +91,10 @@ only generic touchpoints like `channel_projects` grounding for `!ask`).
   transcripts work natively). Live capture is the source of truth going
   forward; backfill scripts are one-time tools.
 - Finalize-script drift fixed and deployed to the VM.
-- Remaining: AZ-104 (recording hook wrong-row matching), AZ-90 (orphaned
-  preview session), AZ-157 smoke checklist next stream (start the worker
-  BEFORE going live).
+- AZ-104 + AZ-90 code shipped 2026-07-26 (recordedAt-based recording
+  matching, stale-VOD reaper, preview title inheritance after a manual end);
+  on-stream confirmation folded into the AZ-157 smoke checklist next stream
+  (start the worker BEFORE going live).
 
 ### V1 — Identity & the bridge
 Channel/membership model + pooled-history merge; unclaimed channels for all
@@ -105,7 +106,9 @@ welcome (auto/suggest); watch experience (persistent mini-player so
 interactions never stop playback; one-tap fullscreen with YouTube parity).
 
 ### V2 — Overlay consolidation & streamer intelligence
-Single-frame overlay + Preview-tab live editor + token + sounds; cut old URLs.
+Single-frame overlay + Preview-tab live editor + token + sounds shipped
+2026-07-26 (AZ-175/AZ-176; old URLs cut), pending first on-stream OBS
+confirmation.
 `stream_metrics` (worker samples per origin every 60s: concurrent viewers,
 chat rate) + combined goals strip + per-platform popover charts + per-stream
 history. AZ-167 quota calibration (10s chat poll floor, 4h + padding); the
