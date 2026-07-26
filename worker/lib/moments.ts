@@ -1,6 +1,10 @@
 import { runClaude } from "./claude";
 import type { EligibleStream } from "./streams";
-import { deliverReply, enqueueNightbotSend } from "./replies";
+import {
+  deliverReply,
+  enqueueNightbotSend,
+  MAX_AI_REPLY_CHARS,
+} from "./replies";
 import { supabaseAdmin } from "../supabase";
 
 function intervalMs(env: string, fallback: number): number {
@@ -172,7 +176,10 @@ export async function runProactiveMoments(
           if (parsed.found === true && parsed.answer) {
             await sendBroadcast(
               stream.id,
-              `Heard you wondering — ${parsed.answer}`.slice(0, 400)
+              `Heard you wondering — ${parsed.answer}`.slice(
+                0,
+                MAX_AI_REPLY_CHARS
+              )
             );
           }
         }
@@ -227,14 +234,14 @@ export async function runWrapupIfRequested(
       try {
         const raw = await runClaude(
           [
-            "Summarize what was achieved on this live stream as a single celebratory wrap-up chat message, under 380 characters, plain text.",
+            "Summarize what was achieved on this live stream as a single celebratory wrap-up chat message, under ~550 characters, plain text.",
             "",
             `Transcript: ${transcript.slice(-8000)}`,
             "",
             "Reply with the message only.",
           ].join("\n")
         );
-        const summary = raw.trim().slice(0, 400);
+        const summary = raw.trim().slice(0, MAX_AI_REPLY_CHARS);
         if (summary) {
           await sendBroadcast(stream.id, summary);
         }
@@ -249,7 +256,7 @@ export async function runWrapupIfRequested(
     const projects = lines.length ? ` Keep up with the projects: ${lines.join(" | ")}` : "";
     await sendBroadcast(
       stream.id,
-      `Thanks for watching, everyone!${projects}`.slice(0, 400)
+      `Thanks for watching, everyone!${projects}`
     );
   }
 

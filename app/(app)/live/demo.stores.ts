@@ -32,7 +32,7 @@ type LayoutState = {
   setGoalProgressFull: (v: boolean) => void;
   setBackground: (bg: DemoBackground) => void;
   setMobileChrome: (v: boolean) => void;
-  setCompetitionOpacity: (v: number) => void;
+  setBoxOpacity: (key: DemoBoxKey, v: number) => void;
   setFeedSound: (v: OverlayFeedSound) => void;
   resetLayout: () => void;
 };
@@ -63,8 +63,13 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
     set((s) => ({ config: { ...s.config, background: bg } })),
   setMobileChrome: (v) =>
     set((s) => ({ config: { ...s.config, mobileChrome: v } })),
-  setCompetitionOpacity: (v) =>
-    set((s) => ({ config: { ...s.config, competitionOpacity: v } })),
+  setBoxOpacity: (key, v) =>
+    set((s) => ({
+      config: {
+        ...s.config,
+        boxOpacity: { ...s.config.boxOpacity, [key]: v },
+      },
+    })),
   setFeedSound: (v) => set((s) => ({ config: { ...s.config, feedSound: v } })),
   resetLayout: () =>
     set((s) => ({

@@ -54,10 +54,10 @@ export function useIsOwner() {
 }
 
 export function useIsChannelOwner(
-  channel: { owner_user_id: string } | null | undefined
+  channel: { owner_user_id: string | null } | null | undefined
 ) {
   const user = useAuthStore((state) => state.user);
-  if (!channel || !user) {
+  if (!channel || !channel.owner_user_id || !user) {
     return false;
   }
   return channel.owner_user_id === user.id;

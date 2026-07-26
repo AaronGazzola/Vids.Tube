@@ -31,9 +31,19 @@ export async function processLinkVerifications(
       continue;
     }
     if (data?.length) {
+      const userId = data[0].user_id;
       console.error(
-        `[verify] youtube link verified for user ${data[0].user_id} (${m.externalAuthorId})`
+        `[verify] youtube link verified for user ${userId} (${m.externalAuthorId})`
       );
+      const { data: merge, error: mergeErr } = await supabaseAdmin.rpc(
+        "merge_youtube_identity",
+        { p_user_id: userId }
+      );
+      if (mergeErr) {
+        console.error("identity merge failed:", mergeErr);
+      } else {
+        console.error(`[verify] identity merge for user ${userId}:`, merge);
+      }
     }
   }
 }

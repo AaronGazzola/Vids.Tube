@@ -25,7 +25,7 @@ export type DemoLayoutConfig = {
   goalProgressFull: boolean;
   background: DemoBackground;
   mobileChrome: boolean;
-  competitionOpacity: number;
+  boxOpacity: Record<DemoBoxKey, number>;
   feedSound: OverlayFeedSound;
 };
 
@@ -76,7 +76,14 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   goalProgressFull: false,
   background: "slideshow",
   mobileChrome: false,
-  competitionOpacity: 0.6,
+  boxOpacity: {
+    goalSubs: 1,
+    goalLikes: 1,
+    goalViewers: 1,
+    competition: 0.6,
+    highlight: 1,
+    break: 1,
+  },
   feedSound: "chime",
 };
 
@@ -84,8 +91,14 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
 // over these at render time; these are only the fallback when none are set.
 export const DEMO_GOAL_TARGETS: Counts = { subs: 1000, likes: 500, viewers: 100 };
 
+// Saved layouts from before per-overlay opacity carry a single
+// `competitionOpacity` number; it migrates into `boxOpacity.competition`.
+type LegacyDemoLayoutConfig = Partial<DemoLayoutConfig> & {
+  competitionOpacity?: number;
+};
+
 export function mergeDemoLayout(
-  partial: Partial<DemoLayoutConfig> | null | undefined
+  partial: LegacyDemoLayoutConfig | null | undefined
 ): DemoLayoutConfig {
   if (!partial) return DEFAULT_DEMO_LAYOUT;
   const boxesCurrent = partial.version === DEMO_LAYOUT_VERSION;
@@ -99,8 +112,13 @@ export function mergeDemoLayout(
       partial.goalProgressFull ?? DEFAULT_DEMO_LAYOUT.goalProgressFull,
     background: partial.background ?? DEFAULT_DEMO_LAYOUT.background,
     mobileChrome: partial.mobileChrome ?? DEFAULT_DEMO_LAYOUT.mobileChrome,
-    competitionOpacity:
-      partial.competitionOpacity ?? DEFAULT_DEMO_LAYOUT.competitionOpacity,
+    boxOpacity: {
+      ...DEFAULT_DEMO_LAYOUT.boxOpacity,
+      ...(partial.competitionOpacity !== undefined
+        ? { competition: partial.competitionOpacity }
+        : {}),
+      ...(partial.boxOpacity ?? {}),
+    },
     feedSound: partial.feedSound ?? DEFAULT_DEMO_LAYOUT.feedSound,
   };
 }

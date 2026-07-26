@@ -53,6 +53,8 @@ export type SettingsForm = {
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
   ttsMode: "suggest" | "auto";
+  ttsStability: string;
+  ttsSimilarity: string;
   askMode: "suggest" | "auto";
   bridgeEnabled: boolean;
   highlightingEnabled: boolean;
@@ -760,6 +762,39 @@ export function SettingsTab({
           checked={form.ttsMode === "auto"}
           onCheckedChange={(v) => set({ ttsMode: v ? "auto" : "suggest" })}
         />
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-muted-foreground">TTS voice stability</span>
+            <Input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={form.ttsStability}
+              onChange={(e) => set({ ttsStability: e.target.value })}
+              aria-label="TTS voice stability"
+              className="h-8 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-muted-foreground">TTS voice similarity</span>
+            <Input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={form.ttsSimilarity}
+              onChange={(e) => set({ ttsSimilarity: e.target.value })}
+              aria-label="TTS voice similarity"
+              className="h-8 text-sm"
+            />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          ElevenLabs voice settings (0–1). Higher stability keeps delivery
+          steady; lower values can drift or drag syllables. Applies to newly
+          synthesized !tts audio.
+        </p>
         <SwitchRow
           label="Auto-answer !ask (vs suggest)"
           description="On: grounded answers post without a click. Off: you approve each Q&A."

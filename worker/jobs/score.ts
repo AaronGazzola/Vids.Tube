@@ -13,7 +13,7 @@ import {
 } from "../lib/scoring-prompt";
 import {
   type EligibleStream,
-  isStreamEligible,
+  getStreamEngagement,
   renewLock,
   upsertWorkerHeartbeat,
 } from "../lib/streams";
@@ -520,7 +520,10 @@ export async function applyModeration(
   }
 }
 
-export async function runScoringJob(stream: EligibleStream): Promise<void> {
+export async function runScoringJob(
+  stream: EligibleStream,
+  onEngagement?: (fresh: EligibleStream) => void
+): Promise<void> {
   let vidstubeCursor = new Date().toISOString();
 
   const { data: streamRow } = await supabaseAdmin
@@ -700,9 +703,11 @@ export async function runScoringJob(stream: EligibleStream): Promise<void> {
         }
       }
 
-      if (!(await isStreamEligible(stream.id))) {
+      const fresh = await getStreamEngagement(stream.id);
+      if (!fresh) {
         break;
       }
+      onEngagement?.(fresh);
       await sleep(SCORE_INTERVAL_MS);
     }
   } finally {

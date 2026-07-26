@@ -17,7 +17,7 @@ test.beforeAll(async () => {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  ownerUserId = owner!.owner_user_id;
+  ownerUserId = owner!.owner_user_id!;
   await admin.from("youtube_links").delete().eq("user_id", ownerUserId);
 });
 

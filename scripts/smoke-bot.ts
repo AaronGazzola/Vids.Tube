@@ -82,10 +82,11 @@ async function main() {
     .limit(1)
     .maybeSingle();
 
-  if (!channel) {
-    console.error("No channel exists — cannot seed a stream.");
+  if (!channel || !channel.owner_user_id) {
+    console.error("No owned channel exists — cannot seed a stream.");
     process.exit(1);
   }
+  const ownerUserId = channel.owner_user_id;
 
   const batch: BufferedMessage[] = SEED_MESSAGES.map((m, i) => ({
     ref: `youtube:${m.externalAuthorId}:${i}`,
@@ -106,7 +107,7 @@ async function main() {
       origin: "vidstube",
       author: channel.handle,
       text: VIDSTUBE_MESSAGE,
-      userId: channel.owner_user_id,
+      userId: ownerUserId,
       externalAuthorId: null,
       authorName: null,
       authorAvatarUrl: null,
@@ -167,7 +168,7 @@ async function main() {
       .from("chat_messages")
       .insert({
         stream_id: streamId,
-        user_id: channel.owner_user_id,
+        user_id: ownerUserId,
         body: VIDSTUBE_MESSAGE,
       })
       .select("id, created_at")
@@ -180,7 +181,7 @@ async function main() {
         origin: "vidstube",
         author: channel.handle,
         text: VIDSTUBE_MESSAGE,
-        userId: channel.owner_user_id,
+        userId: ownerUserId,
         externalAuthorId: null,
         authorName: null,
         authorAvatarUrl: null,

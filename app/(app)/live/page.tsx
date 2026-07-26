@@ -31,7 +31,11 @@ import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { ExternalLink, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { DemoActivity, DemoWrapupButton } from "./demo-activity";
+import {
+  DemoActivity,
+  DemoActivityIndicators,
+  DemoWrapupButton,
+} from "./demo-activity";
 import { DemoPreviewStage } from "./demo-preview";
 import {
   useDemoController,
@@ -41,7 +45,7 @@ import {
 } from "./demo.hooks";
 import { OverlayEditor } from "./overlay-editor";
 import { useDemoLayoutStore } from "./demo.stores";
-import { ActivityContent, WrapupButton } from "./panels";
+import { ActivityContent, ActivityIndicators, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
 import {
   useCurrentBroadcast,
@@ -71,6 +75,14 @@ function fromLocalInput(local: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function voiceSetting(raw: string, fallback: number): number {
+  const n = Number(raw);
+  if (raw.trim() === "" || !Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(1, Math.max(0, n));
+}
+
 function buildForm(s: StreamSettings): SettingsForm {
   return {
     title: s.title,
@@ -85,6 +97,8 @@ function buildForm(s: StreamSettings): SettingsForm {
     scoringEnabled: s.scoringEnabled,
     banMode: s.banMode,
     ttsMode: s.ttsMode,
+    ttsStability: String(s.ttsStability),
+    ttsSimilarity: String(s.ttsSimilarity),
     askMode: s.askMode,
     highlightingEnabled: s.highlightingEnabled,
     usefulInfoEnabled: s.usefulInfoEnabled,
@@ -463,6 +477,8 @@ export default function LivePage() {
     scoringEnabled: f.scoringEnabled,
     banMode: f.banMode,
     ttsMode: f.ttsMode,
+    ttsStability: voiceSetting(f.ttsStability, 0.5),
+    ttsSimilarity: voiceSetting(f.ttsSimilarity, 0.75),
     askMode: f.askMode,
     highlightingEnabled: f.highlightingEnabled,
     usefulInfoEnabled: f.usefulInfoEnabled,
@@ -514,18 +530,22 @@ export default function LivePage() {
   const disconnected = broadcast ? isFeedDisconnected(broadcast) : false;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-3.5rem)] w-full max-w-6xl flex-col">
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col">
       <Tabs
         value={tab}
         onValueChange={setTab}
         className="flex min-h-0 flex-1 flex-col"
       >
         <div className="mx-4 mt-4 flex shrink-0 items-center justify-between gap-2">
-          <TabsList>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-          </TabsList>
+          <div className="flex min-w-0 items-center gap-2">
+            <TabsList>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+              <TabsTrigger value="preview">Preview</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            </TabsList>
+            {tab === "activity" &&
+              (demo ? <DemoActivityIndicators /> : <ActivityIndicators />)}
+          </div>
           <div className="flex items-center gap-3">
             {settings?.channelSlug &&
               !demo &&

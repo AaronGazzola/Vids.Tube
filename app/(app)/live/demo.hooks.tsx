@@ -28,9 +28,17 @@ import { DEMO_GOAL_TARGETS, mergeDemoLayout } from "./demo.types";
 // any changes the owner makes (drag, toggle, background) back to the DB. Saves
 // only fire for configs that diverge from the hydrated baseline, so the default
 // layout is a display fallback and is never persisted on its own.
+// Hydration and the save gate key off the store's own `hydrated` flag, not a
+// component ref: Fast Refresh recreates the store (config back to defaults,
+// hydrated back to false) while component refs survive, so a ref-based gate
+// would persist the defaults. The store flag blocks saves in that window and
+// triggers re-hydration from the query cache, which save successes keep
+// current via setQueryData.
 export function useDemoLayout(enabled: boolean) {
   const hydrate = useDemoLayoutStore((s) => s.hydrate);
   const config = useDemoLayoutStore((s) => s.config);
+  const hydrated = useDemoLayoutStore((s) => s.hydrated);
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["demo-layout"],
     queryFn: () => getDemoLayoutAction(),
@@ -42,31 +50,34 @@ export function useDemoLayout(enabled: boolean) {
       if ("error" in res) throw new Error(res.error);
       return res.data;
     },
+    onSuccess: (_data, saved) => {
+      queryClient.setQueryData(["demo-layout"], saved);
+    },
   });
 
-  const hydratedRef = useRef(false);
   const lastSavedRef = useRef<string>("");
   const configRef = useRef(config);
+  const hydratedRef = useRef(hydrated);
 
   useEffect(() => {
     configRef.current = config;
-  }, [config]);
+    hydratedRef.current = hydrated;
+  }, [config, hydrated]);
 
   // Hydrate only from a fetch completed in this mount — cached data from a
   // previous visit may predate saves made since, and hydrating from it would
   // revert the layout and then persist the reversion on the next edit.
   const fetchedFresh = query.isFetchedAfterMount && !query.isError;
   useEffect(() => {
-    if (fetchedFresh && query.data !== undefined && !hydratedRef.current) {
-      hydratedRef.current = true;
+    if (fetchedFresh && query.data !== undefined && !hydrated) {
       lastSavedRef.current = JSON.stringify(mergeDemoLayout(query.data));
       hydrate(query.data);
     }
-  }, [fetchedFresh, query.data, hydrate]);
+  }, [fetchedFresh, query.data, hydrated, hydrate]);
 
   const saveMutate = save.mutate;
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydrated) return;
     const serialized = JSON.stringify(config);
     if (serialized === lastSavedRef.current) return;
     const t = setTimeout(() => {
@@ -74,7 +85,7 @@ export function useDemoLayout(enabled: boolean) {
       saveMutate(config);
     }, 700);
     return () => clearTimeout(t);
-  }, [config, saveMutate]);
+  }, [hydrated, config, saveMutate]);
 
   useEffect(() => {
     return () => {
@@ -85,10 +96,6 @@ export function useDemoLayout(enabled: boolean) {
       saveMutate(configRef.current);
     };
   }, [saveMutate]);
-
-  useEffect(() => {
-    if (!enabled) hydratedRef.current = false;
-  }, [enabled]);
 
   return { hydrated: query.isSuccess };
 }

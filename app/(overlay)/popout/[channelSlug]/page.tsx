@@ -1,7 +1,7 @@
 "use client";
 
 import { useCurrentBroadcast } from "@/app/(app)/live/broadcast.hooks";
-import { ActivityContent } from "@/app/(app)/live/panels";
+import { ActivityContent, ActivityIndicators } from "@/app/(app)/live/panels";
 import { LivePlayer } from "@/components/live-player";
 import { DisconnectedOverlay } from "@/components/live-stage";
 import { isFeedDisconnected } from "@/lib/stream";
@@ -36,8 +36,13 @@ export default function PopoutPage() {
     return <PreviewPopout />;
   }
   return (
-    <div className="flex h-screen flex-col bg-background p-3 text-foreground">
-      <ActivityContent />
+    <div className="flex h-screen flex-col gap-3 bg-background p-3 text-foreground">
+      <div className="flex shrink-0 items-center">
+        <ActivityIndicators />
+      </div>
+      <div className="min-h-0 flex-1">
+        <ActivityContent />
+      </div>
     </div>
   );
 }

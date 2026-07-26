@@ -85,12 +85,10 @@ export function CompetitionLadder({
   entries,
   size = 56,
   gap = 6,
-  opacity = 1,
 }: {
   entries: CompetitionEntry[];
   size?: number;
   gap?: number;
-  opacity?: number;
 }) {
   const ranked = [...entries].sort((a, b) => b.score - a.score);
   const standings = computeStandings(
@@ -132,7 +130,7 @@ export function CompetitionLadder({
   }, [burst]);
 
   return (
-    <div className="relative" style={{ width, height, opacity }}>
+    <div className="relative" style={{ width, height }}>
       {ranked.map((e) => {
         const st = standings.get(e.key) ?? { rank: ranked.length, progress: 0 };
         const f = rankScale(st.rank);

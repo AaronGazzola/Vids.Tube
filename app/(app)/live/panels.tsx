@@ -21,7 +21,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -40,8 +39,17 @@ import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { channelAssetUrl } from "@/lib/storage";
 import { useChatAutoScroll } from "@/lib/use-chat-autoscroll";
 import { cn } from "@/lib/utils";
-import { ChevronDown, EllipsisVertical, Info, Sparkles } from "lucide-react";
-import { useState } from "react";
+import {
+  EllipsisVertical,
+  HelpCircle,
+  Info,
+  Scissors,
+  Shield,
+  Sparkles,
+  Trophy,
+  Volume2,
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
 import {
   useOverlayContext,
   useViewerLeaderboard,
@@ -102,19 +110,17 @@ function MetricBar({
   pct: number;
 }) {
   return (
-    <div className="min-w-0 flex-1 space-y-1">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="font-medium capitalize">{label}</span>
-        <span className="tabular-nums text-muted-foreground">
-          {current} / {goal}
-        </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="shrink-0 text-xs font-medium capitalize">{label}</span>
+      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-primary"
           style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
         />
       </div>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {current}/{goal}
+      </span>
     </div>
   );
 }
@@ -134,26 +140,35 @@ function GoalsHeader({ channelSlug }: { channelSlug: string }) {
       <MetricBar
         label="subs"
         current={metrics.subs.current}
-        goal={metrics.subs.goal}
+        goal={metrics.subs.target}
         pct={metrics.subs.pct}
       />
       <MetricBar
         label="likes"
         current={metrics.likes.current}
-        goal={metrics.likes.goal}
+        goal={metrics.likes.target}
         pct={metrics.likes.pct}
       />
       <MetricBar
         label="viewers"
         current={metrics.viewers.current}
-        goal={metrics.viewers.goal}
+        goal={metrics.viewers.target}
         pct={metrics.viewers.pct}
       />
     </div>
   );
 }
 
-// ── Competition (collapsible) ─────────────────────────────────────────────
+// ── Indicator popovers (tab-bar row) ──────────────────────────────────────
+
+function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 function competitorLabel(v: ViewerScoreWithAuthor): string {
   return v.author?.handle ? `@${v.author.handle}` : v.author?.name ?? "viewer";
@@ -163,28 +178,6 @@ function competitorAvatar(v: ViewerScoreWithAuthor): string {
   return (
     (v.author?.avatarUrl ?? channelAssetUrl(v.author?.avatarPath ?? null)) ||
     placeholderAvatar(v.author?.handle ?? v.author?.name)
-  );
-}
-
-function CompetitorBadge({
-  v,
-  rank,
-}: {
-  v: ViewerScoreWithAuthor;
-  rank: number;
-}) {
-  const label = competitorLabel(v);
-  const url = competitorAvatar(v);
-  return (
-    <Badge variant="secondary" className="gap-1.5 py-1 pl-1.5 pr-2 text-xs font-normal">
-      <span className="font-bold text-muted-foreground">#{rank}</span>
-      <Avatar className="h-4 w-4 shrink-0">
-        {url && <AvatarImage src={url} alt={label} />}
-        <AvatarFallback className="text-[8px]">{initials(label)}</AvatarFallback>
-      </Avatar>
-      <span className="max-w-28 truncate">{label}</span>
-      <span className="font-bold tabular-nums">{v.total_score}</span>
-    </Badge>
   );
 }
 
@@ -210,52 +203,48 @@ function CompetitionRow({
   );
 }
 
-function Competition({ streamId }: { streamId: string | null }) {
-  const { data: leaderboard, isPending } = useViewerLeaderboard(streamId);
-  const [expanded, setExpanded] = useState(false);
+function CompetitionIndicator({ streamId }: { streamId: string | null }) {
+  const { data: leaderboard } = useViewerLeaderboard(streamId);
   const rows = leaderboard ?? [];
-  const top3 = rows.slice(0, 3);
+  const leader = rows[0];
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setExpanded((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2"
-      >
-        {expanded ? (
-          <span className="text-sm font-semibold">Competition</span>
-        ) : isPending && streamId ? (
-          <Skeleton className="h-6 w-40" />
-        ) : rows.length === 0 ? (
-          <span className="text-xs text-muted-foreground">No scores yet.</span>
-        ) : (
-          <span className="flex flex-wrap gap-2">
-            {top3.map((v, i) => (
-              <CompetitorBadge key={v.participant_key} v={v} rank={i + 1} />
-            ))}
-          </span>
-        )}
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 transition-transform",
-            expanded && "rotate-180"
-          )}
-        />
-      </button>
-      {expanded && (
-        <div className="border-t px-3 py-2">
-          {rows.length === 0 ? (
-            <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 rounded-full"
+          aria-label="Competition leaderboard"
+        >
+          {leader ? (
+            <Avatar className="h-6 w-6">
+              <AvatarImage
+                src={competitorAvatar(leader)}
+                alt={competitorLabel(leader)}
+              />
+              <AvatarFallback className="text-[9px]">
+                {initials(competitorLabel(leader))}
+              </AvatarFallback>
+            </Avatar>
           ) : (
-            <ul>
-              {rows.map((v, i) => (
-                <CompetitionRow key={v.participant_key} v={v} rank={i + 1} />
-              ))}
-            </ul>
+            <Trophy className="h-4 w-4" />
           )}
-        </div>
-      )}
-    </div>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72">
+        <p className="text-sm font-semibold">Competition</p>
+        {rows.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+        ) : (
+          <ul className="mt-1 max-h-80 overflow-y-auto">
+            {rows.map((v, i) => (
+              <CompetitionRow key={v.participant_key} v={v} rank={i + 1} />
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -377,25 +366,70 @@ function MessageMenu({
   );
 }
 
-function StatusChip({
-  status,
+type CardTone = "amber" | "violet" | "sky";
+
+const CARD_TONE: Record<CardTone, string> = {
+  amber: "border-amber-400/50 bg-amber-400/10",
+  violet: "border-violet-400/50 bg-violet-400/10",
+  sky: "border-sky-400/50 bg-sky-400/10",
+};
+
+const PILL_TONE: Record<CardTone, string> = {
+  amber: "bg-amber-400/15 text-amber-700 dark:text-amber-300",
+  violet: "bg-violet-400/15 text-violet-700 dark:text-violet-300",
+  sky: "bg-sky-400/15 text-sky-700 dark:text-sky-300",
+};
+
+function StatusPill({
   tone,
+  label,
+  icon,
 }: {
-  status: string;
-  tone: "violet" | "sky";
+  tone: CardTone;
+  label: string;
+  icon?: ReactNode;
 }) {
   return (
     <span
       className={cn(
-        "ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] font-semibold uppercase align-middle",
-        tone === "violet"
-          ? "bg-violet-400/15 text-violet-600 dark:text-violet-300"
-          : "bg-sky-400/15 text-sky-600 dark:text-sky-300"
+        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+        PILL_TONE[tone]
       )}
     >
-      {status}
+      {icon}
+      {label}
     </span>
   );
+}
+
+function ttsStatusLabel(status: string): string {
+  switch (status) {
+    case "suggested":
+      return "TTS · pending";
+    case "approved":
+      return "TTS · approved";
+    case "played":
+      return "TTS · played";
+    case "dismissed":
+      return "TTS · dismissed";
+    default:
+      return `TTS · ${status}`;
+  }
+}
+
+function askStatusLabel(status: string): string {
+  switch (status) {
+    case "suggested":
+      return "Ask · pending";
+    case "approved":
+      return "Ask · answered";
+    case "shown":
+      return "Ask · shown";
+    case "dismissed":
+      return "Ask · dismissed";
+    default:
+      return `Ask · ${status}`;
+  }
 }
 
 function ChatMessageRow({
@@ -424,7 +458,6 @@ function ChatMessageRow({
   const [dismissed, setDismissed] = useState(false);
 
   const hidden = !!msg.hidden_at;
-  const suggested = !!featured && !featured.promoted_at && !dismissed;
 
   // Hidden + collapsed → thin row with a Reveal popover.
   if (hidden && !revealed) {
@@ -477,10 +510,19 @@ function ChatMessageRow({
     );
   }
 
-  // Suggested TTS request → violet card with inline Approve / Dismiss.
-  if (tts?.status === "suggested") {
+  // Any TTS (!tts) request → violet card, so every read-aloud request stays
+  // visible whatever its state (pending, approved, played, dismissed). Approve /
+  // Dismiss show only while it's still pending.
+  if (tts) {
+    const pending = tts.status === "suggested";
     return (
-      <li className="rounded-md border border-violet-400/50 bg-violet-400/10 p-2">
+      <li
+        className={cn(
+          "rounded-md border p-2",
+          CARD_TONE.violet,
+          tts.status === "dismissed" && "opacity-70"
+        )}
+      >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <ChatAuthor message={msg} size="chat" className="mr-1" />
@@ -491,35 +533,53 @@ function ChatMessageRow({
               </span>
             )}
           </div>
-          <MessageMenu msg={msg} streamId={streamId} />
+          {msg.origin !== "bot" && <MessageMenu msg={msg} streamId={streamId} />}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <Button
-            size="sm"
-            className="h-6 px-2 text-xs"
-            disabled={approveTts.isPending}
-            onClick={() => approveTts.mutate(tts.id)}
-          >
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs text-muted-foreground"
-            disabled={dismissTts.isPending}
-            onClick={() => dismissTts.mutate(tts.id)}
-          >
-            Dismiss
-          </Button>
+          <StatusPill
+            tone="violet"
+            icon={<Volume2 className="h-3 w-3" />}
+            label={ttsStatusLabel(tts.status)}
+          />
+          {pending && (
+            <>
+              <Button
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled={approveTts.isPending}
+                onClick={() => approveTts.mutate(tts.id)}
+              >
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                disabled={dismissTts.isPending}
+                onClick={() => dismissTts.mutate(tts.id)}
+              >
+                Dismiss
+              </Button>
+            </>
+          )}
         </div>
       </li>
     );
   }
 
-  // Suggested ask → sky card with the AI answer preview and three choices.
-  if (ask?.status === "suggested") {
+  // Any ask (!ask) request → sky card with the AI answer preview, so every
+  // question stays visible whatever its state (pending, answered, shown,
+  // dismissed). The three answer choices show only while pending.
+  if (ask) {
+    const pending = ask.status === "suggested";
     return (
-      <li className="rounded-md border border-sky-400/50 bg-sky-400/10 p-2">
+      <li
+        className={cn(
+          "rounded-md border p-2",
+          CARD_TONE.sky,
+          ask.status === "dismissed" && "opacity-70"
+        )}
+      >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <ChatAuthor message={msg} size="chat" className="mr-1" />
@@ -535,48 +595,64 @@ function ChatMessageRow({
               </span>
             )}
           </div>
-          <MessageMenu msg={msg} streamId={streamId} />
+          {msg.origin !== "bot" && <MessageMenu msg={msg} streamId={streamId} />}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          {ask.answer && (
-            <Button
-              size="sm"
-              className="h-6 px-2 text-xs"
-              disabled={approveAsk.isPending}
-              onClick={() => approveAsk.mutate({ id: ask.id, includeAnswer: true })}
-            >
-              Answer
-            </Button>
+          <StatusPill
+            tone="sky"
+            icon={<HelpCircle className="h-3 w-3" />}
+            label={askStatusLabel(ask.status)}
+          />
+          {pending && (
+            <>
+              {ask.answer && (
+                <Button
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={approveAsk.isPending}
+                  onClick={() =>
+                    approveAsk.mutate({ id: ask.id, includeAnswer: true })
+                  }
+                >
+                  Answer
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={ask.answer ? "outline" : "default"}
+                className="h-6 px-2 text-xs"
+                disabled={approveAsk.isPending}
+                onClick={() =>
+                  approveAsk.mutate({ id: ask.id, includeAnswer: false })
+                }
+              >
+                {ask.answer ? "Question only" : "Show question"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                disabled={dismissAsk.isPending}
+                onClick={() => dismissAsk.mutate(ask.id)}
+              >
+                Dismiss
+              </Button>
+            </>
           )}
-          <Button
-            size="sm"
-            variant={ask.answer ? "outline" : "default"}
-            className="h-6 px-2 text-xs"
-            disabled={approveAsk.isPending}
-            onClick={() =>
-              approveAsk.mutate({ id: ask.id, includeAnswer: false })
-            }
-          >
-            {ask.answer ? "Question only" : "Show question"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs text-muted-foreground"
-            disabled={dismissAsk.isPending}
-            onClick={() => dismissAsk.mutate(ask.id)}
-          >
-            Dismiss
-          </Button>
         </div>
       </li>
     );
   }
 
-  // Feature-suggested → prominent styling with Highlight / Dismiss.
-  if (suggested && featured) {
+  // Any featured message → amber card, so AI-highlighted messages stay visually
+  // distinct even when auto-display promoted them straight to the overlay. While
+  // pending (manual mode, not yet promoted) show Highlight / Dismiss; once on the
+  // overlay show an "on overlay" pill instead. A locally-dismissed suggestion
+  // falls through to the normal row below.
+  if (featured && msg.origin !== "bot" && !dismissed) {
+    const promoted = !!featured.promoted_at;
     return (
-      <li className="rounded-md border border-amber-400/50 bg-amber-400/10 p-2">
+      <li className={cn("rounded-md border p-2", CARD_TONE.amber)}>
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <ChatAuthor message={msg} size="chat" className="mr-1" />
@@ -585,23 +661,47 @@ function ChatMessageRow({
           <MessageMenu msg={msg} streamId={streamId} />
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <Button
-            size="sm"
-            className="h-6 px-2 text-xs"
-            disabled={promote.isPending}
-            onClick={() => promote.mutate(featured.id)}
-          >
-            Highlight
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs text-muted-foreground"
-            disabled={dismiss.isPending}
-            onClick={() => setDismissed(true)}
-          >
-            Dismiss
-          </Button>
+          {promoted ? (
+            <>
+              <StatusPill
+                tone="amber"
+                icon={<Sparkles className="h-3 w-3" />}
+                label="Highlighted"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                disabled={promote.isPending}
+                onClick={() => promote.mutate(featured.id)}
+              >
+                Show again
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled={promote.isPending}
+                onClick={() => promote.mutate(featured.id)}
+              >
+                Highlight
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                disabled={dismiss.isPending}
+                onClick={() => setDismissed(true)}
+              >
+                Dismiss
+              </Button>
+            </>
+          )}
+          <span className="text-[10px] font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+            score {featured.score}
+          </span>
           {featured.reason && (
             <Popover>
               <PopoverTrigger asChild>
@@ -625,11 +725,10 @@ function ChatMessageRow({
     );
   }
 
-  // Normal (incl. already highlighted/dismissed → secondary styling; handled
-  // tts/ask rows carry a color-matched status chip; clip requests carry an
-  // emerald accent with the marker timestamp). The three-dot menu stays
-  // visible so highlighted messages keep their actions; bot rows are the
-  // bot's own output and carry no moderation or scoring.
+  // Normal row (bot output, or a locally-dismissed featured suggestion). TTS,
+  // ask, and un-dismissed featured messages are handled as cards above; clip
+  // requests carry an emerald accent with the marker timestamp. The three-dot
+  // menu stays visible on viewer rows; bot rows carry no moderation or scoring.
   return (
     <li
       className={cn(
@@ -646,8 +745,6 @@ function ChatMessageRow({
           </code>
         )}
         <ChatText text={msg.body} className="text-sm" />
-        {tts && <StatusChip status={tts.status} tone="violet" />}
-        {ask && <StatusChip status={ask.status} tone="sky" />}
         {featured && msg.origin !== "bot" && (
           <span className="ml-1 align-middle">
             <ScoreBadge score={featured.score} reason={featured.reason} />
@@ -763,73 +860,70 @@ function formatClipTime(totalSeconds: number): string {
     : `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function ClipMarkersPanel({ streamId }: { streamId: string | null }) {
+function ClipMarkersIndicator({ streamId }: { streamId: string | null }) {
   const { data: markers } = useClipMarkers(streamId);
-  const [open, setOpen] = useState(false);
-
   const items = markers ?? [];
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative h-8 w-8"
+          aria-label="Clip markers"
+        >
+          <Scissors className="h-4 w-4" />
+          <CountBadge count={items.length} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-2">
+        <p className="px-1 pb-1 text-sm font-semibold">
           Clip markers
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {items.length}
-            {!streamId && items[0]?.streamTitle
-              ? ` · ${items[0].streamTitle}`
-              : ""}
-          </span>
-        </span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="border-t p-2">
-          {items.length === 0 ? (
-            <p className="px-1 py-2 text-xs text-muted-foreground">
-              No clip markers yet — viewers drop them with !clip.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {items.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
-                >
-                  <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
-                    {formatClipTime(m.streamTimeS)}
-                  </code>
-                  <div className="min-w-0 flex-1">
-                    <OriginBadge origin={m.origin} className="mr-1" />
-                    <span className="font-semibold">{m.authorName ?? "viewer"}</span>
-                    {m.snippet && (
-                      <span className="block text-muted-foreground">
-                        {m.snippet}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+          {!streamId && items[0]?.streamTitle && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {items[0].streamTitle}
+            </span>
           )}
-        </div>
-      )}
-    </div>
+        </p>
+        {items.length === 0 ? (
+          <p className="px-1 py-2 text-xs text-muted-foreground">
+            No clip markers yet — viewers drop them with !clip.
+          </p>
+        ) : (
+          <ul className="max-h-80 space-y-1 overflow-y-auto">
+            {items.map((m) => (
+              <li
+                key={m.id}
+                className="flex items-start gap-2 rounded border px-2 py-1.5 text-xs"
+              >
+                <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                  {formatClipTime(m.streamTimeS)}
+                </code>
+                <div className="min-w-0 flex-1">
+                  <OriginBadge origin={m.origin} className="mr-1" />
+                  <span className="font-semibold">{m.authorName ?? "viewer"}</span>
+                  {m.snippet && (
+                    <span className="block text-muted-foreground">
+                      {m.snippet}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function ModBotActions({ streamId }: { streamId: string }) {
+function ModBotActionsIndicator({ streamId }: { streamId: string }) {
   const { data: feed } = useModerationFeed(streamId);
   const approve = useApproveSuggestion(streamId);
   const dismiss = useDismissSuggestion(streamId);
   const unhide = useUnhideMessage(streamId);
   const unban = useUnbanParticipant(streamId);
-  const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"hidden" | "banned">("hidden");
 
   const actions = feed?.actions ?? [];
@@ -838,21 +932,21 @@ function ModBotActions({ streamId }: { streamId: string }) {
   const list = tab === "hidden" ? hidden : banned;
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
-          Mod bot actions
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {hidden.length} hidden · {banned.length} banned
-          </span>
-        </span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="border-t p-2">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative h-8 w-8"
+          aria-label="Mod bot actions"
+        >
+          <Shield className="h-4 w-4" />
+          <CountBadge count={actions.length} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-2">
+        <p className="px-1 pb-1 text-sm font-semibold">Mod bot actions</p>
+        <div>
           <div className="mb-2 flex gap-1">
             {(["hidden", "banned"] as const).map((t) => (
               <button
@@ -872,7 +966,7 @@ function ModBotActions({ streamId }: { streamId: string }) {
               Nothing here yet.
             </p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="max-h-80 space-y-1 overflow-y-auto">
               {list.map((a) => (
                 <li
                   key={a.id}
@@ -937,12 +1031,28 @@ function ModBotActions({ streamId }: { streamId: string }) {
             </ul>
           )}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
 // ── Activity tab ──────────────────────────────────────────────────────────
+
+// Icon-with-badge popovers rendered in the tab bar next to the tab triggers
+// (and in the pop-out header): goals, competition, mod bot actions, clip
+// markers. The competition trigger is the leading chatter's avatar.
+export function ActivityIndicators() {
+  const { data: ctx } = useOverlayContext();
+  const streamId = ctx?.streamId ?? null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <CompetitionIndicator streamId={streamId} />
+      {streamId && <ModBotActionsIndicator streamId={streamId} />}
+      <ClipMarkersIndicator streamId={streamId} />
+    </div>
+  );
+}
 
 // Shared Activity content — rendered both in the /live Activity tab and, verbatim,
 // in the pop-out window so the two match exactly.
@@ -952,32 +1062,21 @@ export function ActivityContent() {
 
   if (!streamId && !isPending) {
     return (
-      <div className="space-y-3">
-        <div className="flex min-h-60 items-center justify-center rounded-lg border text-sm text-muted-foreground">
-          No active broadcast — go live and this fills with goals, chat, and mod
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex flex-1 items-center justify-center rounded-lg border text-sm text-muted-foreground">
+          No active broadcast — go live and this fills with chat and mod
           activity.
         </div>
-        <ClipMarkersPanel streamId={null} />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="shrink-0 rounded-lg border p-3">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="shrink-0 rounded-lg border px-3 py-1.5">
         <GoalsHeader channelSlug={ctx?.channelSlug ?? ""} />
       </div>
-
       {streamId && <ChatPanel streamId={streamId} />}
-
-      <div className="shrink-0 rounded-lg border p-3">
-        <Competition streamId={streamId} />
-      </div>
-      {streamId && (
-        <div className="shrink-0 space-y-3">
-          <ModBotActions streamId={streamId} />
-        </div>
-      )}
     </div>
   );
 }

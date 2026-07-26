@@ -50,7 +50,7 @@ async function main() {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (!owner) fail("no channel");
+  if (!owner || !owner.owner_user_id) fail("no owned channel");
   const userId = owner.owner_user_id;
 
   const { data: existing } = await admin

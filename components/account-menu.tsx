@@ -22,25 +22,44 @@ function initials(email: string | undefined) {
   return email.slice(0, 2).toUpperCase();
 }
 
-export function AccountMenu() {
+export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
   const user = useAuthStore((state) => state.user);
   const { signOut } = useUserAuth();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full"
-          aria-label="Account menu"
-        >
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>{initials(user?.email)}</AvatarFallback>
-          </Avatar>
-        </Button>
+        {collapsed ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            aria-label="Account menu"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>{initials(user?.email)}</AvatarFallback>
+            </Avatar>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            className="h-auto w-full justify-start gap-2 px-2 py-1.5"
+            aria-label="Account menu"
+          >
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback>{initials(user?.email)}</AvatarFallback>
+            </Avatar>
+            <span className="max-w-40 min-w-0 flex-1 truncate text-left text-sm font-medium">
+              {user?.email ?? "Account"}
+            </span>
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent
+        side={collapsed ? "right" : "top"}
+        align="start"
+        className="w-52"
+      >
         <DropdownMenuLabel className="truncate">
           {user?.email ?? "Account"}
         </DropdownMenuLabel>

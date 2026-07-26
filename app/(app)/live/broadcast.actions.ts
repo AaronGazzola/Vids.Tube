@@ -495,6 +495,15 @@ export async function discardBroadcastAction(): Promise<
 }
 
 const DEFAULT_GOAL_TARGETS = { subs: 1000, likes: 500, viewers: 100 };
+const DEFAULT_TTS_STABILITY = 0.5;
+const DEFAULT_TTS_SIMILARITY = 0.75;
+
+function clampVoiceSetting(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(1, Math.max(0, value));
+}
 
 export type StreamSettings = {
   streamId: string | null;
@@ -508,6 +517,8 @@ export type StreamSettings = {
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
   ttsMode: "suggest" | "auto";
+  ttsStability: number;
+  ttsSimilarity: number;
   askMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
@@ -532,6 +543,8 @@ export type StreamSettingsInput = {
   scoringEnabled: boolean;
   banMode: "suggest" | "auto";
   ttsMode: "suggest" | "auto";
+  ttsStability: number;
+  ttsSimilarity: number;
   askMode: "suggest" | "auto";
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
@@ -588,6 +601,8 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       scoringEnabled: false,
       banMode: "suggest",
       ttsMode: "suggest",
+      ttsStability: DEFAULT_TTS_STABILITY,
+      ttsSimilarity: DEFAULT_TTS_SIMILARITY,
       askMode: "suggest",
       highlightingEnabled: true,
       usefulInfoEnabled: false,
@@ -612,7 +627,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
   const { data: scoring } = await supabaseAdmin
     .from("chat_scoring_state")
     .select(
-      "enabled, moderation_mode, tts_mode, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled, bridge_enabled"
+      "enabled, moderation_mode, tts_mode, tts_stability, tts_similarity, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled, bridge_enabled"
     )
     .eq("stream_id", stream.id)
     .maybeSingle();
@@ -633,6 +648,8 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     scoringEnabled: scoring?.enabled ?? false,
     banMode: scoring?.moderation_mode === "auto" ? "auto" : "suggest",
     ttsMode: scoring?.tts_mode === "auto" ? "auto" : "suggest",
+    ttsStability: scoring?.tts_stability ?? DEFAULT_TTS_STABILITY,
+    ttsSimilarity: scoring?.tts_similarity ?? DEFAULT_TTS_SIMILARITY,
     askMode: scoring?.ask_mode === "auto" ? "auto" : "suggest",
     usefulInfoEnabled: scoring?.useful_info_enabled ?? false,
     competitionStatusEnabled: scoring?.competition_status_enabled ?? false,
@@ -797,6 +814,8 @@ export async function saveStreamSettingsAction(
         enabled: input.scoringEnabled,
         moderation_mode: input.banMode === "auto" ? "auto" : "manual",
         tts_mode: input.ttsMode === "auto" ? "auto" : "suggest",
+        tts_stability: clampVoiceSetting(input.ttsStability, DEFAULT_TTS_STABILITY),
+        tts_similarity: clampVoiceSetting(input.ttsSimilarity, DEFAULT_TTS_SIMILARITY),
         ask_mode: input.askMode === "auto" ? "auto" : "suggest",
         useful_info_enabled: input.usefulInfoEnabled,
         competition_status_enabled: input.competitionStatusEnabled,

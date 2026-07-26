@@ -11,7 +11,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,10 +30,11 @@ import { useChatAutoScroll } from "@/lib/use-chat-autoscroll";
 import { cn } from "@/lib/utils";
 import {
   Bot,
-  ChevronDown,
   EllipsisVertical,
   Info,
+  Shield,
   Sparkles,
+  Trophy,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -67,19 +67,17 @@ function MetricBar({
   pct: number;
 }) {
   return (
-    <div className="min-w-0 flex-1 space-y-1">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="font-medium capitalize">{label}</span>
-        <span className="tabular-nums text-muted-foreground">
-          {current} / {goal}
-        </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="shrink-0 text-xs font-medium capitalize">{label}</span>
+      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-primary"
           style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
         />
       </div>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {current}/{goal}
+      </span>
     </div>
   );
 }
@@ -89,9 +87,9 @@ function GoalsHeader({ goals }: { goals: Counts | null }) {
   const m = computeGoalProgress(counts, null, goals ?? DEMO_GOAL_TARGETS);
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <MetricBar label="subs" current={m.subs.current} goal={m.subs.goal} pct={m.subs.pct} />
-      <MetricBar label="likes" current={m.likes.current} goal={m.likes.goal} pct={m.likes.pct} />
-      <MetricBar label="viewers" current={m.viewers.current} goal={m.viewers.goal} pct={m.viewers.pct} />
+      <MetricBar label="subs" current={m.subs.current} goal={m.subs.target} pct={m.subs.pct} />
+      <MetricBar label="likes" current={m.likes.current} goal={m.likes.target} pct={m.likes.pct} />
+      <MetricBar label="viewers" current={m.viewers.current} goal={m.viewers.target} pct={m.viewers.pct} />
     </div>
   );
 }
@@ -113,83 +111,72 @@ function useRanked(): Ranked[] {
   );
 }
 
-function CompetitorBadge({ x, rank }: { x: Ranked; rank: number }) {
-  const label = labelOf(x.v);
+function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
   return (
-    <Badge variant="secondary" className="gap-1.5 py-1 pl-1.5 pr-2 text-xs font-normal">
-      <span className="font-bold text-muted-foreground">#{rank}</span>
-      <Avatar className="h-4 w-4 shrink-0">
-        <AvatarImage src={x.v.avatarUrl} alt={label} />
-        <AvatarFallback className="text-[8px]">{initials(label)}</AvatarFallback>
-      </Avatar>
-      <span className="max-w-28 truncate">{label}</span>
-      <span className="font-bold tabular-nums">{x.total}</span>
-    </Badge>
+    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 
-function Competition() {
+function CompetitionIndicator() {
   const ranked = useRanked();
-  const [expanded, setExpanded] = useState(false);
-  const top3 = ranked.slice(0, 3);
+  const leader = ranked[0];
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setExpanded((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2"
-      >
-        {expanded ? (
-          <span className="text-sm font-semibold">Competition</span>
-        ) : ranked.length === 0 ? (
-          <span className="text-xs text-muted-foreground">No scores yet.</span>
-        ) : (
-          <span className="flex flex-wrap gap-2">
-            {top3.map((x, i) => (
-              <CompetitorBadge key={x.v.key} x={x} rank={i + 1} />
-            ))}
-          </span>
-        )}
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 transition-transform",
-            expanded && "rotate-180"
-          )}
-        />
-      </button>
-      {expanded && (
-        <div className="border-t px-3 py-2">
-          {ranked.length === 0 ? (
-            <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 rounded-full"
+          aria-label="Competition leaderboard"
+        >
+          {leader ? (
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={leader.v.avatarUrl} alt={labelOf(leader.v)} />
+              <AvatarFallback className="text-[9px]">
+                {initials(labelOf(leader.v))}
+              </AvatarFallback>
+            </Avatar>
           ) : (
-            <ul>
-              {ranked.map((x, i) => {
-                const label = labelOf(x.v);
-                return (
-                  <li key={x.v.key} className="flex items-center gap-2 py-1">
-                    <span className="w-5 text-xs text-muted-foreground">
-                      #{i + 1}
-                    </span>
-                    <Avatar className="h-5 w-5 shrink-0">
-                      <AvatarImage src={x.v.avatarUrl} alt={label} />
-                      <AvatarFallback className="text-[9px]">
-                        {initials(label)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="min-w-0 flex-1 truncate text-xs">
-                      {label}
-                    </span>
-                    <span className="text-xs font-bold tabular-nums">
-                      {x.total}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <Trophy className="h-4 w-4" />
           )}
-        </div>
-      )}
-    </div>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72">
+        <p className="text-sm font-semibold">Competition</p>
+        {ranked.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">No scores yet.</p>
+        ) : (
+          <ul className="mt-1 max-h-80 overflow-y-auto">
+            {ranked.map((x, i) => {
+              const label = labelOf(x.v);
+              return (
+                <li key={x.v.key} className="flex items-center gap-2 py-1">
+                  <span className="w-5 text-xs text-muted-foreground">
+                    #{i + 1}
+                  </span>
+                  <Avatar className="h-5 w-5 shrink-0">
+                    <AvatarImage src={x.v.avatarUrl} alt={label} />
+                    <AvatarFallback className="text-[9px]">
+                      {initials(label)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {label}
+                  </span>
+                  <span className="text-xs font-bold tabular-nums">
+                    {x.total}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -318,7 +305,6 @@ function RequestStatusChip({
 function ViewerChatRow({ msg }: { msg: DemoMessage }) {
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const unhide = useDemoGeneratorStore((s) => s.unhideMessage);
-  const hide = useDemoGeneratorStore((s) => s.hideMessage);
   const highlight = useDemoGeneratorStore((s) => s.highlightMessage);
   const dismiss = useDemoGeneratorStore((s) => s.dismissMessage);
   const ttsRequests = useDemoGeneratorStore((s) => s.tts);
@@ -558,13 +544,12 @@ function ChatPanel() {
 
 // ── Mod bot actions ────────────────────────────────────────────────────────
 
-function ModBotActions() {
+function ModBotActionsIndicator() {
   const mod = useDemoGeneratorStore((s) => s.mod);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
   const approve = useDemoGeneratorStore((s) => s.approveMod);
   const dismiss = useDemoGeneratorStore((s) => s.dismissMod);
   const unban = useDemoGeneratorStore((s) => s.unbanViewer);
-  const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"hidden" | "banned">("hidden");
 
   const hidden = mod.filter((a) => a.action === "hide");
@@ -572,21 +557,21 @@ function ModBotActions() {
   const list = tab === "hidden" ? hidden : banned;
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
-      >
-        <span>
-          Mod bot actions
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {hidden.length} hidden · {banned.length} banned
-          </span>
-        </span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="border-t p-2">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative h-8 w-8"
+          aria-label="Mod bot actions"
+        >
+          <Shield className="h-4 w-4" />
+          <CountBadge count={mod.length} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-2">
+        <p className="px-1 pb-1 text-sm font-semibold">Mod bot actions</p>
+        <div>
           <div className="mb-2 flex gap-1">
             {(["hidden", "banned"] as const).map((t) => (
               <button
@@ -604,7 +589,7 @@ function ModBotActions() {
           {list.length === 0 ? (
             <p className="px-1 py-2 text-xs text-muted-foreground">Nothing here yet.</p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="max-h-80 space-y-1 overflow-y-auto">
               {list.map((a) => {
                 const viewer = viewers.find((v) => v.key === a.viewerKey);
                 return (
@@ -658,8 +643,8 @@ function ModBotActions() {
             </ul>
           )}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -704,15 +689,20 @@ export function DemoWrapupButton() {
 
 // ── Activity ───────────────────────────────────────────────────────────────
 
+export function DemoActivityIndicators() {
+  return (
+    <div className="flex items-center gap-1.5">
+      <CompetitionIndicator />
+      <ModBotActionsIndicator />
+    </div>
+  );
+}
+
 export function DemoActivity({ goals }: { goals: Counts | null }) {
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="shrink-0 space-y-3 rounded-lg border p-3">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="shrink-0 rounded-lg border px-3 py-1.5">
         <GoalsHeader goals={goals} />
-        <Competition />
-      </div>
-      <div className="shrink-0">
-        <ModBotActions />
       </div>
       <ChatPanel />
     </div>

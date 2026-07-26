@@ -98,11 +98,12 @@ async function main() {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (!channel) {
-    console.error("No channel exists.");
+  if (!channel || !channel.owner_user_id) {
+    console.error("No owned channel exists.");
     process.exit(1);
   }
   channelId = channel.id;
+  const ownerUserId = channel.owner_user_id;
 
   const nowIso = new Date().toISOString();
   const { data: created } = await admin
@@ -240,7 +241,7 @@ async function main() {
       await admin.from("chat_messages").insert({
         stream_id: streamId!,
         origin: "vidstube",
-        user_id: channel.owner_user_id,
+        user_id: ownerUserId,
         body: VIDSTUBE[Math.floor((tick - 1) / 2) % VIDSTUBE.length],
       });
     }

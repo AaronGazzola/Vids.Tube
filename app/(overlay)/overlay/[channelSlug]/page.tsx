@@ -57,11 +57,20 @@ function ttsPlayKey(t: PlayableTts): string {
   return `${t.id}:${t.approvedAt ?? ""}`;
 }
 
+// Re-highlighting a message stamps a fresh promoted_at (and clears shown_at), so a
+// replayed highlight gets a new key and isn't filtered out as already shown — this
+// is what lets the owner click Highlight again to replay it on this same overlay.
+function highlightShowKey(m: { id: string; promoted_at: string | null }): string {
+  return `${m.id}:${m.promoted_at ?? ""}`;
+}
+
 function Positioned({
   box,
+  opacity = 1,
   children,
 }: {
   box: OverlayBox;
+  opacity?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -70,6 +79,7 @@ function Positioned({
       style={{
         left: box.x,
         top: box.y,
+        opacity,
         transform: `scale(${box.scale})`,
         transformOrigin: "top left",
       }}
@@ -192,7 +202,7 @@ function LiveFeedSlot({
   // One shared slot: the highlight, TTS card, and ask exchange never render
   // together — each waits until the slot is free.
   const currentHighlight =
-    promoted?.find((m) => !doneHighlights.has(m.id)) ?? null;
+    promoted?.find((m) => !doneHighlights.has(highlightShowKey(m))) ?? null;
   const currentTts = currentHighlight
     ? null
     : (ttsQueue ?? []).find((t) => !doneTts.has(ttsPlayKey(t))) ?? null;
@@ -206,7 +216,7 @@ function LiveFeedSlot({
     !soundOn
       ? null
       : currentHighlight
-        ? `highlight:${currentHighlight.id}`
+        ? `highlight:${highlightShowKey(currentHighlight)}`
         : currentTts
           ? `tts:${ttsPlayKey(currentTts)}`
           : currentAsk
@@ -249,7 +259,7 @@ function LiveFeedSlot({
     <>
       {currentHighlight && (
         <HighlightedMessage
-          key={currentHighlight.id}
+          key={highlightShowKey(currentHighlight)}
           author={currentHighlight.author}
           text={currentHighlight.body ?? ""}
           rank={highlightStanding.rank}
@@ -257,7 +267,7 @@ function LiveFeedSlot({
           onDone={() => {
             setDoneHighlights((prev) => {
               const next = new Set(prev);
-              next.add(currentHighlight.id);
+              next.add(highlightShowKey(currentHighlight));
               return next;
             });
             markHighlightShownAction(currentHighlight.id).catch((e) =>
@@ -381,7 +391,10 @@ export default function OverlayFramePage({
       style={{ width: OVERLAY_CANVAS_W, height: OVERLAY_CANVAS_H }}
     >
       {feedVisible && (
-        <Positioned box={boxes.highlight}>
+        <Positioned
+          box={boxes.highlight}
+          opacity={config.boxOpacity.highlight}
+        >
           <div style={{ width: OVERLAY_FEED_WIDTH }}>
             {demo ? (
               <DemoOverlayFeed snapshot={demo} />
@@ -402,30 +415,36 @@ export default function OverlayFramePage({
         const data = visible[boxKey] ? goalMetric(m) : null;
         if (!data) return null;
         return (
-          <Positioned key={m} box={boxes[boxKey]}>
+          <Positioned
+            key={m}
+            box={boxes[boxKey]}
+            opacity={config.boxOpacity[boxKey]}
+          >
             <GoalBar metric={m} data={data} height={OVERLAY_GOAL_HEIGHT} />
           </Positioned>
         );
       })}
 
       {visible.competition && competitionEntries.length > 0 && (
-        <Positioned box={boxes.competition}>
+        <Positioned
+          box={boxes.competition}
+          opacity={config.boxOpacity.competition}
+        >
           <CompetitionLadder
             entries={competitionEntries}
             size={OVERLAY_LADDER_SIZE}
-            opacity={config.competitionOpacity}
           />
         </Positioned>
       )}
 
       {demo
         ? visible.break && (
-            <Positioned box={boxes.break}>
+            <Positioned box={boxes.break} opacity={config.boxOpacity.break}>
               <DemoBreak />
             </Positioned>
           )
         : breakEndsAt && (
-            <Positioned box={boxes.break}>
+            <Positioned box={boxes.break} opacity={config.boxOpacity.break}>
               <BreakCard key={breakEndsAt} endsAt={breakEndsAt} />
             </Positioned>
           )}

@@ -68,6 +68,7 @@ function DraggableBox({
   children: React.ReactNode;
 }) {
   const box = useDemoLayoutStore((s) => s.config.boxes[boxKey]);
+  const opacity = useDemoLayoutStore((s) => s.config.boxOpacity[boxKey]);
   const setBox = useDemoLayoutStore((s) => s.setBox);
 
   function startDrag(e: React.PointerEvent) {
@@ -118,7 +119,7 @@ function DraggableBox({
         transformOrigin: "top left",
       }}
     >
-      {children}
+      <div style={{ opacity }}>{children}</div>
       <div
         onPointerDown={startResize}
         className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize rounded-full border border-white bg-black/70"
@@ -307,6 +308,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
   const config = useDemoLayoutStore((s) => s.config);
   const toggleVisible = useDemoLayoutStore((s) => s.toggleVisible);
   const setGoalProgressFull = useDemoLayoutStore((s) => s.setGoalProgressFull);
+  const setBoxOpacity = useDemoLayoutStore((s) => s.setBoxOpacity);
   const setBackground = useDemoLayoutStore((s) => s.setBackground);
   const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
   const resetLayout = useDemoLayoutStore((s) => s.resetLayout);
@@ -533,7 +535,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
 
       {/* control panel */}
       {panelOpen && (
-      <div className="absolute right-3 top-3 flex w-44 flex-col gap-2 rounded-lg bg-black/70 p-2.5 text-xs text-white backdrop-blur-sm">
+      <div className="absolute right-3 top-3 flex max-h-[calc(100%-1.5rem)] w-44 flex-col gap-2 overflow-y-auto rounded-lg bg-black/70 p-2.5 text-xs text-white backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <p className="font-semibold">Overlays</p>
           <button
@@ -572,6 +574,24 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
                     />
                     persist
                   </label>
+                </div>
+              )}
+              {key !== "tts" && key !== "ask" && (
+                <div className="flex items-center gap-1.5 pl-2">
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    value={Math.round(config.boxOpacity[key] * 100)}
+                    onChange={(e) =>
+                      setBoxOpacity(key, Number(e.target.value) / 100)
+                    }
+                    aria-label={`${DEMO_OVERLAY_LABELS[key]} opacity`}
+                    className="min-w-0 flex-1 accent-primary"
+                  />
+                  <span className="w-7 text-right text-[10px] tabular-nums text-white/70">
+                    {Math.round(config.boxOpacity[key] * 100)}%
+                  </span>
                 </div>
               )}
             </div>

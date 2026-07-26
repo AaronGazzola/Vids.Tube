@@ -21,7 +21,8 @@ import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Camera } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 function getInitials(name: string): string {
   return name
@@ -51,6 +52,13 @@ function ChannelHeaderSkeleton() {
 
 export function ChannelView({ slug }: { slug: string }) {
   const { data: channel, isPending } = useChannel(slug);
+  const router = useRouter();
+  const redirectToSlug = channel?.redirectToSlug ?? null;
+  useEffect(() => {
+    if (redirectToSlug) {
+      router.replace(`/${redirectToSlug}`);
+    }
+  }, [redirectToSlug, router]);
   const { data: ownerChannel, isPending: ownerPending } = useOwnerChannel();
   const { data: videos } = useChannelVideos(channel?.id);
   const isOwner = useIsChannelOwner(channel);

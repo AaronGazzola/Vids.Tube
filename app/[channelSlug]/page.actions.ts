@@ -56,7 +56,7 @@ export async function getUpcomingScheduledBroadcastAction(
 
 export async function getChannelBySlugAction(
   slug: string
-): Promise<Channel | null> {
+): Promise<(Channel & { redirectToSlug?: string | null }) | null> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -68,6 +68,23 @@ export async function getChannelBySlugAction(
   if (error) {
     console.error(error);
     throw new Error("Failed to fetch channel");
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  if (data.merged_into_channel_id) {
+    const { data: survivor, error: survivorError } = await supabase
+      .from("channels")
+      .select("slug")
+      .eq("id", data.merged_into_channel_id)
+      .maybeSingle();
+    if (survivorError) {
+      console.error(survivorError);
+      throw new Error("Failed to resolve merged channel");
+    }
+    return { ...data, redirectToSlug: survivor?.slug ?? null };
   }
 
   return data;

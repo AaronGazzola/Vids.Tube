@@ -1,7 +1,6 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { Nav } from "@/components/nav";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 
@@ -20,7 +19,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="relative flex h-full w-full overflow-hidden">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Nav />
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>

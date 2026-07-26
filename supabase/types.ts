@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -217,9 +217,11 @@ export type Database = {
           description: string
           handle: string
           id: string
+          merged_into_channel_id: string | null
           name: string
-          owner_user_id: string
+          owner_user_id: string | null
           slug: string
+          youtube_channel_id: string | null
         }
         Insert: {
           avatar_path?: string | null
@@ -228,9 +230,11 @@ export type Database = {
           description?: string
           handle: string
           id?: string
+          merged_into_channel_id?: string | null
           name: string
-          owner_user_id: string
+          owner_user_id?: string | null
           slug: string
+          youtube_channel_id?: string | null
         }
         Update: {
           avatar_path?: string | null
@@ -239,11 +243,21 @@ export type Database = {
           description?: string
           handle?: string
           id?: string
+          merged_into_channel_id?: string | null
           name?: string
-          owner_user_id?: string
+          owner_user_id?: string | null
           slug?: string
+          youtube_channel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "channels_merged_into_channel_id_fkey"
+            columns: ["merged_into_channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       chat_commands: {
         Row: {
@@ -371,6 +385,8 @@ export type Database = {
           progress_update_enabled: boolean
           stream_id: string
           tts_mode: string
+          tts_similarity: number
+          tts_stability: number
           updated_at: string
           useful_info_enabled: boolean
           wrapup_mvp_enabled: boolean
@@ -390,6 +406,8 @@ export type Database = {
           progress_update_enabled?: boolean
           stream_id: string
           tts_mode?: string
+          tts_similarity?: number
+          tts_stability?: number
           updated_at?: string
           useful_info_enabled?: boolean
           wrapup_mvp_enabled?: boolean
@@ -409,6 +427,8 @@ export type Database = {
           progress_update_enabled?: boolean
           stream_id?: string
           tts_mode?: string
+          tts_similarity?: number
+          tts_stability?: number
           updated_at?: string
           useful_info_enabled?: boolean
           wrapup_mvp_enabled?: boolean
@@ -739,6 +759,114 @@ export type Database = {
           snapshot?: Json
         }
         Relationships: []
+      }
+      membership_stream_stats: {
+        Row: {
+          membership_id: string
+          message_count: number
+          stream_id: string
+          stream_started_at: string | null
+          xp: number
+        }
+        Insert: {
+          membership_id: string
+          message_count?: number
+          stream_id: string
+          stream_started_at?: string | null
+          xp?: number
+        }
+        Update: {
+          membership_id?: string
+          message_count?: number
+          stream_id?: string
+          stream_started_at?: string | null
+          xp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_stream_stats_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_stream_stats_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          best_streak: number
+          channel_id: string
+          community_channel_id: string
+          created_at: string
+          credits: number
+          current_streak: number
+          first_seen_at: string | null
+          id: string
+          last_seen_at: string | null
+          level: number
+          lifetime_xp: number
+          message_count: number
+          rewards: Json
+          streams_attended: number
+          updated_at: string
+        }
+        Insert: {
+          best_streak?: number
+          channel_id: string
+          community_channel_id: string
+          created_at?: string
+          credits?: number
+          current_streak?: number
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          level?: number
+          lifetime_xp?: number
+          message_count?: number
+          rewards?: Json
+          streams_attended?: number
+          updated_at?: string
+        }
+        Update: {
+          best_streak?: number
+          channel_id?: string
+          community_channel_id?: string
+          created_at?: string
+          credits?: number
+          current_streak?: number
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          level?: number
+          lifetime_xp?: number
+          message_count?: number
+          rewards?: Json
+          streams_attended?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_community_channel_id_fkey"
+            columns: ["community_channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       moderation_actions: {
         Row: {
@@ -1448,6 +1576,12 @@ export type Database = {
     Functions: {
       email_signup_status: { Args: { p_email: string }; Returns: string }
       is_participant_banned: { Args: { p_user: string }; Returns: boolean }
+      level_for_xp: { Args: { xp: number }; Returns: number }
+      merge_youtube_identity: { Args: { p_user_id: string }; Returns: Json }
+      recompute_membership: {
+        Args: { p_channel_id: string; p_community_channel_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

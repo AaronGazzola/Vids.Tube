@@ -65,21 +65,36 @@ export async function resolveEligibleStream(): Promise<EligibleStream | null> {
   };
 }
 
-export async function isStreamEligible(streamId: string): Promise<boolean> {
+export async function getStreamEngagement(
+  streamId: string
+): Promise<EligibleStream | null> {
   const { data: stream } = await supabaseAdmin
     .from("streams")
-    .select("status, scheduled_start_at, last_seen_at")
+    .select("status, scheduled_start_at, last_seen_at, started_at")
     .eq("id", streamId)
     .maybeSingle();
   if (!stream || !isEngageable(stream)) {
-    return false;
+    return null;
   }
   const { data: state } = await supabaseAdmin
     .from("chat_scoring_state")
     .select("enabled")
     .eq("stream_id", streamId)
     .maybeSingle();
-  return !!state?.enabled;
+  if (!state?.enabled) {
+    return null;
+  }
+  return {
+    id: streamId,
+    status: stream.status,
+    startedAtMs: stream.started_at
+      ? new Date(stream.started_at).getTime()
+      : Date.now(),
+  };
+}
+
+export async function isStreamEligible(streamId: string): Promise<boolean> {
+  return !!(await getStreamEngagement(streamId));
 }
 
 let heartbeatChannelId: string | null = null;

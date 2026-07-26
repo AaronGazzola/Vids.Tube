@@ -5,6 +5,20 @@ import { supabaseAdmin } from "../supabase";
 const MAX_TTS_CHARS = 200;
 const ELEVENLABS_DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
 
+export type TtsVoiceSettings = { stability: number; similarity: number };
+
+export const DEFAULT_TTS_VOICE: TtsVoiceSettings = {
+  stability: 0.5,
+  similarity: 0.75,
+};
+
+// Short unpunctuated inputs make flash v2.5 drag the final syllable
+// ("three" -> "threeeee"); a terminal full stop anchors the prosody.
+export function ensureTerminalPunctuation(text: string): string {
+  const trimmed = text.trim();
+  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 let warnedMissingKey = false;
 
 export type TtsVerdict = { allow: boolean; reason: string };
@@ -91,6 +105,7 @@ type FetchLike = typeof fetch;
 
 export async function synthesizeTts(
   text: string,
+  voice: TtsVoiceSettings = DEFAULT_TTS_VOICE,
   fetchImpl: FetchLike = fetch
 ): Promise<ArrayBuffer | null> {
   const key = process.env.ELEVENLABS_API_KEY;
@@ -101,9 +116,9 @@ export async function synthesizeTts(
     }
     return null;
   }
-  const voice = process.env.ELEVENLABS_VOICE_ID ?? ELEVENLABS_DEFAULT_VOICE;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? ELEVENLABS_DEFAULT_VOICE;
   const res = await fetchImpl(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {
       method: "POST",
       headers: {
@@ -111,8 +126,12 @@ export async function synthesizeTts(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        text,
+        text: ensureTerminalPunctuation(text),
         model_id: "eleven_flash_v2_5",
+        voice_settings: {
+          stability: voice.stability,
+          similarity_boost: voice.similarity,
+        },
       }),
     }
   );
@@ -137,8 +156,20 @@ export async function synthesizePendingTts(streamId: string): Promise<void> {
     console.error(error);
     return;
   }
-  for (const row of pending ?? []) {
-    const audio = await synthesizeTts(row.text);
+  if (!pending?.length) {
+    return;
+  }
+  const { data: scoring } = await supabaseAdmin
+    .from("chat_scoring_state")
+    .select("tts_stability, tts_similarity")
+    .eq("stream_id", streamId)
+    .maybeSingle();
+  const voice: TtsVoiceSettings = {
+    stability: scoring?.tts_stability ?? DEFAULT_TTS_VOICE.stability,
+    similarity: scoring?.tts_similarity ?? DEFAULT_TTS_VOICE.similarity,
+  };
+  for (const row of pending) {
+    const audio = await synthesizeTts(row.text, voice);
     if (!audio) {
       return;
     }

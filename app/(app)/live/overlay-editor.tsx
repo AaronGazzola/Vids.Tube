@@ -147,9 +147,7 @@ export function OverlayEditor({
 }) {
   const config = useDemoLayoutStore((s) => s.config);
   const toggleVisible = useDemoLayoutStore((s) => s.toggleVisible);
-  const setCompetitionOpacity = useDemoLayoutStore(
-    (s) => s.setCompetitionOpacity
-  );
+  const setBoxOpacity = useDemoLayoutStore((s) => s.setBoxOpacity);
   const setFeedSound = useDemoLayoutStore((s) => s.setFeedSound);
   const resetLayout = useDemoLayoutStore((s) => s.resetLayout);
   const urlInfo = useOverlayUrlInfo();
@@ -210,7 +208,7 @@ export function OverlayEditor({
         ))}
       </div>
 
-      <div className="absolute right-2 top-2 flex w-52 flex-col gap-2 rounded-lg bg-black/80 p-2.5 text-xs text-white backdrop-blur-sm">
+      <div className="absolute right-2 top-2 flex max-h-[calc(100%-1rem)] w-52 flex-col gap-2 overflow-y-auto rounded-lg bg-black/80 p-2.5 text-xs text-white backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <p className="font-semibold">Overlay layout</p>
           <button
@@ -231,25 +229,24 @@ export function OverlayEditor({
           </label>
         ))}
         <div className="my-0.5 h-px bg-white/15" />
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span>Competition opacity</span>
-            <span className="tabular-nums text-white/70">
-              {Math.round(config.competitionOpacity * 100)}%
+        <p className="font-semibold">Opacity</p>
+        {BOX_KEYS.map((key) => (
+          <div key={key} className="flex items-center gap-2">
+            <span className="w-20 truncate">{DEMO_OVERLAY_LABELS[key]}</span>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              value={Math.round(config.boxOpacity[key] * 100)}
+              onChange={(e) => setBoxOpacity(key, Number(e.target.value) / 100)}
+              aria-label={`${DEMO_OVERLAY_LABELS[key]} opacity`}
+              className="min-w-0 flex-1 accent-primary"
+            />
+            <span className="w-8 text-right tabular-nums text-white/70">
+              {Math.round(config.boxOpacity[key] * 100)}%
             </span>
           </div>
-          <input
-            type="range"
-            min={10}
-            max={100}
-            value={Math.round(config.competitionOpacity * 100)}
-            onChange={(e) =>
-              setCompetitionOpacity(Number(e.target.value) / 100)
-            }
-            aria-label="Competition overlay opacity"
-            className="w-full accent-primary"
-          />
-        </div>
+        ))}
         <div className="flex items-center justify-between gap-2">
           <span>Notification sound</span>
           <div className="flex items-center gap-1">

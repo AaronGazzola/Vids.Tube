@@ -2,12 +2,16 @@
 
 import { useIsOwner, useUser } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
+import { AccountMenu } from "@/components/account-menu";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -15,9 +19,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  LogIn,
   Menu,
   Radio,
   User,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -109,8 +115,49 @@ function NavRow({
   );
 }
 
+function SidebarAuthLinks({ collapsed }: { collapsed: boolean }) {
+  if (collapsed) {
+    return (
+      <>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" asChild aria-label="Log in">
+              <Link href="/login">
+                <LogIn className="h-4 w-4" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Log in</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" asChild aria-label="Sign up">
+              <Link href="/signup">
+                <UserPlus className="h-4 w-4" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Sign up</TooltipContent>
+        </Tooltip>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Button variant="ghost" className="w-full justify-start" asChild>
+        <Link href="/login">Log in</Link>
+      </Button>
+      <Button className="w-full" asChild>
+        <Link href="/signup">Sign up</Link>
+      </Button>
+    </>
+  );
+}
+
 function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
+  const { isPending } = useUser();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const items = useVisibleNavItems();
 
@@ -148,6 +195,24 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
           ))}
         </SidebarContent>
       )}
+
+      <div
+        className={cn(
+          "mt-auto flex flex-col gap-1 p-2",
+          collapsed && "items-center"
+        )}
+      >
+        <ThemeToggle collapsed={collapsed} />
+        {isPending ? (
+          <Skeleton
+            className={collapsed ? "h-8 w-8 rounded-full" : "h-11 w-full"}
+          />
+        ) : isAuthenticated ? (
+          <AccountMenu collapsed={collapsed} />
+        ) : (
+          <SidebarAuthLinks collapsed={collapsed} />
+        )}
+      </div>
     </div>
   );
 }

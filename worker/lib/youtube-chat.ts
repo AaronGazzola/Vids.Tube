@@ -25,7 +25,7 @@ function isNightbot(m: YouTubeChatMessage): boolean {
   if (nightbotChannelId && m.authorChannelId === nightbotChannelId) {
     return true;
   }
-  return m.author === "Nightbot";
+  return m.author.replace(/^@+/, "").toLowerCase() === "nightbot";
 }
 
 export async function* pollYoutubeChat(

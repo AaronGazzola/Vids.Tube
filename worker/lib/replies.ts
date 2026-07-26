@@ -6,6 +6,8 @@ import {
 
 const NIGHTBOT_SEND_URL = "https://api.nightbot.tv/1/channel/send";
 const MAX_YOUTUBE_CHARS = 400;
+const MAX_REPLY_CHUNKS = 3;
+export const MAX_AI_REPLY_CHARS = 600;
 
 export type ReplyDelivery = {
   streamId: string;
@@ -21,6 +23,37 @@ export function truncateForYoutube(text: string): string {
   const lastSpace = slice.lastIndexOf(" ");
   const cut = lastSpace > MAX_YOUTUBE_CHARS / 2 ? slice.slice(0, lastSpace) : slice;
   return `${cut}…`;
+}
+
+function takeChunk(text: string, budget: number): [string, string] {
+  const slice = text.slice(0, budget);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > budget / 2 ? lastSpace : budget;
+  return [text.slice(0, cut).trimEnd(), text.slice(cut).trimStart()];
+}
+
+export function chunkForYoutube(text: string): string[] {
+  const clean = text.trim();
+  if (clean.length <= MAX_YOUTUBE_CHARS) {
+    return [clean];
+  }
+  const parts: string[] = [];
+  let rest = clean;
+  const markerBudget = MAX_YOUTUBE_CHARS - " (n/m)".length;
+  while (rest.length && parts.length < MAX_REPLY_CHUNKS) {
+    const last = parts.length === MAX_REPLY_CHUNKS - 1;
+    if (last && rest.length > markerBudget) {
+      const [head] = takeChunk(rest, markerBudget - 1);
+      parts.push(`${head}…`);
+      rest = "";
+      break;
+    }
+    const [head, tail] = takeChunk(rest, markerBudget);
+    parts.push(head);
+    rest = tail;
+  }
+  const total = parts.length;
+  return total > 1 ? parts.map((p, i) => `${p} (${i + 1}/${total})`) : parts;
 }
 
 function sendSpacingMs(): number {
@@ -121,7 +154,9 @@ export function enqueueNightbotSend(
     }
     return;
   }
-  queue.push(truncateForYoutube(text));
+  for (const chunk of chunkForYoutube(text)) {
+    queue.push(chunk);
+  }
   void drainQueue(sender, wait, tokenFn, refreshFn);
 }
 

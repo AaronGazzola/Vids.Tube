@@ -28,7 +28,9 @@
     "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts",
     "backfill:youtube-chat": "doppler run -- tsx scripts/backfill-youtube-chat.ts",
     "backfill:youtube-transcripts": "doppler run -- tsx scripts/backfill-youtube-transcripts.ts",
-    "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts"
+    "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts",
+    "backfill:memberships": "doppler run -- tsx scripts/backfill-memberships.ts",
+    "verify:membership-merge": "doppler run -- tsx scripts/verify-membership-merge.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
@@ -62,6 +64,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "happy-dom": "^20.11.1",
     "react-email": "^6.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",

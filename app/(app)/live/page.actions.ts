@@ -71,7 +71,7 @@ export async function manualHighlightAction(
   if (existing) {
     const { error } = await supabaseAdmin
       .from("featured_messages")
-      .update({ promoted_at: nowIso })
+      .update({ promoted_at: nowIso, shown_at: null })
       .eq("id", existing.id);
     if (error) {
       console.error(error);
@@ -257,9 +257,11 @@ export async function promoteHighlightAction(
   const ok = await assertStreamOwned(fm.stream_id, owned.data.id);
   if ("error" in ok) return { error: ok.error };
 
+  // Reset shown_at so the overlay re-fetches and replays it, even if it was
+  // already displayed once — re-clicking Highlight shows it again.
   const { error } = await supabaseAdmin
     .from("featured_messages")
-    .update({ promoted_at: new Date().toISOString() })
+    .update({ promoted_at: new Date().toISOString(), shown_at: null })
     .eq("id", featuredMessageId);
   if (error) {
     console.error(error);

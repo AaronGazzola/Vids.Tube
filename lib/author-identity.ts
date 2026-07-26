@@ -23,6 +23,9 @@ export async function resolveAuthorIdentities(
 
   const map = new Map<string, AuthorIdentity>();
   for (const row of data ?? []) {
+    if (!row.owner_user_id) {
+      continue;
+    }
     map.set(row.owner_user_id, {
       handle: row.handle,
       avatarPath: row.avatar_path,

@@ -7,6 +7,7 @@ import {
 import { runScoringJob } from "./jobs/score";
 import { runTranscriptionJob } from "./jobs/transcribe";
 import {
+  type EligibleStream,
   releaseLock,
   resolveEligibleStream,
   tryAcquireLock,
@@ -31,10 +32,32 @@ async function tick(): Promise<void> {
 
   // Scoring, YouTube-chat polling, and moderation run for any engaged public
   // stream (waiting room or live). Transcription pulls the RTMP feed and only
-  // makes sense once the stream is live.
-  const jobs = [runScoringJob(stream)];
+  // makes sense once the stream is live — an engagement that starts in the
+  // waiting room must still pick it up when the stream flips to live, and a
+  // transcriber that exits mid-broadcast (the RTMP reader periodically hits a
+  // clean EOF) must be relaunched, so the scoring loop reports each fresh
+  // eligibility snapshot back here.
+  const jobs: Promise<void>[] = [];
+  let transcription: Promise<void> | null = null;
+  const launchTranscription = (fresh: EligibleStream) => {
+    const job = runTranscriptionJob(fresh)
+      .catch((e) => console.error(`transcription job failed:`, e))
+      .finally(() => {
+        transcription = null;
+      });
+    transcription = job;
+    jobs.push(job);
+  };
+  jobs.push(
+    runScoringJob(stream, (fresh) => {
+      if (fresh.status === "live" && !transcription) {
+        console.error(`stream ${stream.id} is live: starting transcription`);
+        launchTranscription(fresh);
+      }
+    })
+  );
   if (stream.status === "live") {
-    jobs.push(runTranscriptionJob(stream));
+    launchTranscription(stream);
   }
   console.error(
     `engaging stream ${stream.id} (${stream.status}): ${
@@ -42,7 +65,9 @@ async function tick(): Promise<void> {
     }`
   );
   try {
-    await Promise.all(jobs);
+    while (jobs.length) {
+      await Promise.all(jobs.splice(0));
+    }
   } finally {
     await releaseLock(stream.id);
     console.error(`stopped engaging stream ${stream.id}`);

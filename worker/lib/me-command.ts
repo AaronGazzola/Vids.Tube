@@ -12,7 +12,7 @@ async function deps() {
 }
 
 const REGEN_MESSAGE_DELTA = 20;
-const MAX_PROFILE_CHARS = 400;
+const MAX_PROFILE_CHARS = 600;
 
 export const FIRST_TIMER_REPLY =
   "you're brand new here — welcome in! Stick around, chat a bit, and I'll have a story about you next time.";
@@ -273,7 +273,7 @@ function buildMePrompt(
   }
   return [
     "You write one-line chat-bot bios for live-stream viewers.",
-    `Using only these facts, write a warm, playful mini-bio about ${name} in the third person (e.g. "${name} has been part of the community since…"), under 350 characters, plain text, no hashtags, no emojis at the start, no quotes around it.`,
+    `Using only these facts, write a warm, playful mini-bio about ${name} in the third person (e.g. "${name} has been part of the community since…"), under ~550 characters, plain text, no hashtags, no emojis at the start, no quotes around it.`,
     "If their recent messages suggest what they like to talk about, weave in one playful nod to it.",
     ...lines,
     "Reply with the bio text only.",

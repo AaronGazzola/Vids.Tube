@@ -24,10 +24,11 @@ async function main() {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (!channel) {
-    console.log("no channel — skipping");
+  if (!channel || !channel.owner_user_id) {
+    console.log("no owned channel — skipping");
     return;
   }
+  const ownerUserId = channel.owner_user_id;
 
   const { data: stream } = await admin
     .from("streams")
@@ -40,7 +41,7 @@ async function main() {
     console.log("=== 1. hide excludes from anon read ===");
     const { data: msg } = await admin
       .from("chat_messages")
-      .insert({ stream_id: streamId, user_id: channel.owner_user_id, body: "mod test message" })
+      .insert({ stream_id: streamId, user_id: ownerUserId, body: "mod test message" })
       .select("id")
       .single();
     const msgId = msg!.id;
@@ -62,14 +63,14 @@ async function main() {
     console.log("\n=== 2. ban + is_participant_banned ===");
     await admin.from("banned_participants").insert({
       channel_id: channel.id,
-      participant_key: channel.owner_user_id,
+      participant_key: ownerUserId,
       origin: "vidstube",
-      user_id: channel.owner_user_id,
+      user_id: ownerUserId,
       reason: "mod test",
       banned_by: "owner",
     });
     const banned = await admin.rpc("is_participant_banned", {
-      p_user: channel.owner_user_id,
+      p_user: ownerUserId,
     });
     assert(banned.data === true, "is_participant_banned() returns true for a banned user");
 
@@ -77,9 +78,9 @@ async function main() {
       .from("banned_participants")
       .delete()
       .eq("channel_id", channel.id)
-      .eq("participant_key", channel.owner_user_id);
+      .eq("participant_key", ownerUserId);
     const cleared = await admin.rpc("is_participant_banned", {
-      p_user: channel.owner_user_id,
+      p_user: ownerUserId,
     });
     assert(cleared.data === false, "is_participant_banned() returns false after unban");
 
@@ -106,7 +107,7 @@ async function main() {
       .from("banned_participants")
       .delete()
       .eq("channel_id", channel.id)
-      .eq("participant_key", channel.owner_user_id);
+      .eq("participant_key", ownerUserId);
     await admin.from("streams").delete().eq("id", streamId);
     console.log("\ncleaned up");
   }

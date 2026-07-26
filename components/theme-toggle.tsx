@@ -10,18 +10,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Monitor, Moon, Sun } from "lucide-react";
 
-export function ThemeToggle() {
+export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
   const { setTheme } = useTheme();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Toggle theme">
-          <Sun className="h-5 w-5 dark:hidden" />
-          <Moon className="hidden h-5 w-5 dark:block" />
-        </Button>
+        {collapsed ? (
+          <Button variant="ghost" size="icon" aria-label="Toggle theme">
+            <Sun className="h-5 w-5 dark:hidden" />
+            <Moon className="hidden h-5 w-5 dark:block" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 px-3"
+            aria-label="Toggle theme"
+          >
+            <Sun className="h-4 w-4 dark:hidden" />
+            <Moon className="hidden h-4 w-4 dark:block" />
+            <span className="text-sm font-medium">Theme</span>
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        side={collapsed ? "right" : "top"}
+        align="start"
+      >
         <DropdownMenuItem onClick={() => setTheme("light")}>
           <Sun className="mr-2 h-4 w-4" />
           Light

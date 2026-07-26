@@ -27,7 +27,7 @@ test.beforeAll(async () => {
     .maybeSingle();
   if (error || !owner) throw error ?? new Error("owner channel missing");
   ownerChannelId = owner.id;
-  ownerUserId = owner.owner_user_id;
+  ownerUserId = owner.owner_user_id!;
   ownerSlug = owner.slug;
 
   const { count } = await admin
