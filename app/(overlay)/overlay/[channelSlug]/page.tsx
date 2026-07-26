@@ -2,19 +2,33 @@
 
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
+import type { GoalMetric } from "@/app/layout.types";
+import { GOAL_METRICS } from "@/app/layout.types";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
-import { OverlayBoxFrame } from "@/components/overlay/box-frame";
-import { OverlayEmptyState } from "@/components/overlay/empty-placeholder";
+import { BreakCard } from "@/components/overlay/break-card";
+import { CompetitionLadder } from "@/components/overlay/competition-ladder";
+import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
+import type { DemoLayoutConfig } from "@/app/(app)/live/demo.types";
 import {
   DEMO_TTS_SAMPLE_SRC,
+  GOAL_METRIC_BOX,
+  OVERLAY_CANVAS_H,
+  OVERLAY_CANVAS_W,
   OVERLAY_FEED_WIDTH,
+  OVERLAY_GOAL_HEIGHT,
+  OVERLAY_LADDER_SIZE,
   type DemoOverlaySnapshot,
+  type OverlayBox,
 } from "@/lib/demo-overlay";
+import { DEFAULT_GOALS, idleProgress } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import { useBreakState } from "./break/page.hooks";
+import { useCompetition } from "./competition/page.hooks";
+import { useGoalProgress } from "./goals/page.hooks";
 import {
   markAskShownAction,
   markHighlightShownAction,
@@ -23,8 +37,8 @@ import {
 } from "./page.actions";
 import {
   useDemoOverlaySnapshot,
+  useLiveOverlayLayout,
   useOverlayChime,
-  useOverlayLayout,
   usePlayableAsk,
   usePlayableTts,
   usePromotedMessages,
@@ -41,6 +55,28 @@ function ttsAudioUrl(path: string): string {
 // new key and isn't filtered out as already played.
 function ttsPlayKey(t: PlayableTts): string {
   return `${t.id}:${t.approvedAt ?? ""}`;
+}
+
+function Positioned({
+  box,
+  children,
+}: {
+  box: OverlayBox;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: box.x,
+        top: box.y,
+        transform: `scale(${box.scale})`,
+        transformOrigin: "top left",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
@@ -137,21 +173,13 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
   );
 }
 
-export default function OverlayPage({
-  params,
+function LiveFeedSlot({
+  streamId,
+  soundOn,
 }: {
-  params: Promise<{ channelSlug: string }>;
+  streamId: string;
+  soundOn: boolean;
 }) {
-  const { channelSlug } = use(params);
-  const sp = useSearchParams();
-  const width = Number(sp.get("width")) || OVERLAY_FEED_WIDTH;
-  const demo = useDemoOverlaySnapshot(channelSlug);
-  const { data: layout } = useOverlayLayout(channelSlug);
-  const { data: channel } = useChannel(channelSlug);
-  const streamQuery = useLiveStream(channel?.id);
-  const stream = streamQuery.data;
-
-  const streamId = stream?.status === "live" ? stream.id : null;
   const { data: promoted } = usePromotedMessages(streamId);
   const { data: standings } = useStreamStandings(streamId);
   const { data: ttsQueue } = usePlayableTts(streamId);
@@ -163,9 +191,8 @@ export default function OverlayPage({
 
   // One shared slot: the highlight, TTS card, and ask exchange never render
   // together — each waits until the slot is free.
-  const currentHighlight = streamId
-    ? promoted?.find((m) => !doneHighlights.has(m.id)) ?? null
-    : null;
+  const currentHighlight =
+    promoted?.find((m) => !doneHighlights.has(m.id)) ?? null;
   const currentTts = currentHighlight
     ? null
     : (ttsQueue ?? []).find((t) => !doneTts.has(ttsPlayKey(t))) ?? null;
@@ -173,10 +200,10 @@ export default function OverlayPage({
     currentHighlight || currentTts
       ? null
       : (askQueue ?? []).find((a) => !doneAsks.has(a.id)) ?? null;
-  const currentAskId = demo ? null : currentAsk?.id ?? null;
+  const currentAskId = currentAsk?.id ?? null;
 
   useOverlayChime(
-    demo
+    !soundOn
       ? null
       : currentHighlight
         ? `highlight:${currentHighlight.id}`
@@ -201,38 +228,13 @@ export default function OverlayPage({
   }, [currentAskId]);
 
   const standingMap = computeStandings(
-    (standings ?? []).map((s) => ({ id: s.participant_key, score: s.total_score }))
+    (standings ?? []).map((s) => ({
+      id: s.participant_key,
+      score: s.total_score,
+    }))
   );
   const standingFor = (key: string | null) =>
     (key ? standingMap.get(key) : null) ?? { rank: 99, progress: 0 };
-
-  if (demo) {
-    return (
-      <OverlayBoxFrame
-        scale={demo.boxes.highlight.scale}
-        width={OVERLAY_FEED_WIDTH}
-      >
-        <DemoOverlayFeed snapshot={demo} />
-      </OverlayBoxFrame>
-    );
-  }
-
-  // Offline: show a placeholder at the saved scale so the source can be
-  // positioned in OBS. Once live, an empty slot stays invisible.
-  if (streamQuery.isSuccess && !streamId) {
-    return (
-      <OverlayBoxFrame
-        scale={layout?.boxes.highlight.scale ?? 1}
-        width={OVERLAY_FEED_WIDTH}
-      >
-        <OverlayEmptyState
-          label="Highlights"
-          width={OVERLAY_FEED_WIDTH}
-          height={380}
-        />
-      </OverlayBoxFrame>
-    );
-  }
 
   const highlightStanding = standingFor(
     currentHighlight
@@ -243,7 +245,7 @@ export default function OverlayPage({
   const ttsStanding = standingFor(currentTts?.participantKey ?? null);
   const askStanding = standingFor(currentAsk?.participantKey ?? null);
 
-  const feed = (
+  return (
     <>
       {currentHighlight && (
         <HighlightedMessage
@@ -296,17 +298,137 @@ export default function OverlayPage({
       )}
     </>
   );
+}
 
-  if (layout) {
-    return (
-      <OverlayBoxFrame
-        scale={layout.boxes.highlight.scale}
-        width={OVERLAY_FEED_WIDTH}
-      >
-        {feed}
-      </OverlayBoxFrame>
-    );
+function DemoBreak() {
+  const DEMO_BREAK_MS = 5 * 60_000;
+  const [endsAt, setEndsAt] = useState(() => Date.now() + DEMO_BREAK_MS);
+  return (
+    <BreakCard
+      endsAt={endsAt}
+      onDone={() => setEndsAt(Date.now() + DEMO_BREAK_MS)}
+    />
+  );
+}
+
+// The single overlay frame: one 1080x1920 OBS browser source rendering every
+// enabled element at its saved position/scale. Gated by the channel's overlay
+// token; layout edits arrive live over the layout broadcast channel.
+export default function OverlayFramePage({
+  params,
+}: {
+  params: Promise<{ channelSlug: string }>;
+}) {
+  const { channelSlug } = use(params);
+  const sp = useSearchParams();
+  const token = sp.get("token") ?? "";
+
+  const layout = useLiveOverlayLayout(channelSlug, token);
+  const demo = useDemoOverlaySnapshot(channelSlug);
+  const { data: channel } = useChannel(channelSlug);
+  const streamQuery = useLiveStream(channel?.id);
+  const stream = streamQuery.data;
+  const streamId = stream?.status === "live" ? stream.id : null;
+
+  const { data: goalData } = useGoalProgress(channelSlug, 10, !demo);
+  const { data: scores } = useCompetition(channelSlug, 5);
+  const breakQuery = useBreakState(channelSlug);
+
+  if (!layout.isSuccess || !layout.config) {
+    return null;
   }
+  const config: DemoLayoutConfig = layout.config;
 
-  return <div style={{ width }}>{feed}</div>;
+  const boxes = demo ? demo.boxes : config.boxes;
+  const visible = demo ? demo.visible : config.visible;
+
+  const feedVisible = demo
+    ? demo.visible.highlight || demo.visible.tts || demo.visible.ask
+    : config.visible.highlight ||
+      config.visible.tts ||
+      config.visible.ask;
+
+  const goalMetric = (m: GoalMetric) => {
+    if (demo) {
+      return demo.metrics[m];
+    }
+    if (goalData?.active && goalData.metrics) {
+      return goalData.metrics[m];
+    }
+    if (goalData && !goalData.isLive) {
+      return idleProgress(DEFAULT_GOALS[m]);
+    }
+    return null;
+  };
+
+  const competitionEntries = demo
+    ? demo.competition.slice(0, 18)
+    : (scores ?? [])
+        .filter((s) => s.total_score > 0)
+        .sort((a, b) => b.total_score - a.total_score)
+        .slice(0, 18)
+        .map((s) => ({
+          key: s.participant_key,
+          author: s.author,
+          score: s.total_score,
+        }));
+
+  const breakEndsAt = breakQuery.data?.breakEndsAt ?? null;
+
+  return (
+    <div
+      className="fixed left-0 top-0 overflow-hidden"
+      style={{ width: OVERLAY_CANVAS_W, height: OVERLAY_CANVAS_H }}
+    >
+      {feedVisible && (
+        <Positioned box={boxes.highlight}>
+          <div style={{ width: OVERLAY_FEED_WIDTH }}>
+            {demo ? (
+              <DemoOverlayFeed snapshot={demo} />
+            ) : (
+              streamId && (
+                <LiveFeedSlot
+                  streamId={streamId}
+                  soundOn={config.feedSound !== "off"}
+                />
+              )
+            )}
+          </div>
+        </Positioned>
+      )}
+
+      {GOAL_METRICS.map((m) => {
+        const boxKey = GOAL_METRIC_BOX[m];
+        const data = visible[boxKey] ? goalMetric(m) : null;
+        if (!data) return null;
+        return (
+          <Positioned key={m} box={boxes[boxKey]}>
+            <GoalBar metric={m} data={data} height={OVERLAY_GOAL_HEIGHT} />
+          </Positioned>
+        );
+      })}
+
+      {visible.competition && competitionEntries.length > 0 && (
+        <Positioned box={boxes.competition}>
+          <CompetitionLadder
+            entries={competitionEntries}
+            size={OVERLAY_LADDER_SIZE}
+            opacity={config.competitionOpacity}
+          />
+        </Positioned>
+      )}
+
+      {demo
+        ? visible.break && (
+            <Positioned box={boxes.break}>
+              <DemoBreak />
+            </Positioned>
+          )
+        : breakEndsAt && (
+            <Positioned box={boxes.break}>
+              <BreakCard key={breakEndsAt} endsAt={breakEndsAt} />
+            </Positioned>
+          )}
+    </div>
+  );
 }

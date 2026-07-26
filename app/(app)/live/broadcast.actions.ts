@@ -1,7 +1,11 @@
 "use server";
 
 import type { ActionResult, Stream } from "@/app/layout.types";
-import { ensureProcessingVod, publishVodForStream } from "@/lib/broadcast-end";
+import {
+  ensureProcessingVod,
+  publishVodForStream,
+  reapStaleProcessingVods,
+} from "@/lib/broadcast-end";
 import { uploadToR2 } from "@/lib/r2";
 import { isLiveAndFresh, STALE_MS } from "@/lib/stream";
 import { isWorkerFresh } from "@/lib/worker-status";
@@ -152,6 +156,8 @@ export async function getCurrentBroadcastAction(): Promise<Stream | null> {
     throw new Error(owned.error);
   }
   const { channel } = owned.data;
+
+  reapStaleProcessingVods(channel.id).catch((e) => console.error(e));
 
   // Resolve the single active broadcast (draft/scheduled/preview/live), not the
   // newest row — otherwise an already-ended stream pre-fills the /live form.

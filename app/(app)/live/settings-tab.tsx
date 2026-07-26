@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { OVERLAY_BASE_DIMS } from "@/lib/demo-overlay";
 import { vodAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
@@ -41,13 +40,9 @@ import {
   useDeleteProject,
   useUpdateProject,
 } from "./projects.hooks";
-import { useDemoLayoutStore } from "./demo.stores";
+import { useOverlayUrlInfo, useRegenerateOverlayToken } from "./demo.hooks";
 
 const STREAM_HOST = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
-
-function scaledDims(base: { w: number; h: number }, scale: number): string {
-  return `${Math.round(base.w * scale)} × ${Math.round(base.h * scale)}`;
-}
 
 export type SettingsForm = {
   title: string;
@@ -603,12 +598,14 @@ export function SettingsTab({
   workerRunning: boolean;
 }) {
   const uploadThumbnail = useUploadBroadcastThumbnail();
-  const [opacityPct, setOpacityPct] = useState(90);
-  const boxes = useDemoLayoutStore((s) => s.config.boxes);
+  const urlInfo = useOverlayUrlInfo();
+  const regenerateToken = useRegenerateOverlayToken();
   const thumbnailUrl = vodAssetUrl(thumbnailPath);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const base = `${origin}/overlay/${channelSlug}`;
+  const overlayUrl = urlInfo.data
+    ? `${origin}/overlay/${channelSlug}?token=${urlInfo.data.token}`
+    : null;
 
   const set = (patch: Partial<SettingsForm>) => setForm({ ...form, ...patch });
 
@@ -709,59 +706,32 @@ export function SettingsTab({
         </p>
       </Section>
 
-      <Section title="OBS overlays">
+      <Section title="OBS overlay">
         <p className="text-xs text-muted-foreground">
-          Each overlay renders at the size you gave it in the demo preview. Add
-          it as a browser source at the dimensions shown, then position it on
-          your canvas in OBS — no scaling needed there.
+          One browser source renders every overlay element. Add it in OBS at
+          1080 × 1920 covering the full canvas, then position, scale, and
+          toggle each element live from the Preview tab — OBS updates within a
+          second.
         </p>
-        <CopyRow
-          label="Highlights"
-          url={base}
-          dimensions={scaledDims(OVERLAY_BASE_DIMS.highlight, boxes.highlight.scale)}
-        />
-        <CopyRow
-          label="Goal · Subs"
-          url={`${base}/goals/subs`}
-          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalSubs.scale)}
-        />
-        <CopyRow
-          label="Goal · Likes"
-          url={`${base}/goals/likes`}
-          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalLikes.scale)}
-        />
-        <CopyRow
-          label="Goal · Viewers"
-          url={`${base}/goals/viewers`}
-          dimensions={scaledDims(OVERLAY_BASE_DIMS.goal, boxes.goalViewers.scale)}
-        />
-        <CopyRow
-          label="Competition"
-          url={`${base}/competition?opacity=${(opacityPct / 100).toFixed(2)}`}
-          dimensions={scaledDims(
-            OVERLAY_BASE_DIMS.competition,
-            boxes.competition.scale
-          )}
-        />
-        <CopyRow
-          label="Break timer"
-          url={`${base}/break`}
-          dimensions={scaledDims(OVERLAY_BASE_DIMS.break, boxes.break.scale)}
-        />
-        <div className="space-y-1 pt-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Competition opacity</span>
-            <span className="text-xs tabular-nums text-muted-foreground">{opacityPct}%</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={opacityPct}
-            onChange={(e) => setOpacityPct(Number(e.target.value))}
-            aria-label="Competition overlay opacity"
-            className="w-full accent-primary"
-          />
+        {overlayUrl ? (
+          <CopyRow label="Overlay" url={overlayUrl} dimensions="1080 × 1920 (full canvas)" />
+        ) : (
+          <Skeleton className="h-14 w-full" />
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            The URL includes a private token. Regenerating it invalidates the
+            old URL — update the OBS source after.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0"
+            disabled={regenerateToken.isPending}
+            onClick={() => regenerateToken.mutate()}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Regenerate
+          </Button>
         </div>
       </Section>
 

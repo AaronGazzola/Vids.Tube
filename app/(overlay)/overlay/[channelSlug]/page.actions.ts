@@ -11,7 +11,8 @@ import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
 
 export async function getOverlayLayoutAction(
-  channelSlug: string
+  channelSlug: string,
+  token: string
 ): Promise<DemoLayoutConfig | null> {
   const { data: channel, error: channelError } = await supabaseAdmin
     .from("channels")
@@ -26,16 +27,19 @@ export async function getOverlayLayoutAction(
     return null;
   }
   const { data, error } = await supabaseAdmin
-    .from("demo_layouts")
-    .select("config")
+    .from("overlay_layouts")
+    .select("config, token")
     .eq("channel_id", channel.id)
     .maybeSingle();
   if (error) {
     console.error(error);
     throw new Error("Failed to fetch overlay layout");
   }
+  if (!data || data.token !== token) {
+    return null;
+  }
   return mergeDemoLayout(
-    (data?.config as Partial<DemoLayoutConfig> | null) ?? null
+    (data.config as Partial<DemoLayoutConfig> | null) ?? null
   );
 }
 

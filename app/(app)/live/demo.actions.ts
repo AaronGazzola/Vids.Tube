@@ -5,6 +5,7 @@ import { vodAssetUrl } from "@/lib/storage";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
 import {
+  DEFAULT_DEMO_LAYOUT,
   mergeDemoLayout,
   type DemoLayoutConfig,
 } from "./demo.types";
@@ -42,7 +43,7 @@ export async function getDemoLayoutAction(): Promise<DemoLayoutConfig | null> {
     throw new Error(owned.error);
   }
   const { data, error } = await supabaseAdmin
-    .from("demo_layouts")
+    .from("overlay_layouts")
     .select("config")
     .eq("channel_id", owned.data)
     .maybeSingle();
@@ -63,7 +64,7 @@ export async function saveDemoLayoutAction(
   if ("error" in owned) {
     return { error: owned.error };
   }
-  const { error } = await supabaseAdmin.from("demo_layouts").upsert(
+  const { error } = await supabaseAdmin.from("overlay_layouts").upsert(
     {
       channel_id: owned.data,
       config,
@@ -76,6 +77,65 @@ export async function saveDemoLayoutAction(
     throw new Error("Failed to save demo layout");
   }
   return { data: { ok: true } };
+}
+
+function newOverlayToken(): string {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function getOverlayUrlInfoAction(): Promise<
+  ActionResult<{ token: string }>
+> {
+  const owned = await getOwnedChannelId();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { data: existing, error } = await supabaseAdmin
+    .from("overlay_layouts")
+    .select("token")
+    .eq("channel_id", owned.data)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load overlay token");
+  }
+  if (existing) {
+    return { data: { token: existing.token } };
+  }
+  const token = newOverlayToken();
+  const { error: insertError } = await supabaseAdmin
+    .from("overlay_layouts")
+    .insert({
+      channel_id: owned.data,
+      config: DEFAULT_DEMO_LAYOUT,
+      token,
+    });
+  if (insertError) {
+    console.error(insertError);
+    throw new Error("Failed to create overlay layout");
+  }
+  return { data: { token } };
+}
+
+export async function regenerateOverlayTokenAction(): Promise<
+  ActionResult<{ token: string }>
+> {
+  const owned = await getOwnedChannelId();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const token = newOverlayToken();
+  const { error } = await supabaseAdmin
+    .from("overlay_layouts")
+    .update({ token, updated_at: new Date().toISOString() })
+    .eq("channel_id", owned.data);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to regenerate overlay token");
+  }
+  return { data: { token } };
 }
 
 const MAX_DEMO_FRAMES = 30;

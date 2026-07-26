@@ -43,6 +43,70 @@ export async function ensureProcessingVod(
   }
 }
 
+const REAP_AFTER_MS = 60 * 60 * 1000;
+
+// Self-heal stuck VODs: a `processing` row whose source stream has been ended
+// for over an hour will never finalize normally. Publish it if a recording
+// landed (late finalize), otherwise mark it failed so it can't shadow future
+// recording-hook matches. Runs from the ingest heartbeat and the owner's
+// /live query — no cron needed.
+export async function reapStaleProcessingVods(channelId: string): Promise<void> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("videos")
+    .select("id, mp4_path, source_stream_id, created_at")
+    .eq("channel_id", channelId)
+    .eq("status", "processing");
+  if (error) {
+    console.error(error);
+    return;
+  }
+  const now = Date.now();
+  for (const row of rows ?? []) {
+    let endedAtMs: number | null = null;
+    if (row.source_stream_id) {
+      const { data: stream } = await supabaseAdmin
+        .from("streams")
+        .select("status, ended_at")
+        .eq("id", row.source_stream_id)
+        .maybeSingle();
+      if (!stream || stream.status !== "ended") {
+        continue;
+      }
+      endedAtMs = stream.ended_at
+        ? new Date(stream.ended_at).getTime()
+        : new Date(row.created_at).getTime();
+    } else {
+      endedAtMs = new Date(row.created_at).getTime();
+    }
+    if (now - endedAtMs < REAP_AFTER_MS) {
+      continue;
+    }
+    if (row.mp4_path) {
+      const { error: publishError } = await supabaseAdmin
+        .from("videos")
+        .update({ status: "ready", published_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("status", "processing");
+      if (publishError) {
+        console.error(publishError);
+      } else {
+        console.error(`reaper: published stuck VOD ${row.id} (late finalize)`);
+      }
+    } else {
+      const { error: failError } = await supabaseAdmin
+        .from("videos")
+        .update({ status: "failed" })
+        .eq("id", row.id)
+        .eq("status", "processing");
+      if (failError) {
+        console.error(failError);
+      } else {
+        console.error(`reaper: failed stuck VOD ${row.id} (no recording)`);
+      }
+    }
+  }
+}
+
 // On End, publish the VOD if its recording has already been finalized (mp4
 // present). If the finalize hasn't arrived yet, the recording hook publishes it
 // once it lands (it gates on the stream being ended).

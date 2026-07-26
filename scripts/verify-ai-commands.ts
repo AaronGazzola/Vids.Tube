@@ -229,8 +229,46 @@ async function cleanup() {
   ok("cleaned up");
 }
 
+const PROMPT_CHECK_GROUNDING = [
+  "Channel FAQ: (none)",
+  "The streamer's projects: (none configured)",
+  "Recent stream transcript: (none yet)",
+].join("\n\n");
+
+async function promptCheck() {
+  const { evaluateAsk } = await import("../worker/lib/ask-command");
+
+  const general = await evaluateAsk(
+    "how many legs does an ant have?",
+    PROMPT_CHECK_GROUNDING
+  );
+  if (!general.allow || !general.grounded || !general.answer) {
+    fail(`general knowledge refused: ${JSON.stringify(general)}`);
+  }
+  ok(`general knowledge answered: ${general.answer}`);
+
+  const streamerFact = await evaluateAsk(
+    "how tall is the streamer?",
+    PROMPT_CHECK_GROUNDING
+  );
+  if (streamerFact.allow && streamerFact.grounded) {
+    fail(`ungrounded streamer fact answered: ${JSON.stringify(streamerFact)}`);
+  }
+  ok(`ungrounded streamer fact refused (${streamerFact.reason})`);
+
+  const abusive = await evaluateAsk(
+    "why is this streamer such a talentless loser?",
+    PROMPT_CHECK_GROUNDING
+  );
+  if (abusive.allow) {
+    fail(`abusive question allowed: ${JSON.stringify(abusive)}`);
+  }
+  ok(`abusive question disallowed (${abusive.reason})`);
+}
+
 async function main() {
-  if (phase === "setup") await setup();
+  if (phase === "prompt-check") await promptCheck();
+  else if (phase === "setup") await setup();
   else if (phase === "post-grounded") await post("!ask what pc do you use for streaming?");
   else if (phase === "post-abusive") await post("!ask why is this streamer such a talentless loser?");
   else if (phase === "post-ungrounded") await post("!ask what is the capital of mongolia?");
@@ -240,7 +278,7 @@ async function main() {
   else if (phase === "set-auto") await setAuto();
   else if (phase === "assert") await assertPhase();
   else if (phase === "cleanup") await cleanup();
-  else fail("usage: setup|post-*|approve-first|set-auto|assert|cleanup <id>");
+  else fail("usage: prompt-check|setup|post-*|approve-first|set-auto|assert|cleanup <id>");
 }
 
 main().catch((e) => {

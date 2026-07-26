@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { reapStaleProcessingVods } from "@/lib/broadcast-end";
 import { decideGoLive } from "@/lib/stream";
 import { hasValidIngestSecret, resolveIngestChannel, supabaseAdmin } from "../_shared";
+
+const RECENT_END_GRACE_MS = 10 * 60 * 1000;
 
 export async function POST(request: Request) {
   if (!hasValidIngestSecret(request)) {
@@ -15,6 +18,8 @@ export async function POST(request: Request) {
   if (!channel) {
     return new NextResponse(null, { status: 404 });
   }
+
+  reapStaleProcessingVods(channel.id).catch((e) => console.error(e));
 
   const host = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
   const hlsPath = `${host}/${mtxPath}/index.m3u8`;
@@ -78,6 +83,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // The encoder is still (or again) running with no active session. If a
+  // broadcast ended moments ago (manual End while OBS kept streaming), carry
+  // its details onto the fresh preview so re-going-live is one click.
+  const { data: recentEnded } = await supabaseAdmin
+    .from("streams")
+    .select("title, description, thumbnail_path, ended_at")
+    .eq("channel_id", channel.id)
+    .eq("status", "ended")
+    .order("ended_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const endedRecently =
+    recentEnded?.ended_at &&
+    Date.now() - new Date(recentEnded.ended_at).getTime() <=
+      RECENT_END_GRACE_MS;
+  if (endedRecently) {
+    console.error(
+      `ingest/live: encoder continued after a manual end on channel ${channel.id}; new preview inherits the ended broadcast's details`
+    );
+  }
+
   const { error } = await supabaseAdmin.from("streams").insert({
     channel_id: channel.id,
     status: "preview",
@@ -85,6 +111,13 @@ export async function POST(request: Request) {
     hls_path: hlsPath,
     started_at: now,
     last_seen_at: now,
+    ...(endedRecently
+      ? {
+          title: recentEnded.title,
+          description: recentEnded.description,
+          thumbnail_path: recentEnded.thumbnail_path,
+        }
+      : {}),
   });
   if (error) {
     console.error(error);

@@ -10,6 +10,7 @@ import {
   type DemoBoxKey,
   type DemoLayoutConfig,
   type DemoOverlayKey,
+  type OverlayFeedSound,
 } from "./demo.types";
 
 // ── Layout store ───────────────────────────────────────────────────────────
@@ -31,6 +32,8 @@ type LayoutState = {
   setGoalProgressFull: (v: boolean) => void;
   setBackground: (bg: DemoBackground) => void;
   setMobileChrome: (v: boolean) => void;
+  setCompetitionOpacity: (v: number) => void;
+  setFeedSound: (v: OverlayFeedSound) => void;
   resetLayout: () => void;
 };
 
@@ -60,6 +63,9 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
     set((s) => ({ config: { ...s.config, background: bg } })),
   setMobileChrome: (v) =>
     set((s) => ({ config: { ...s.config, mobileChrome: v } })),
+  setCompetitionOpacity: (v) =>
+    set((s) => ({ config: { ...s.config, competitionOpacity: v } })),
+  setFeedSound: (v) => set((s) => ({ config: { ...s.config, feedSound: v } })),
   resetLayout: () =>
     set((s) => ({
       config: { ...s.config, boxes: DEFAULT_DEMO_LAYOUT.boxes },

@@ -4,17 +4,21 @@ import type { FeaturedAuthor } from "@/app/layout.types";
 import {
   DEMO_OVERLAY_EVENT,
   demoOverlayChannelName,
+  OVERLAY_LAYOUT_EVENT,
+  overlayLayoutChannelName,
   type DemoOverlaySnapshot,
 } from "@/lib/demo-overlay";
 import { computeGoalProgress, reachedProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { supabase } from "@/supabase/browser-client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import {
   getDemoFramesAction,
   getDemoLayoutAction,
+  getOverlayUrlInfoAction,
+  regenerateOverlayTokenAction,
   saveDemoLayoutAction,
 } from "./demo.actions";
 import { useDemoGeneratorStore, useDemoLayoutStore } from "./demo.stores";
@@ -87,6 +91,65 @@ export function useDemoLayout(enabled: boolean) {
   }, [enabled]);
 
   return { hydrated: query.isSuccess };
+}
+
+// Push layout edits to the live overlay frame the moment they happen, so a
+// drag on the Preview tab moves the element in OBS within ~1s (the frame's
+// 15s poll is only the fallback).
+export function useOverlayLayoutBroadcast(channelSlug: string | null) {
+  const config = useDemoLayoutStore((s) => s.config);
+  const hydrated = useDemoLayoutStore((s) => s.hydrated);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
+  useEffect(() => {
+    if (!channelSlug) return;
+    const channel = supabase.channel(overlayLayoutChannelName(channelSlug));
+    channel.subscribe();
+    channelRef.current = channel;
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [channelSlug]);
+
+  useEffect(() => {
+    if (!channelSlug || !hydrated) return;
+    const timer = setTimeout(() => {
+      const channel = channelRef.current;
+      if (!channel || channel.state !== "joined") return;
+      void channel.send({
+        type: "broadcast",
+        event: OVERLAY_LAYOUT_EVENT,
+        payload: { config },
+      });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [channelSlug, hydrated, config]);
+}
+
+export function useOverlayUrlInfo() {
+  return useQuery({
+    queryKey: ["overlay-url-info"],
+    queryFn: async () => {
+      const res = await getOverlayUrlInfoAction();
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
+    },
+  });
+}
+
+export function useRegenerateOverlayToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await regenerateOverlayTokenAction();
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["overlay-url-info"], data);
+    },
+  });
 }
 
 export function useDemoFrames(enabled: boolean) {

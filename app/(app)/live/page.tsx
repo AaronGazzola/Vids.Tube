@@ -37,7 +37,9 @@ import {
   useDemoController,
   useDemoLayout,
   useDemoOverlayBroadcast,
+  useOverlayLayoutBroadcast,
 } from "./demo.hooks";
+import { OverlayEditor } from "./overlay-editor";
 import { useDemoLayoutStore } from "./demo.stores";
 import { ActivityContent, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
@@ -417,6 +419,7 @@ export default function LivePage() {
   const [confirm, setConfirm] = useState<ScheduleSaveCheck | null>(null);
   const [tab, setTab] = useState("settings");
   const [demo, setDemo] = useState(false);
+  const [editOverlays, setEditOverlays] = useState(false);
   const [previewPortrait, setPreviewPortrait] = useState<boolean | null>(null);
   const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
@@ -429,6 +432,7 @@ export default function LivePage() {
   useDemoLayout(true);
   useDemoController(demo);
   useDemoOverlayBroadcast(demo, settings?.channelSlug ?? null, demoGoals);
+  useOverlayLayoutBroadcast(settings?.channelSlug ?? null);
 
   // Sync the form from the DB only when the active stream changes (not on every
   // background refetch), so in-progress edits are preserved.
@@ -619,22 +623,52 @@ export default function LivePage() {
                     Preview — only you can see this
                   </Badge>
                 )}
-                <div className="absolute right-2 top-2 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                  <span>
-                    {previewPortrait === false
-                      ? "Mobile layout (vertical streams only)"
-                      : "Mobile layout"}
-                  </span>
-                  <Switch
-                    checked={mobileChrome}
-                    onCheckedChange={setMobileChrome}
-                    disabled={previewPortrait === false}
+                {editOverlays && settings?.channelSlug ? (
+                  <OverlayEditor
+                    channelSlug={settings.channelSlug}
+                    onClose={() => setEditOverlays(false)}
                   />
-                </div>
+                ) : (
+                  <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                      <span>
+                        {previewPortrait === false
+                          ? "Mobile layout (vertical streams only)"
+                          : "Mobile layout"}
+                      </span>
+                      <Switch
+                        checked={mobileChrome}
+                        onCheckedChange={setMobileChrome}
+                        disabled={previewPortrait === false}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setEditOverlays(true)}
+                      className="rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/85"
+                    >
+                      Edit overlays
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex aspect-video w-full items-center justify-center rounded-lg border text-sm text-muted-foreground">
-                Start your encoder to see the private preview here.
+              <div className="relative flex aspect-9/16 max-h-[70vh] w-full items-center justify-center rounded-lg border bg-black/5 text-sm text-muted-foreground">
+                {!editOverlays && (
+                  <span>Start your encoder to see the private preview here.</span>
+                )}
+                {editOverlays && settings?.channelSlug ? (
+                  <OverlayEditor
+                    channelSlug={settings.channelSlug}
+                    onClose={() => setEditOverlays(false)}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setEditOverlays(true)}
+                    className="absolute right-2 top-2 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/85"
+                  >
+                    Edit overlays
+                  </button>
+                )}
               </div>
             )}
             {!demo && (

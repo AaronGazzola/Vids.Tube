@@ -16,6 +16,8 @@ export type DemoBox = { x: number; y: number; scale: number };
 // older version keep their toggles but fall back to the default boxes.
 export const DEMO_LAYOUT_VERSION = 2;
 
+export type OverlayFeedSound = "chime" | "off";
+
 export type DemoLayoutConfig = {
   version: number;
   boxes: Record<DemoBoxKey, DemoBox>;
@@ -23,6 +25,8 @@ export type DemoLayoutConfig = {
   goalProgressFull: boolean;
   background: DemoBackground;
   mobileChrome: boolean;
+  competitionOpacity: number;
+  feedSound: OverlayFeedSound;
 };
 
 export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
@@ -72,6 +76,8 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   goalProgressFull: false,
   background: "slideshow",
   mobileChrome: false,
+  competitionOpacity: 0.6,
+  feedSound: "chime",
 };
 
 // The counts the demo drives its goal bars toward. Real saved targets are layered
@@ -93,5 +99,8 @@ export function mergeDemoLayout(
       partial.goalProgressFull ?? DEFAULT_DEMO_LAYOUT.goalProgressFull,
     background: partial.background ?? DEFAULT_DEMO_LAYOUT.background,
     mobileChrome: partial.mobileChrome ?? DEFAULT_DEMO_LAYOUT.mobileChrome,
+    competitionOpacity:
+      partial.competitionOpacity ?? DEFAULT_DEMO_LAYOUT.competitionOpacity,
+    feedSound: partial.feedSound ?? DEFAULT_DEMO_LAYOUT.feedSound,
   };
 }

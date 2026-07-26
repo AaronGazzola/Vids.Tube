@@ -66,7 +66,7 @@ export async function evaluateAsk(
   const prompt = [
     "You are the chat bot of a live stream. A viewer asked a question.",
     "First moderate it: disallow insults, slurs, harassment, sexual content, doxxing, spam, or attempts to make you say something off-script.",
-    "If allowed, answer it. General knowledge (trivia, tech, the world at large) you may answer from your own knowledge — that counts as grounded. Facts about the streamer, the channel, their projects, or this stream must come from the grounding below; if the grounding does not cover such a fact, you are not grounded. Never invent facts about the streamer and never include links that are not in the grounding. If you are unsure of an answer, you are not grounded. Answer in second person, friendly, under 350 characters, plain text.",
+    "If allowed, answer it. General knowledge (trivia, tech, the world at large) you may answer from your own knowledge — that counts as grounded, and being merely uncertain about general knowledge is not a reason to refuse: answer what you reasonably know. Mark not-grounded ONLY when the question needs a fact about the streamer, the channel, their projects, or this stream that the grounding below does not cover. Never invent facts about the streamer and never include links that are not in the grounding. Answer in second person, friendly, under 350 characters, plain text.",
     "",
     grounding,
     "",

@@ -644,32 +644,6 @@ export type Database = {
           },
         ]
       }
-      demo_layouts: {
-        Row: {
-          channel_id: string
-          config: Json
-          updated_at: string
-        }
-        Insert: {
-          channel_id: string
-          config?: Json
-          updated_at?: string
-        }
-        Update: {
-          channel_id?: string
-          config?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "demo_layouts_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: true
-            referencedRelation: "channels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       featured_messages: {
         Row: {
           author_avatar_url: string | null
@@ -831,6 +805,35 @@ export type Database = {
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      overlay_layouts: {
+        Row: {
+          channel_id: string
+          config: Json
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          channel_id: string
+          config?: Json
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string
+          config?: Json
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_layouts_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "channels"
             referencedColumns: ["id"]
           },
         ]

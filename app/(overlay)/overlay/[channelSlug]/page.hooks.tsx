@@ -7,9 +7,15 @@ import type {
   FeaturedMessageWithAuthor,
 } from "@/app/layout.types";
 import {
+  mergeDemoLayout,
+  type DemoLayoutConfig,
+} from "@/app/(app)/live/demo.types";
+import {
   DEMO_OVERLAY_EVENT,
   DEMO_OVERLAY_STALE_MS,
   demoOverlayChannelName,
+  OVERLAY_LAYOUT_EVENT,
+  overlayLayoutChannelName,
   type DemoOverlayEventPayload,
   type DemoOverlaySnapshot,
 } from "@/lib/demo-overlay";
@@ -27,14 +33,37 @@ import {
   getStreamStandingsAction,
 } from "./page.actions";
 
-// The saved demo-preview layout doubles as the OBS layout: each overlay page
-// positions and scales itself from its box on the 1080x1920 canvas.
-export function useOverlayLayout(channelSlug: string) {
-  return useQuery({
-    queryKey: ["overlay-layout", channelSlug],
-    queryFn: () => getOverlayLayoutAction(channelSlug),
+// The saved layout drives the whole overlay frame. The 15s poll is the
+// fallback; live edits arrive over the layout broadcast channel within ~1s.
+export function useLiveOverlayLayout(channelSlug: string, token: string) {
+  const query = useQuery({
+    queryKey: ["overlay-layout", channelSlug, token],
+    queryFn: () => getOverlayLayoutAction(channelSlug, token),
     refetchInterval: 15_000,
   });
+  const [pushed, setPushed] = useState<DemoLayoutConfig | null>(null);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(overlayLayoutChannelName(channelSlug))
+      .on("broadcast", { event: OVERLAY_LAYOUT_EVENT }, ({ payload }) => {
+        const config = (payload as { config?: Partial<DemoLayoutConfig> })
+          ?.config;
+        if (config) {
+          setPushed(mergeDemoLayout(config));
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [channelSlug]);
+
+  return {
+    isSuccess: query.isSuccess,
+    authorized: !query.isSuccess || query.data !== null,
+    config: query.data ? pushed ?? query.data : null,
+  };
 }
 
 // While the owner has demo mode on in /live, snapshots of the demo state are

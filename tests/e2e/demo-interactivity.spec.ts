@@ -22,7 +22,7 @@ test.beforeAll(async () => {
     .maybeSingle();
   ownerChannelId = owner!.id;
   const { data: layout } = await admin
-    .from("demo_layouts")
+    .from("overlay_layouts")
     .select("config")
     .eq("channel_id", ownerChannelId)
     .maybeSingle();
@@ -31,7 +31,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (savedLayout) {
-    await admin.from("demo_layouts").upsert(
+    await admin.from("overlay_layouts").upsert(
       {
         channel_id: ownerChannelId,
         config: savedLayout,
@@ -41,7 +41,7 @@ test.afterAll(async () => {
     );
   } else {
     await admin
-      .from("demo_layouts")
+      .from("overlay_layouts")
       .delete()
       .eq("channel_id", ownerChannelId);
   }
@@ -200,7 +200,7 @@ test("new overlay toggles persist with the demo layout", async ({ page }) => {
   test.skip(await ownerIsLive(), "an active broadcast row exists");
   test.setTimeout(120_000);
 
-  await admin.from("demo_layouts").upsert(
+  await admin.from("overlay_layouts").upsert(
     {
       channel_id: ownerChannelId,
       config: { visible: { highlight: false } },
@@ -228,7 +228,7 @@ test("new overlay toggles persist with the demo layout", async ({ page }) => {
     .poll(
       async () => {
         const { data } = await admin
-          .from("demo_layouts")
+          .from("overlay_layouts")
           .select("config")
           .eq("channel_id", ownerChannelId)
           .maybeSingle();

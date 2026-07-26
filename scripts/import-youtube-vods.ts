@@ -347,12 +347,22 @@ async function importOne(
 }
 
 async function main() {
+  const { data: ownerStream, error: ownerErr } = await admin
+    .from("streams")
+    .select("channel_id")
+    .not("youtube_channel_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ownerErr) throw new Error(ownerErr.message);
+  if (!ownerStream) throw new Error("no stream with youtube_channel_id — cannot resolve the owner channel");
   const { data: channel, error: chErr } = await admin
     .from("channels")
     .select("id, slug")
-    .limit(1)
+    .eq("id", ownerStream.channel_id)
     .single();
   if (chErr) throw new Error(chErr.message);
+  console.log(`importing into channel: ${channel.slug}`);
 
   const { data: vods, error } = await admin
     .from("youtube_vods")
@@ -360,7 +370,7 @@ async function main() {
     .order("published_at", { ascending: false });
   if (error) throw new Error(error.message);
 
-  let candidates = (vods ?? []).filter((v) =>
+  const candidates = (vods ?? []).filter((v) =>
     ONLY_VIDEO ? v.video_id === ONLY_VIDEO : !SKIP_NATIVE.has(v.video_id)
   );
   console.log(`candidates: ${candidates.length} (limit ${LIMIT})`);

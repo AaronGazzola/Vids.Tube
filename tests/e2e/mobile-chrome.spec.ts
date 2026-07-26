@@ -29,14 +29,14 @@ test.beforeAll(async () => {
   ownerChannelId = owner!.id;
 
   const { data: row } = await admin
-    .from("demo_layouts")
+    .from("overlay_layouts")
     .select("config")
     .eq("channel_id", ownerChannelId)
     .maybeSingle();
   hadLayoutRow = !!row;
   savedLayout = row?.config ?? null;
 
-  await admin.from("demo_layouts").upsert(
+  await admin.from("overlay_layouts").upsert(
     {
       channel_id: ownerChannelId,
       config: {
@@ -51,7 +51,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (hadLayoutRow) {
-    await admin.from("demo_layouts").upsert(
+    await admin.from("overlay_layouts").upsert(
       {
         channel_id: ownerChannelId,
         config: savedLayout,
@@ -61,7 +61,7 @@ test.afterAll(async () => {
     );
   } else {
     await admin
-      .from("demo_layouts")
+      .from("overlay_layouts")
       .delete()
       .eq("channel_id", ownerChannelId);
   }
@@ -159,7 +159,7 @@ test("demo stage mobile chrome keeps reference proportions at two sizes", async 
     .poll(
       async () => {
         const { data } = await admin
-          .from("demo_layouts")
+          .from("overlay_layouts")
           .select("config")
           .eq("channel_id", ownerChannelId)
           .maybeSingle();

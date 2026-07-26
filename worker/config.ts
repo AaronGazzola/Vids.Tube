@@ -42,8 +42,10 @@ export const workerConfig = {
     lockLeaseMs: num("WORKER_LOCK_LEASE_MS", 60_000),
   },
   // Floor on the YouTube chat poll interval. liveChatMessages.list costs 5
-  // quota units per call; YouTube suggests ~3s, which burns ~6k units/hour.
-  youtubeChatPollMs: num("YT_CHAT_POLL_MS", 0),
+  // quota units per call against the 10k units/day default quota. Doppler sets
+  // 10000 (10s): 5h of polling ≈ 9k units, leaving headroom for metrics and
+  // video-status calls (AZ-167 calibration; AZ-193 tracks the quota increase).
+  youtubeChatPollMs: num("YT_CHAT_POLL_MS", 10_000),
   hlsUrl(): string {
     return `${this.streamHost.replace(/\/$/, "")}/${this.mtxPath}/index.m3u8`;
   },

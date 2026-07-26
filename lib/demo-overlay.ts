@@ -103,3 +103,9 @@ export const GOAL_METRIC_BOX: Record<
 export function demoOverlayChannelName(channelSlug: string): string {
   return `demo-overlay:${channelSlug}`;
 }
+
+export const OVERLAY_LAYOUT_EVENT = "layout";
+
+export function overlayLayoutChannelName(channelSlug: string): string {
+  return `overlay-layout:${channelSlug}`;
+}

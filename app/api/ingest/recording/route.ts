@@ -69,19 +69,28 @@ async function findTargetVideo(
     );
   }
 
-  const { data: newest, error: newestError } = await supabaseAdmin
+  // Legacy fallback (no usable recordedAt): only safe when there is exactly
+  // one candidate — guessing among several processing rows attaches the
+  // recording to the wrong broadcast. A 404 keeps the segments on the VM for
+  // a manual re-run.
+  const { data: candidates, error: candidatesError } = await supabaseAdmin
     .from("videos")
     .select("id, thumbnail_path")
     .eq("channel_id", channelId)
     .eq("status", "processing")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (newestError) {
-    console.error(newestError);
+    .limit(2);
+  if (candidatesError) {
+    console.error(candidatesError);
     throw new Error("Failed to resolve recording VOD");
   }
-  return newest ?? null;
+  if ((candidates ?? []).length > 1) {
+    console.error(
+      `recording: ambiguous fallback — ${candidates!.length}+ processing VODs on channel ${channelId} and no recordedAt match; refusing to guess`
+    );
+    return null;
+  }
+  return candidates?.[0] ?? null;
 }
 
 function sanitizePreviewPaths(value: unknown): string[] | null {
