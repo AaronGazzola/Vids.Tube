@@ -1,6 +1,6 @@
 "use client";
 
-import { useIsOwner, useUser } from "@/app/layout.hooks";
+import { useIsOwner, useMyChannel, useUser } from "@/app/layout.hooks";
 import { useAuthStore } from "@/app/layout.stores";
 import { AccountMenu } from "@/components/account-menu";
 import { Logo } from "@/components/logo";
@@ -22,6 +22,7 @@ import {
   LogIn,
   Menu,
   Radio,
+  Tv,
   User,
   UserPlus,
   type LucideIcon,
@@ -160,6 +161,11 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
   const { isPending } = useUser();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const items = useVisibleNavItems();
+  const { data: myChannel } = useMyChannel();
+  const channelItem: NavItem | null =
+    isAuthenticated && myChannel
+      ? { href: `/${myChannel.slug}`, label: "Your channel", icon: Tv }
+      : null;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -183,8 +189,15 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
         </div>
       )}
 
-      {items.length > 0 && (
+      {(channelItem || items.length > 0) && (
         <SidebarContent className={cn("gap-1 p-2", collapsed && "items-center")}>
+          {channelItem && (
+            <NavRow
+              item={channelItem}
+              active={pathname === channelItem.href}
+              collapsed={collapsed}
+            />
+          )}
           {items.map((item) => (
             <NavRow
               key={item.href}

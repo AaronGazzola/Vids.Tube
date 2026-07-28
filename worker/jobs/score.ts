@@ -19,7 +19,7 @@ import {
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
 import { processCommands } from "../lib/commands";
-import { enqueueNightbotBridge } from "../lib/replies";
+import { consumeSelfEcho, enqueueNightbotBridge } from "../lib/replies";
 import { runProactiveMoments, runWrapupIfRequested } from "../lib/moments";
 import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
@@ -556,13 +556,16 @@ export async function runScoringJob(
       if (stopped) {
         return;
       }
+      if (m.isBot && consumeSelfEcho(m.text)) {
+        continue;
+      }
       const extMsgId = `${m.authorChannelId}:${m.publishedAt}`;
       let chatMessageId: string | null = null;
       const { data: row, error } = await supabaseAdmin
         .from("chat_messages")
         .insert({
           stream_id: stream.id,
-          origin: "youtube",
+          origin: m.isBot ? "bot" : "youtube",
           external_author_id: m.authorChannelId,
           author_name: m.author,
           author_avatar_url: m.avatarUrl,
@@ -582,6 +585,11 @@ export async function runScoringJob(
       }
       chatMessageId = row?.id ?? null;
       console.error(`[chat:yt] ${m.author}: ${m.text}`);
+      // Bot messages are visible in chat but never scored, moderated,
+      // command-processed, or bridged back to YouTube.
+      if (m.isBot) {
+        continue;
+      }
       ytBuffer.push({
         ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,
         origin: "youtube",

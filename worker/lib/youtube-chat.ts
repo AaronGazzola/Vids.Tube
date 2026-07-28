@@ -2,7 +2,10 @@ import type { YouTubeChatMessage } from "@/app/layout.types";
 import { fetchLiveChatPage, fetchVideoData } from "@/lib/youtube";
 import { workerConfig } from "../config";
 
-export type YoutubeChatMessage = YouTubeChatMessage & { origin: "youtube" };
+export type YoutubeChatMessage = YouTubeChatMessage & {
+  origin: "youtube";
+  isBot: boolean;
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,8 +21,8 @@ export async function resolveLiveChatId(
   return video.activeLiveChatId;
 }
 
-// The bot's own YouTube sends come back through the poller as the Nightbot
-// account; they must never be persisted, scored, or command-processed.
+// Nightbot messages are shown in Vids.Tube chat (as origin "bot") but must
+// never be scored or command-processed.
 function isNightbot(m: YouTubeChatMessage): boolean {
   const nightbotChannelId = process.env.NIGHTBOT_YOUTUBE_CHANNEL_ID;
   if (nightbotChannelId && m.authorChannelId === nightbotChannelId) {
@@ -38,10 +41,7 @@ export async function* pollYoutubeChat(
   for (;;) {
     const page = await fetchLiveChatPage(liveChatId, pageToken);
     for (const m of page.messages) {
-      if (isNightbot(m)) {
-        continue;
-      }
-      yield { ...m, origin: "youtube" };
+      yield { ...m, origin: "youtube", isBot: isNightbot(m) };
     }
     if (!page.nextPageToken) {
       return;

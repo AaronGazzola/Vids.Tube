@@ -30,7 +30,8 @@
     "backfill:youtube-transcripts": "doppler run -- tsx scripts/backfill-youtube-transcripts.ts",
     "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts",
     "backfill:memberships": "doppler run -- tsx scripts/backfill-memberships.ts",
-    "verify:membership-merge": "doppler run -- tsx scripts/verify-membership-merge.ts"
+    "verify:membership-merge": "doppler run -- tsx scripts/verify-membership-merge.ts",
+    "create:unclaimed-channels": "doppler run -- tsx scripts/create-unclaimed-channels.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",

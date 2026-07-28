@@ -4,18 +4,17 @@
 
 Deliver command replies to the origin they came from — VidsBot rows in
 vids.tube chat and rate-limited Nightbot sends in the merged YouTube chat —
-with a distinct bot identity that never re-enters ingestion, scoring, or
-moderation.
-
+with a distinct bot identity that is visible in chat but never re-enters
+scoring, moderation, or command processing.
 ## Requirements
-
 ### Requirement: Origin-local command replies
 
 The system SHALL deliver each command reply to the chat origin the command came
 from: a vids.tube command is answered by a VidsBot message in vids.tube chat; a
 YouTube command is answered through Nightbot's send API into the YouTube live
-chat. Replies SHALL NOT be cross-posted to the other origin, and the reply text
-SHALL continue to be recorded on the command event.
+chat. A YouTube reply SHALL also be recorded as a VidsBot row in vids.tube chat
+so the owner sees everything the bot says, and the reply text SHALL continue to
+be recorded on the command event.
 
 #### Scenario: vids.tube command answered by VidsBot
 
@@ -27,8 +26,8 @@ SHALL continue to be recorded on the command event.
 
 - **WHEN** a viewer types an executable command in the merged YouTube chat and a
   Nightbot token is configured
-- **THEN** the reply is posted to Nightbot's `channel/send` endpoint and no
-  vids.tube bot row is created
+- **THEN** the reply is posted to Nightbot's `channel/send` endpoint and a
+  single `origin='bot'` VidsBot row is recorded in vids.tube chat
 
 ### Requirement: VidsBot identity rendering
 
@@ -53,17 +52,40 @@ be processed by the command pipeline.
 ### Requirement: Nightbot send queue
 
 The system SHALL send YouTube replies through a queue that spaces requests at
-least 5.2 seconds apart (Nightbot's rate limit) and truncates messages to 400
-characters on a word boundary. When `NIGHTBOT_CHANNEL_SEND_TOKEN` is not
-configured the system SHALL skip YouTube sends with a clear log line and no
-error; a failed send SHALL be logged with the response body and dropped after at
-most one retry for rate-limit responses.
+least 5.2 seconds apart (Nightbot's rate limit). A reply that exceeds Nightbot's
+400-character per-message limit SHALL be split into multiple ≤400-character
+messages on whitespace boundaries rather than truncated: each part SHALL carry a
+` (n/m)` continuation marker when the reply spans more than one part, the split
+SHALL be capped at 3 parts (the last part ellipsis-truncated if content remains),
+and each part SHALL be enqueued as its own send so parts inherit the queue's
+spacing and its precedence behind command replies. A reply of 400 characters or
+fewer SHALL be sent as a single message with no marker. When
+`NIGHTBOT_CHANNEL_SEND_TOKEN` is not configured the system SHALL skip YouTube
+sends with a clear log line and no error; a failed send SHALL be logged with the
+response body and dropped after at most one retry for rate-limit responses.
 
 #### Scenario: Sends are spaced
 
 - **WHEN** two YouTube replies are produced within a second of each other
 - **THEN** the second Nightbot request starts no less than 5.2 seconds after the
   first
+
+#### Scenario: Short reply sent as one message
+
+- **WHEN** a reply of 400 characters or fewer is produced
+- **THEN** it is sent as a single Nightbot message with no continuation marker
+
+#### Scenario: Long reply is split, not truncated
+
+- **WHEN** a reply longer than 400 characters is produced
+- **THEN** it is delivered as multiple Nightbot messages, each 400 characters or
+  fewer, split on whitespace, each tagged with a `(n/m)` marker, and no content is
+  lost within the 3-part cap
+
+#### Scenario: Split respects the part cap
+
+- **WHEN** a reply is long enough to need more than 3 parts
+- **THEN** exactly 3 messages are sent and the third ends with an ellipsis
 
 #### Scenario: Missing token skips gracefully
 
@@ -104,36 +126,54 @@ skip behavior.
 - **THEN** the failure is logged (no more than once per hour), YouTube sends
   skip as if unconfigured, and vids.tube replies continue unaffected
 
-### Requirement: Nightbot ingestion exclusion
+### Requirement: Nightbot visible but never scored
 
-The system SHALL drop YouTube chat messages authored by Nightbot — matched by
-the configured Nightbot channel id, or by the exact display name "Nightbot" —
-before persisting, scoring, or command-processing them, so the bot's own sends
-never re-enter the pipeline.
+The system SHALL identify YouTube chat messages authored by Nightbot — matched
+by the configured Nightbot channel id, or by the exact display name "Nightbot" —
+and persist them as `origin='bot'` `chat_messages` rows so they appear in
+vids.tube chat, while excluding them from scoring, moderation, command
+processing, viewer stats, and the YouTube bridge. Text the system itself pushed
+through Nightbot (command replies, broadcasts, bridged vids.tube messages) comes
+back through the poller as a Nightbot message and is already recorded, so each
+such echo SHALL be matched against recently sent text and dropped rather than
+persisted a second time.
 
-#### Scenario: Nightbot's own message ignored
+#### Scenario: Nightbot's own message appears in chat
 
-- **WHEN** the YouTube poller receives a message authored by Nightbot
-- **THEN** it is not inserted into `chat_messages`, not scored, and not treated
-  as a command
+- **WHEN** the YouTube poller receives a Nightbot message the system did not
+  send (a Nightbot timer, or a reply to a native Nightbot command)
+- **THEN** an `origin='bot'` row authored "Nightbot" appears in vids.tube chat,
+  and it is not scored, not command-processed, and not bridged
+
+#### Scenario: Our own send does not echo back
+
+- **WHEN** the poller receives a Nightbot message whose text matches a reply,
+  broadcast, or bridged message the system just sent
+- **THEN** no additional `chat_messages` row is created
 
 ### Requirement: Bridge vids.tube chat to YouTube
 
 The system SHALL post each visible vids.tube chat message into the YouTube
-live chat through Nightbot — as `name: message`, with the 400-char
-word-boundary truncation — while the engaged stream is simulcast on YouTube
-and the stream's bridge setting is enabled. Bridged sends SHALL share the Nightbot send queue
-but yield to command replies, and SHALL wait in a bounded buffer of 5 that
-drops the oldest bridged message (with a log line) when full. Command
-messages, bot rows, and messages from banned participants SHALL NOT be
-bridged. The bridge SHALL be controlled by `chat_scoring_state.bridge_enabled`
-(default true), editable as a switch in the /live Settings tab.
+live chat through Nightbot — as `name: message`, as a single message with the
+400-char word-boundary truncation (bridged messages are not split into multiple
+parts) — while the engaged stream is simulcast on YouTube and the stream's bridge
+setting is enabled. Bridged sends SHALL share the Nightbot send queue but yield to
+command replies, and SHALL wait in a bounded buffer of 5 that drops the oldest
+bridged message (with a log line) when full. Command messages, bot rows, and
+messages from banned participants SHALL NOT be bridged. The bridge SHALL be
+controlled by `chat_scoring_state.bridge_enabled` (default true), editable as a
+switch in the /live Settings tab.
 
 #### Scenario: vids.tube message appears on YouTube
 
 - **WHEN** a vids.tube viewer sends "hello" during a simulcast with the
   bridge enabled
 - **THEN** Nightbot posts `<viewer name>: hello` to the YouTube live chat
+
+#### Scenario: Long bridged message is truncated, not split
+
+- **WHEN** a bridged vids.tube message exceeds 400 characters
+- **THEN** it is sent as a single truncated Nightbot message, not multiple parts
 
 #### Scenario: Replies outrank bridged chat
 
@@ -151,3 +191,4 @@ bridged. The bridge SHALL be controlled by `chat_scoring_state.bridge_enabled`
 - **WHEN** the owner disables "Bridge chat to YouTube" and saves
 - **THEN** subsequent vids.tube messages are not sent to YouTube, while
   command replies continue to deliver
+

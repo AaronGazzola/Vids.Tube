@@ -4,6 +4,7 @@ import { CustomToast } from "@/components/CustomToast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  ensureVerifyCodeAction,
   getBannedParticipantsAction,
   getYoutubeLinkAction,
   regenerateYoutubeCodeAction,
@@ -56,6 +57,22 @@ export function useYoutubeLink() {
   });
 }
 
+const verifyCodeKey = ["verify-code"] as const;
+
+export function useEnsureVerifyCode(enabled: boolean, live: boolean) {
+  return useQuery({
+    queryKey: verifyCodeKey,
+    queryFn: async () => {
+      const res = await ensureVerifyCodeAction();
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
+    },
+    enabled,
+    refetchOnWindowFocus: true,
+    refetchInterval: live ? 30_000 : false,
+  });
+}
+
 export function useSaveYoutubeLink() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -89,6 +106,7 @@ export function useRegenerateYoutubeCode() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: youtubeLinkKey });
+      queryClient.invalidateQueries({ queryKey: verifyCodeKey });
     },
     onError: (error: Error) => {
       toast.custom(() => (

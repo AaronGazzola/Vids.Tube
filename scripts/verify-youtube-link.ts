@@ -21,20 +21,43 @@ function ok(msg: string) {
 
 function youtubeMessage(
   text: string,
-  externalAuthorId: string
+  externalAuthorId: string,
+  authorName = "Poster"
 ): BufferedMessage {
   return {
     ref: "verify:test",
     origin: "youtube",
-    author: "Verifier",
+    author: authorName,
     text,
     userId: null,
     externalAuthorId,
-    authorName: "Verifier",
+    authorName,
     authorAvatarUrl: null,
     chatMessageId: null,
     createdAt: new Date().toISOString(),
   };
+}
+
+const suffix = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+
+async function mkUser(tag: string): Promise<string> {
+  const { data, error } = await admin.auth.admin.createUser({
+    email: `verify-link-${tag}-${suffix}@example.invalid`,
+    password: `pw-${suffix}-${tag}`,
+    email_confirm: true,
+  });
+  if (error || !data.user) fail(`createUser ${tag}: ${error?.message}`);
+  return data.user!.id;
+}
+
+async function mkChannel(userId: string, tag: string): Promise<void> {
+  const { error } = await admin.from("channels").insert({
+    owner_user_id: userId,
+    slug: `vlink_${tag}_${suffix}`,
+    handle: `vlink_${tag}_${suffix}`.slice(0, 30),
+    name: `Verify Link ${tag}`,
+  });
+  if (error) fail(`mkChannel ${tag}: ${error.message}`);
 }
 
 async function main() {
@@ -44,69 +67,68 @@ async function main() {
   }
   ok(`resolved @YouTube -> ${resolved.channelId} (${resolved.title})`);
 
-  const { data: owner } = await admin
-    .from("channels")
-    .select("owner_user_id")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!owner || !owner.owner_user_id) fail("no owned channel");
-  const userId = owner.owner_user_id;
-
-  const { data: existing } = await admin
-    .from("youtube_links")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const claimedChannel = "UC_VERIFY_TEST_CHANNEL";
-  const code = "TESTA2";
-  const seed = async () => {
-    const { error } = await admin.from("youtube_links").upsert(
-      {
-        user_id: userId,
-        youtube_channel_id: claimedChannel,
-        youtube_handle: "verifytest",
-        verify_code: code,
-        verified_at: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
-    if (error) fail(error.message);
-  };
+  const uA = await mkUser("a");
+  const uB = await mkUser("b");
+  const users = [uA, uB];
+  const posterChannel = `UC_POSTER_${suffix}`;
 
   try {
-    await seed();
-    await processLinkVerifications([
-      youtubeMessage(` ${code} `, claimedChannel),
-    ]);
-    let { data: row } = await admin
-      .from("youtube_links")
-      .select("verified_at")
-      .eq("user_id", userId)
-      .single();
-    if (!row?.verified_at) fail("matching code from claimed channel did not verify");
-    ok("code posted from the claimed channel verifies the link");
+    await mkChannel(uA, "a");
+    await mkChannel(uB, "b");
 
-    await seed();
+    // Code-first: a code with no channel yet; the poster's channel is learned.
+    const codeA = "AAA222";
+    await admin.from("youtube_links").insert({
+      user_id: uA,
+      verify_code: codeA,
+      updated_at: new Date().toISOString(),
+    });
     await processLinkVerifications([
-      youtubeMessage(code, "UC_SOMEONE_ELSE_ENTIRELY"),
+      youtubeMessage(codeA, posterChannel, "Poster A"),
     ]);
-    ({ data: row } = await admin
+    const { data: rowA } = await admin
+      .from("youtube_links")
+      .select("verified_at, youtube_channel_id, youtube_handle")
+      .eq("user_id", uA)
+      .single();
+    if (!rowA?.verified_at) fail("posting the code did not verify the link");
+    if (rowA.youtube_channel_id !== posterChannel)
+      fail(`channel not learned from poster: ${rowA.youtube_channel_id}`);
+    ok("posting the code verifies and learns the poster's channel + handle");
+
+    // Unknown code is ignored.
+    const codeB = "BBB222";
+    await admin.from("youtube_links").insert({
+      user_id: uB,
+      verify_code: codeB,
+      updated_at: new Date().toISOString(),
+    });
+    await processLinkVerifications([
+      youtubeMessage("ZZZ999", posterChannel, "Poster Z"),
+    ]);
+    const { data: rowB1 } = await admin
       .from("youtube_links")
       .select("verified_at")
-      .eq("user_id", userId)
-      .single());
-    if (row?.verified_at) fail("code from a different channel verified the link");
-    ok("code posted by a different channel is ignored");
+      .eq("user_id", uB)
+      .single();
+    if (rowB1?.verified_at) fail("an unknown code verified a link");
+    ok("a non-matching code is ignored");
+
+    // A channel already verified-linked to another account cannot be re-linked.
+    await processLinkVerifications([
+      youtubeMessage(codeB, posterChannel, "Poster B"),
+    ]);
+    const { data: rowB2 } = await admin
+      .from("youtube_links")
+      .select("verified_at")
+      .eq("user_id", uB)
+      .single();
+    if (rowB2?.verified_at)
+      fail("a channel already linked elsewhere was re-linked");
+    ok("a channel already linked to another account is ignored");
   } finally {
-    if (existing) {
-      await admin
-        .from("youtube_links")
-        .upsert(existing, { onConflict: "user_id" });
-    } else {
-      await admin.from("youtube_links").delete().eq("user_id", userId);
+    for (const uid of users) {
+      await admin.auth.admin.deleteUser(uid);
     }
     ok("cleaned up");
   }

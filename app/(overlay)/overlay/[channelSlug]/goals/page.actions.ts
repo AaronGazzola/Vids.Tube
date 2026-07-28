@@ -1,6 +1,6 @@
 "use server";
 
-import type { GoalProgressResponse } from "@/app/layout.types";
+import type { GoalProgressResponse, YouTubeVideoData } from "@/app/layout.types";
 import { computeGoalProgress } from "@/lib/goals";
 import { isLiveAndFresh } from "@/lib/stream";
 import { fetchSubs, fetchVideoData } from "@/lib/youtube";
@@ -12,36 +12,54 @@ const INACTIVE = (isLive: boolean): GoalProgressResponse => ({
   metrics: null,
 });
 
-// One YouTube fetch per video per minute, shared by every overlay source
-// polling this action. liveChat quota is the scarce resource; without this,
-// each OBS goal source costs 2 units per poll.
-const YT_COUNTS_TTL_MS = 60_000;
+// One YouTube fetch per key per TTL, shared by every overlay source polling
+// this action. Quota is the scarce resource (10k units/day; chat polling at 10s
+// spends ~7.2k of it over a 4h stream), so the two reads are cached separately:
+// likes/viewers move constantly and cost 1 unit (videos.list), subs barely move
+// and cost 1 unit (channels.list). 10s + 60s = 7 units/min ≈ 1.7k units per 4h
+// stream. Refreshing both at 10s would cost 2.9k and blow the daily budget.
+const VIDEO_TTL_MS = 10_000;
+const SUBS_TTL_MS = 60_000;
 type YtCounts = { subs: number; likes: number; viewers: number };
-const ytCountsCache = new Map<
+const videoCache = new Map<
   string,
-  { at: number; promise: Promise<YtCounts> }
+  { at: number; promise: Promise<YouTubeVideoData> }
 >();
+const subsCache = new Map<string, { at: number; promise: Promise<number> }>();
 
-function fetchCountsShared(
+function fetchVideoShared(videoId: string): Promise<YouTubeVideoData> {
+  const hit = videoCache.get(videoId);
+  if (hit && Date.now() - hit.at < VIDEO_TTL_MS) {
+    return hit.promise;
+  }
+  const promise = fetchVideoData(videoId);
+  videoCache.set(videoId, { at: Date.now(), promise });
+  promise.catch(() => videoCache.delete(videoId));
+  return promise;
+}
+
+function fetchSubsShared(channelId: string): Promise<number> {
+  const hit = subsCache.get(channelId);
+  if (hit && Date.now() - hit.at < SUBS_TTL_MS) {
+    return hit.promise;
+  }
+  const promise = fetchSubs(channelId);
+  subsCache.set(channelId, { at: Date.now(), promise });
+  promise.catch(() => subsCache.delete(channelId));
+  return promise;
+}
+
+async function fetchCountsShared(
   videoId: string,
   youtubeChannelId: string | null
 ): Promise<YtCounts> {
-  const hit = ytCountsCache.get(videoId);
-  if (hit && Date.now() - hit.at < YT_COUNTS_TTL_MS) {
-    return hit.promise;
-  }
-  const promise = (async () => {
-    const video = await fetchVideoData(videoId);
-    const subs = await fetchSubs(youtubeChannelId || video.channelId);
-    return {
-      subs,
-      likes: video.likeCount,
-      viewers: video.concurrentViewers,
-    };
-  })();
-  ytCountsCache.set(videoId, { at: Date.now(), promise });
-  promise.catch(() => ytCountsCache.delete(videoId));
-  return promise;
+  const video = await fetchVideoShared(videoId);
+  const subs = await fetchSubsShared(youtubeChannelId || video.channelId);
+  return {
+    subs,
+    likes: video.likeCount,
+    viewers: video.concurrentViewers,
+  };
 }
 
 export async function getGoalProgressAction(

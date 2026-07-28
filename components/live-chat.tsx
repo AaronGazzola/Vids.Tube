@@ -7,6 +7,7 @@ import { ChatText } from "@/components/chat-text";
 import { ChatComposer } from "@/components/chat-composer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { YoutubeVerifyBanner } from "@/components/youtube-verify-banner";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { ArrowDown } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
   return (
     <div className="flex h-full min-h-80 flex-col rounded-lg border">
       <div className="border-b p-3 text-sm font-medium">Live chat</div>
+      <YoutubeVerifyBanner live={!!streamId} />
       <div className="relative min-h-0 flex-1">
         <div
           ref={containerRef}

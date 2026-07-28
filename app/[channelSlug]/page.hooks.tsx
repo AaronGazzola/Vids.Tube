@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getChannelBySlugAction,
+  getChannelMembershipStatsAction,
   getChannelProcessingVideosAction,
   getChannelVideosAction,
   getUpcomingScheduledBroadcastAction,
@@ -15,6 +16,17 @@ export function useChannel(slug: string) {
   return useQuery({
     queryKey: ["channel", slug],
     queryFn: () => getChannelBySlugAction(slug),
+  });
+}
+
+export function useChannelMembershipStats(
+  channelId: string | undefined,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: ["membership-stats", channelId],
+    queryFn: () => getChannelMembershipStatsAction(channelId!),
+    enabled: !!channelId && enabled,
   });
 }
 

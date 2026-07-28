@@ -238,6 +238,24 @@ export async function gatherRecentMessages(
   return samples;
 }
 
+async function unclaimedClaimNudge(
+  identity: MeIdentity
+): Promise<string> {
+  if (!identity.youtubeChannelId) {
+    return "";
+  }
+  const { supabaseAdmin } = await deps();
+  const { data } = await supabaseAdmin
+    .from("channels")
+    .select("handle, owner_user_id")
+    .eq("youtube_channel_id", identity.youtubeChannelId)
+    .maybeSingle();
+  if (data && !data.owner_user_id) {
+    return ` · your page's already here — vids.tube/${data.handle} — sign in there to claim it`;
+  }
+  return "";
+}
+
 function hasHistory(stats: MeStats): boolean {
   return (
     stats.totalMessages > 0 ||
@@ -332,5 +350,6 @@ export async function meHandler(ctx: CommandContext): Promise<void> {
     }
   }
 
-  ctx.reply(truncateProfile(`${mention} ${profile}`));
+  const nudge = await unclaimedClaimNudge(identity);
+  ctx.reply(truncateProfile(`${mention} ${profile}`) + nudge);
 }

@@ -75,6 +75,28 @@ const defaultSender: NightbotSender = (text, token) =>
   });
 
 const BRIDGE_MAX_QUEUE = 5;
+const ECHO_MEMORY = 200;
+
+// Everything we push through Nightbot comes back through the YouTube poller as
+// a Nightbot message. We already persist our own sends, so those echoes are
+// dropped; anything else Nightbot says is genuinely its own and is kept.
+const sentTexts: string[] = [];
+
+function rememberSent(text: string): void {
+  sentTexts.push(text.trim());
+  while (sentTexts.length > ECHO_MEMORY) {
+    sentTexts.shift();
+  }
+}
+
+export function consumeSelfEcho(text: string): boolean {
+  const i = sentTexts.indexOf(text.trim());
+  if (i === -1) {
+    return false;
+  }
+  sentTexts.splice(i, 1);
+  return true;
+}
 
 const queue: string[] = [];
 const bridgeQueue: string[] = [];
@@ -155,6 +177,7 @@ export function enqueueNightbotSend(
     return;
   }
   for (const chunk of chunkForYoutube(text)) {
+    rememberSent(chunk);
     queue.push(chunk);
   }
   void drainQueue(sender, wait, tokenFn, refreshFn);
@@ -170,7 +193,9 @@ export function enqueueNightbotBridge(
   if (!nightbotConfigured()) {
     return;
   }
-  bridgeQueue.push(truncateForYoutube(text));
+  const outgoing = truncateForYoutube(text);
+  rememberSent(outgoing);
+  bridgeQueue.push(outgoing);
   while (bridgeQueue.length > BRIDGE_MAX_QUEUE) {
     bridgeQueue.shift();
     bridgeDropped += 1;
@@ -184,7 +209,6 @@ export function enqueueNightbotBridge(
 export async function deliverReply(delivery: ReplyDelivery): Promise<void> {
   if (delivery.origin === "youtube") {
     enqueueNightbotSend(delivery.text);
-    return;
   }
   // Imported lazily so pure helpers (truncation, queue) stay testable without
   // Supabase env configured.

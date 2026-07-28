@@ -12,3 +12,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: false,
   setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
+
+type VerifyBannerStore = {
+  collapsedUserId: string | null;
+  setCollapsed: (userId: string, collapsed: boolean) => void;
+};
+
+export const useVerifyBannerStore = create<VerifyBannerStore>((set) => ({
+  collapsedUserId: null,
+  setCollapsed: (userId, collapsed) =>
+    set({ collapsedUserId: collapsed ? userId : null }),
+}));

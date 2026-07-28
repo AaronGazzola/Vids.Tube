@@ -19,11 +19,12 @@ The `youtube_links` verification flow exists end-to-end (account card generates 
 
 ### Modified Capabilities
 
-_None — this reuses the existing `youtube-handle-link` actions and worker verification unchanged._
+- `youtube-handle-link`: verification becomes **code-first** — the code alone identifies the account and the YouTube channel/handle are learned from whoever posts the code (no handle typed up front). `youtube_links` channel id/handle become nullable and the verify code becomes unique.
 
 ## Impact
 
-- **No migration, no schema change** — reads `youtube_links` via the existing `getYoutubeLinkAction`; writes via existing `saveYoutubeLinkAction` / `regenerateYoutubeCodeAction`.
-- **UI**: new banner component mounted at the top of `components/live-chat.tsx`; a small hook for the signed-in user's link state + a session-scoped dismiss store.
-- **Independent of AZ-169/AZ-170**: works today against the current verify flow; when AZ-169 ships, the same verification it drives will additionally trigger the identity merge (no change needed here).
-- **Mirrors** the existing `YoutubeLinkCard` behavior in `app/(app)/account/page.tsx`.
+- **Migration**: `youtube_links.youtube_channel_id` / `youtube_handle` become nullable; unique index on `verify_code`.
+- **Actions**: new `ensureVerifyCodeAction` (get-or-create a code for the signed-in user, no handle); `YoutubeLink` type channel/handle nullable; save/regenerate use a collision-checked unique code.
+- **Worker**: `worker/lib/verify-links.ts` matches an outstanding code regardless of channel, then sets channel id/handle from the message author, verifies, and triggers the AZ-169 merge.
+- **UI**: banner mounted in `components/live-chat.tsx` showing only the code (no handle input); collapses to a thin re-expandable bar; hidden entirely once verified. Session-scoped collapse store.
+- **Account page**: `YoutubeLinkCard` guards a null handle (code-first rows show a pending state).

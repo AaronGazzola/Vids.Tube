@@ -100,8 +100,8 @@ export async function unbanParticipantAction(
 }
 
 export type YoutubeLink = {
-  youtubeChannelId: string;
-  youtubeHandle: string;
+  youtubeChannelId: string | null;
+  youtubeHandle: string | null;
   verifyCode: string;
   verifiedAt: string | null;
 };
@@ -126,9 +126,24 @@ function newVerifyCode(): string {
   return code;
 }
 
+async function uniqueVerifyCode(): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = newVerifyCode();
+    const { data } = await supabaseAdmin
+      .from("youtube_links")
+      .select("user_id")
+      .eq("verify_code", code)
+      .maybeSingle();
+    if (!data) {
+      return code;
+    }
+  }
+  throw new Error("Could not generate a unique verify code");
+}
+
 function toYoutubeLink(row: {
-  youtube_channel_id: string;
-  youtube_handle: string;
+  youtube_channel_id: string | null;
+  youtube_handle: string | null;
   verify_code: string;
   verified_at: string | null;
 }): YoutubeLink {
@@ -157,6 +172,40 @@ export async function getYoutubeLinkAction(): Promise<YoutubeLink | null> {
   return data ? toYoutubeLink(data) : null;
 }
 
+export async function ensureVerifyCodeAction(): Promise<
+  ActionResult<{ verifyCode: string; verifiedAt: string | null }>
+> {
+  const user = await requireUser();
+  if ("error" in user) {
+    return user;
+  }
+  const { data: existing, error: readErr } = await supabaseAdmin
+    .from("youtube_links")
+    .select("verify_code, verified_at")
+    .eq("user_id", user.data.id)
+    .maybeSingle();
+  if (readErr) {
+    console.error(readErr);
+    throw new Error("Failed to load verify code");
+  }
+  if (existing) {
+    return {
+      data: { verifyCode: existing.verify_code, verifiedAt: existing.verified_at },
+    };
+  }
+  const code = await uniqueVerifyCode();
+  const { error } = await supabaseAdmin.from("youtube_links").insert({
+    user_id: user.data.id,
+    verify_code: code,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to create verify code");
+  }
+  return { data: { verifyCode: code, verifiedAt: null } };
+}
+
 export async function saveYoutubeLinkAction(
   handle: string
 ): Promise<ActionResult<YoutubeLink>> {
@@ -172,7 +221,7 @@ export async function saveYoutubeLinkAction(
     user_id: user.data.id,
     youtube_channel_id: channel.channelId,
     youtube_handle: channel.handle,
-    verify_code: newVerifyCode(),
+    verify_code: await uniqueVerifyCode(),
     verified_at: null,
     updated_at: new Date().toISOString(),
   };
@@ -193,7 +242,7 @@ export async function regenerateYoutubeCodeAction(): Promise<
   if ("error" in user) {
     return user;
   }
-  const code = newVerifyCode();
+  const code = await uniqueVerifyCode();
   const { data, error } = await supabaseAdmin
     .from("youtube_links")
     .update({ verify_code: code, updated_at: new Date().toISOString() })

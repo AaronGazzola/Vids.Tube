@@ -131,7 +131,14 @@ function YoutubeLinkCard({ ownerHandle }: { ownerHandle: string | null }) {
         ) : link ? (
           <div className="space-y-3">
             <p className="text-sm">
-              Linked to <span className="font-medium">@{link.youtubeHandle}</span>{" "}
+              {link.youtubeHandle ? (
+                <>
+                  Linked to{" "}
+                  <span className="font-medium">@{link.youtubeHandle}</span>{" "}
+                </>
+              ) : (
+                <>YouTube link pending{" "}</>
+              )}
               {link.verifiedAt ? (
                 <span className="ml-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs font-medium text-emerald-600">
                   Verified

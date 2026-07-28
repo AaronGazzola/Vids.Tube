@@ -6,9 +6,7 @@ Let a vids.tube user link their YouTube identity without OAuth: a typed handle
 resolved to a channel id server-side, verified by posting a short code in the
 owner's YouTube live chat from that channel, so viewer history merges across
 platforms.
-
 ## Requirements
-
 ### Requirement: User-level YouTube link storage
 
 The system SHALL store at most one YouTube link per vids.tube user
@@ -56,7 +54,9 @@ whose author channel id equals the claimed channel id SHALL mark the link
 verified. A matching code from any other author SHALL be ignored. The card SHALL
 show unverified state with instructions and the code, a control to generate a
 new code, verified state once confirmed, and an Unlink action that deletes the
-link.
+link. Immediately after marking a link verified, the worker SHALL invoke the
+identity merge (`merge_youtube_identity`) for that user; a merge failure SHALL
+be logged and SHALL NOT block the rest of the batch or undo the verification.
 
 #### Scenario: Code posted from the claimed channel verifies
 
@@ -73,3 +73,10 @@ link.
 
 - **WHEN** a verified user saves a different handle
 - **THEN** the link becomes unverified with a fresh code
+
+#### Scenario: Verification pools the YouTube history
+
+- **WHEN** a link is marked verified for a user who owns a channel
+- **THEN** the worker calls the identity merge for that user, pooling their
+  YouTube-origin history onto their channel
+

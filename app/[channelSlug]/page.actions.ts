@@ -90,6 +90,49 @@ export async function getChannelBySlugAction(
   return data;
 }
 
+export type UnclaimedChannelStats = {
+  messageCount: number;
+  streamsAttended: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+};
+
+export async function getChannelMembershipStatsAction(
+  channelId: string
+): Promise<UnclaimedChannelStats | null> {
+  const supabase = await createClient();
+
+  const { data: owner } = await supabase
+    .from("channels")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!owner) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("message_count, streams_attended, first_seen_at, last_seen_at")
+    .eq("channel_id", channelId)
+    .eq("community_channel_id", owner.id)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load membership stats");
+  }
+  if (!data) {
+    return null;
+  }
+  return {
+    messageCount: data.message_count,
+    streamsAttended: data.streams_attended,
+    firstSeenAt: data.first_seen_at,
+    lastSeenAt: data.last_seen_at,
+  };
+}
+
 export async function getChannelVideosAction(
   channelId: string
 ): Promise<Video[]> {

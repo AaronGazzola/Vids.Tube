@@ -220,6 +220,7 @@ export type Database = {
           merged_into_channel_id: string | null
           name: string
           owner_user_id: string | null
+          remote_avatar_path: string | null
           slug: string
           youtube_channel_id: string | null
         }
@@ -233,6 +234,7 @@ export type Database = {
           merged_into_channel_id?: string | null
           name: string
           owner_user_id?: string | null
+          remote_avatar_path?: string | null
           slug: string
           youtube_channel_id?: string | null
         }
@@ -246,6 +248,7 @@ export type Database = {
           merged_into_channel_id?: string | null
           name?: string
           owner_user_id?: string | null
+          remote_avatar_path?: string | null
           slug?: string
           youtube_channel_id?: string | null
         }
@@ -1481,8 +1484,8 @@ export type Database = {
           user_id: string
           verified_at: string | null
           verify_code: string
-          youtube_channel_id: string
-          youtube_handle: string
+          youtube_channel_id: string | null
+          youtube_handle: string | null
         }
         Insert: {
           created_at?: string
@@ -1490,8 +1493,8 @@ export type Database = {
           user_id: string
           verified_at?: string | null
           verify_code: string
-          youtube_channel_id: string
-          youtube_handle: string
+          youtube_channel_id?: string | null
+          youtube_handle?: string | null
         }
         Update: {
           created_at?: string
@@ -1499,8 +1502,8 @@ export type Database = {
           user_id?: string
           verified_at?: string | null
           verify_code?: string
-          youtube_channel_id?: string
-          youtube_handle?: string
+          youtube_channel_id?: string | null
+          youtube_handle?: string | null
         }
         Relationships: []
       }

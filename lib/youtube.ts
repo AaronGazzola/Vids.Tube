@@ -95,6 +95,59 @@ export async function fetchChannelByHandle(
   };
 }
 
+export type YouTubeChannelSnippet = {
+  channelId: string;
+  title: string;
+  customUrl: string | null;
+  avatarUrl: string | null;
+};
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
+
+export async function fetchChannelSnippets(
+  ids: string[]
+): Promise<YouTubeChannelSnippet[]> {
+  const results: YouTubeChannelSnippet[] = [];
+  for (const batch of chunk([...new Set(ids)], 50)) {
+    if (batch.length === 0) continue;
+    const url = `${API}/channels?part=snippet&id=${batch
+      .map((id) => encodeURIComponent(id))
+      .join(",")}&maxResults=50&key=${key()}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error(
+        `YouTube channels.list snippet failed: ${res.status} ${await res.text()}`
+      );
+    }
+    const data = await res.json();
+    for (const item of data.items ?? []) {
+      const thumbs = item.snippet?.thumbnails ?? {};
+      const avatarUrl =
+        thumbs.high?.url ?? thumbs.medium?.url ?? thumbs.default?.url ?? null;
+      results.push({
+        channelId: item.id,
+        title: item.snippet?.title ?? "",
+        customUrl: item.snippet?.customUrl ?? null,
+        avatarUrl,
+      });
+    }
+  }
+  return results;
+}
+
+export function upscaleGgphtAvatar(url: string): string {
+  if (!url.includes("ggpht.com")) {
+    return url;
+  }
+  return url.replace(/=s\d+-c/, "=s800-c");
+}
+
 export async function fetchSubs(channelId: string): Promise<number> {
   if (!channelId) {
     return 0;
@@ -143,7 +196,7 @@ export async function fetchLiveChatPage(
     }) => ({
       author: it.authorDetails?.displayName ?? "",
       authorChannelId: it.authorDetails?.channelId ?? "",
-      avatarUrl: it.authorDetails?.profileImageUrl ?? "",
+      avatarUrl: upscaleGgphtAvatar(it.authorDetails?.profileImageUrl ?? ""),
       text: it.snippet?.displayMessage ?? "",
       publishedAt: it.snippet?.publishedAt ?? "",
     })

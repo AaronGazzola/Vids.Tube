@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  consumeSelfEcho,
   enqueueNightbotBridge,
   enqueueNightbotSend,
   truncateForYoutube,
@@ -183,5 +184,19 @@ describe("enqueueNightbotSend", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].length).toBeLessThanOrEqual(400);
     expect(sent[0].endsWith("…")).toBe(true);
+  });
+
+  it("suppresses the echo of what we sent, but not Nightbot's own messages", async () => {
+    const sender = async () => new Response("ok", { status: 200 });
+    const wait = async () => {};
+
+    enqueueNightbotSend("hello viewers", sender, wait, token, token);
+    enqueueNightbotBridge("viewer: hi", sender, wait, token, token);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(consumeSelfEcho("hello viewers")).toBe(true);
+    expect(consumeSelfEcho("hello viewers")).toBe(false);
+    expect(consumeSelfEcho("viewer: hi")).toBe(true);
+    expect(consumeSelfEcho("!songs -> now playing")).toBe(false);
   });
 });

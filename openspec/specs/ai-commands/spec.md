@@ -7,9 +7,7 @@ model knowledge and channel/streamer questions strictly from the channel FAQ
 and live transcript, with suggest/auto gating and answer withholding, shown
 on the overlay as a mirrored Q&A; !catchup serves a cached summary of the
 stream so far.
-
 ## Requirements
-
 ### Requirement: Grounded moderated !ask
 
 The system SHALL answer `!ask <question>` with a single AI pass that both
@@ -20,7 +18,11 @@ channel's enabled custom-command content and the recent transcript window.
 Questions failing moderation SHALL be dismissed silently with the reason
 recorded; answerable questions SHALL follow the ask mode; unanswerable
 questions SHALL receive a friendly can't-answer reply. Answers SHALL contain
-no links that are not present in the grounding.
+no links that are not present in the grounding. Answers SHALL be capped at 600
+characters — enforced by prompt instruction (targeting under ~550 characters)
+and by truncation — and, together with the mention prefix, are delivered to
+YouTube across multiple Nightbot messages when they exceed a single 400-character
+send.
 
 #### Scenario: Groundable question in auto mode
 
@@ -47,6 +49,13 @@ no links that are not present in the grounding.
 - **WHEN** the question fails moderation
 - **THEN** it is recorded as dismissed with the reason and nothing is replied or
   shown
+
+#### Scenario: Long answer spans multiple sends
+
+- **WHEN** an approved `!ask` answer plus its mention prefix exceeds 400
+  characters
+- **THEN** it is delivered as multiple `(n/m)`-tagged Nightbot messages rather
+  than being cut off at 400
 
 ### Requirement: Suggest mode with answer withholding
 
@@ -104,18 +113,28 @@ highlighted message or TTS card.
 
 ### Requirement: Cached !catchup summary
 
-The system SHALL answer `!catchup` with a ≤400-character summary of the
-stream's transcript so far, cached in the worker for 3 minutes so repeat calls
-within the window reuse the cached text with no AI call, and SHALL reply with a
-friendly line when no transcript exists yet.
+The system SHALL answer `!catchup` with a summary of the stream so far,
+generated via the worker's Claude CLI from the stream transcript and cached per
+stream for a short TTL, serving the cache within that window without a fresh AI
+call. The summary SHALL be capped at 600 characters — enforced by prompt
+instruction (targeting under ~550 characters) and by truncation — and is
+delivered to YouTube across multiple Nightbot messages when it exceeds a single
+400-character send. When there is no transcript yet, the reply SHALL say there is
+nothing to catch up on.
 
-#### Scenario: Summary served and cached
+#### Scenario: Cached summary within TTL
 
-- **WHEN** two viewers call `!catchup` within three minutes on a stream with
-  transcript
-- **THEN** both receive the same ≤400-char summary and Claude runs only once
+- **WHEN** `!catchup` is used twice within the cache TTL for the same stream
+- **THEN** the second reply serves the cached summary without a fresh AI call
 
-#### Scenario: No transcript yet
+#### Scenario: Long summary spans multiple sends
 
-- **WHEN** `!catchup` runs before any transcript exists
+- **WHEN** a generated `!catchup` summary exceeds 400 characters
+- **THEN** it is delivered as multiple `(n/m)`-tagged Nightbot messages rather
+  than being cut off at 400
+
+#### Scenario: Nothing to summarize yet
+
+- **WHEN** `!catchup` runs before any transcript exists for the stream
 - **THEN** the reply says there is nothing to catch up on yet
+
