@@ -14,6 +14,8 @@ import { Controls } from "./controls";
 import { PLAYBACK_SPEEDS, type PlaybackSpeed } from "./speed-menu";
 import { useVideoState } from "./use-video-state";
 
+export type SeekRequest = { seconds: number; id: number };
+
 export type VideoPlayerProps = {
   src: string;
   poster?: string;
@@ -22,6 +24,7 @@ export type VideoPlayerProps = {
   className?: string;
   onTimeUpdate?: (currentTime: number) => void;
   onDimensions?: (width: number, height: number) => void;
+  seekRequest?: SeekRequest | null;
 };
 
 const SEEK_STEP_SECONDS = 5;
@@ -49,10 +52,12 @@ export function VideoPlayer({
   className,
   onTimeUpdate,
   onDimensions,
+  seekRequest,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const seekRequestIdRef = useRef<number | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [intrinsic, setIntrinsic] = useState<{
     width: number;
@@ -84,6 +89,26 @@ export function VideoPlayer({
     },
     [onTimeUpdate]
   );
+
+  useEffect(() => {
+    if (!seekRequest) {
+      return;
+    }
+    if (seekRequestIdRef.current === seekRequest.id) {
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+    seekRequestIdRef.current = seekRequest.id;
+    const duration = Number.isFinite(video.duration) ? video.duration : null;
+    const target = Math.max(
+      0,
+      duration === null ? seekRequest.seconds : Math.min(seekRequest.seconds, duration)
+    );
+    video.currentTime = target;
+  }, [seekRequest]);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);

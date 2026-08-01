@@ -26,6 +26,7 @@
     "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts",
     "dryrun": "doppler run -- tsx scripts/dryrun-stream.ts",
     "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts",
+    "backfill:timeline": "doppler run -- tsx scripts/backfill-stream-timeline.ts",
     "backfill:youtube-chat": "doppler run -- tsx scripts/backfill-youtube-chat.ts",
     "backfill:youtube-transcripts": "doppler run -- tsx scripts/backfill-youtube-transcripts.ts",
     "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts",
