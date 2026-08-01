@@ -41,7 +41,11 @@ const flag = (name: string) => {
 const ONLY_VIDEO = flag("--video");
 const LIMIT = flag("--limit") ? Number(flag("--limit")) : Infinity;
 
-const SKIP_NATIVE = new Set(["zY6Du_ZXkDU", "vsuPzcGncLA"]);
+const SKIP_NATIVE_REASONS: Record<string, string> = {
+  vsuPzcGncLA:
+    "Recorded natively on-platform: stream 2984b4f8 (2026-07-04 14:08-16:34) already has a ready 8772s VOD covering the whole session. Importing the YouTube copy would duplicate it. Verified 2026-07-31 (AZ-207).",
+};
+const SKIP_NATIVE = new Set(Object.keys(SKIP_NATIVE_REASONS));
 
 async function upload(key: string, filePath: string, contentType: string) {
   const up = new Upload({
@@ -374,6 +378,11 @@ async function main() {
     ONLY_VIDEO ? v.video_id === ONLY_VIDEO : !SKIP_NATIVE.has(v.video_id)
   );
   console.log(`candidates: ${candidates.length} (limit ${LIMIT})`);
+  if (!ONLY_VIDEO) {
+    for (const [id, reason] of Object.entries(SKIP_NATIVE_REASONS)) {
+      console.log(`skipping ${id}: ${reason}`);
+    }
+  }
 
   let done = 0;
   let skipped = 0;
@@ -389,8 +398,10 @@ async function main() {
         console.log(`imported ${vod.video_id}: ${result} — ${String(vod.title).slice(0, 60)}`);
       }
     } catch (e) {
-      failures.push(`${vod.video_id}: ${(e as Error).message.slice(0, 200)}`);
-      console.error(`failed ${vod.video_id}: ${(e as Error).message.slice(0, 200)}`);
+      const err = e as Error & { stderr?: string };
+      const detail = [err.message, err.stderr].filter(Boolean).join("\n").slice(0, 2000);
+      failures.push(`${vod.video_id}: ${detail}`);
+      console.error(`failed ${vod.video_id}: ${detail}`);
     }
   }
 
