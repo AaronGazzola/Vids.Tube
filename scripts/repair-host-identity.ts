@@ -96,6 +96,20 @@ async function main() {
   }
   console.log(`host viewer_scores rows deleted: ${hostScores?.length ?? 0}`);
 
+  const { error: seErr, count: seCount } = await admin
+    .from("score_events")
+    .delete({ count: "exact" })
+    .eq("user_id", ownerUserId);
+  if (seErr) throw new Error(`host score_events delete failed: ${seErr.message}`);
+  console.log(`host score_events deleted: ${seCount ?? 0}`);
+
+  const { error: fmErr, count: fmCount } = await admin
+    .from("featured_messages")
+    .delete({ count: "exact" })
+    .eq("user_id", ownerUserId);
+  if (fmErr) throw new Error(`host featured_messages delete failed: ${fmErr.message}`);
+  console.log(`host featured_messages deleted: ${fmCount ?? 0}`);
+
   const after = await snapshotState(community.id, ownerUserId, ycid);
   console.log(`\nafter: ${JSON.stringify(after)}`);
 
@@ -109,6 +123,8 @@ async function main() {
   }
   if (after.selfMemberships !== 0) failures.push(`${after.selfMemberships} self-memberships exist`);
   if (after.hostViewerScores !== 0) failures.push(`${after.hostViewerScores} host score rows remain`);
+  if (after.hostScoreEvents !== 0) failures.push(`${after.hostScoreEvents} host ratings remain`);
+  if (after.hostFeatured !== 0) failures.push(`${after.hostFeatured} host highlighted messages remain`);
 
   if (failures.length) {
     console.error("\npost-conditions failed:");
@@ -141,6 +157,14 @@ async function snapshotState(communityId: string, ownerUserId: string, ycid: str
     .from("viewer_scores")
     .select("*", { count: "exact", head: true })
     .or(`participant_key.eq.youtube:${ycid},participant_key.eq.${ownerUserId},external_author_id.eq.${ycid}`);
+  const { count: hostScoreEvents } = await admin
+    .from("score_events")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", ownerUserId);
+  const { count: hostFeatured } = await admin
+    .from("featured_messages")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", ownerUserId);
   const { data: mems } = await admin.from("memberships").select("channel_id, community_channel_id");
   const selfMemberships = (mems ?? []).filter((m) => m.channel_id === m.community_channel_id).length;
   const { count: totalMemberships } = await admin
@@ -156,6 +180,8 @@ async function snapshotState(communityId: string, ownerUserId: string, ycid: str
     unattributedHostMessages: unattributed ?? 0,
     attributedToOwner: attributed ?? 0,
     hostViewerScores: hostScores ?? 0,
+    hostScoreEvents: hostScoreEvents ?? 0,
+    hostFeatured: hostFeatured ?? 0,
     selfMemberships,
     totalMemberships: totalMemberships ?? 0,
     totalChannels: totalChannels ?? 0,
