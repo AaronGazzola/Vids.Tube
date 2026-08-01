@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -20,6 +20,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      end_abandoned_live_streams: { Args: never; Returns: number }
       graphql: {
         Args: {
           extensions?: Json

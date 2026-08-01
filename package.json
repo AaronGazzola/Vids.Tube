@@ -31,6 +31,7 @@
     "import:youtube-vods": "doppler run -- tsx scripts/import-youtube-vods.ts",
     "backfill:memberships": "doppler run -- tsx scripts/backfill-memberships.ts",
     "verify:membership-merge": "doppler run -- tsx scripts/verify-membership-merge.ts",
+    "verify:abandoned-sweep": "tsx scripts/verify-abandoned-sweep.ts",
     "create:unclaimed-channels": "doppler run -- tsx scripts/create-unclaimed-channels.ts"
   },
   "dependencies": {
