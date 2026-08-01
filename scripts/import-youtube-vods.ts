@@ -25,6 +25,7 @@ const r2 = new S3Client({
   },
 });
 const BUCKET = process.env.R2_BUCKET_VOD!;
+const OWNER_CHANNEL_SLUG = "azanything";
 
 const bin = (envValue: string | undefined, fallback: string) =>
   envValue && existsSync(envValue) ? envValue : fallback;
@@ -351,22 +352,18 @@ async function importOne(
 }
 
 async function main() {
-  const { data: ownerStream, error: ownerErr } = await admin
-    .from("streams")
-    .select("channel_id")
-    .not("youtube_channel_id", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (ownerErr) throw new Error(ownerErr.message);
-  if (!ownerStream) throw new Error("no stream with youtube_channel_id — cannot resolve the owner channel");
   const { data: channel, error: chErr } = await admin
     .from("channels")
     .select("id, slug")
-    .eq("id", ownerStream.channel_id)
-    .single();
+    .eq("slug", OWNER_CHANNEL_SLUG)
+    .maybeSingle();
   if (chErr) throw new Error(chErr.message);
-  console.log(`importing into channel: ${channel.slug}`);
+  if (!channel) {
+    throw new Error(
+      `owner channel @${OWNER_CHANNEL_SLUG} not found — refusing to import into an arbitrary channel`
+    );
+  }
+  console.log(`importing into channel: @${channel.slug}`);
 
   const { data: vods, error } = await admin
     .from("youtube_vods")
