@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # General rules:
 
+- Format all responses in accordance with the `/simple` skill unless otherwise specified
 - Don't include any comments in any files.
 - Don't use `console.log` in any app code unless requested, delete all logs after the related development is completed
 - Error handling follows the expected-vs-unexpected split (see "Error handling in actions" below) - no silent "fallback" functionality

@@ -275,7 +275,7 @@ A channel SHALL carry a unique, case-insensitive `@handle`. The handle SHALL mat
 
 ### Requirement: Publishing and public channel viewing gated to the platform owner
 
-The system SHALL treat the owner of the earliest-created channel as the platform owner. Only the platform owner SHALL be able to publish live/VOD content. A channel page SHALL be publicly viewable only when it is the platform owner's channel; any other user's channel page SHALL be viewable only by that channel's own owner and SHALL otherwise return not-found.
+The system SHALL treat the owner of the earliest-created channel as the platform owner. Only the platform owner SHALL be able to publish live/VOD content. Channel **viewing** SHALL be public for every channel: any visitor, anonymous or signed-in, SHALL be able to view any account (owned, non-tombstone) channel's normal channel/profile page and any unclaimed channel's stats-only profile. A merged (tombstone) channel SHALL redirect to its survivor. Publishing and branding-upload affordances SHALL render only for the channel's own owner.
 
 #### Scenario: Non-owner cannot access publishing
 
@@ -287,15 +287,25 @@ The system SHALL treat the owner of the earliest-created channel as the platform
 - **WHEN** any visitor opens the platform owner's channel page
 - **THEN** the page renders publicly
 
-#### Scenario: Non-owner channel page is private
+#### Scenario: Any account channel is publicly viewable
 
-- **WHEN** a visitor who is not the channel's owner opens a non-owner channel page
-- **THEN** the system returns not-found
+- **WHEN** any visitor opens any owned, non-tombstone channel page
+- **THEN** the channel's normal profile/channel page renders regardless of who owns it
 
-#### Scenario: A user can view their own channel page
+#### Scenario: Unclaimed channel is public
 
-- **WHEN** a signed-in non-owner user opens their own channel page
-- **THEN** the page renders for them
+- **WHEN** any visitor opens an unclaimed channel's page
+- **THEN** the stats-only profile renders with a claim call to action
+
+#### Scenario: Merged channel redirects
+
+- **WHEN** a visitor opens a channel whose `merged_into_channel_id` is set
+- **THEN** they are redirected to the surviving channel
+
+#### Scenario: Publishing controls are owner-only
+
+- **WHEN** a visitor who does not own the channel views it
+- **THEN** no publishing or branding-upload affordances render
 
 ### Requirement: Channel rows remain readable for identity resolution
 
