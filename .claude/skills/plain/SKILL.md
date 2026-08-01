@@ -37,6 +37,9 @@ When invoked, present the response as a structured unordered (bulleted) list, fo
   - Use a flow chart or diagram for a forking or branching pathway, where the structure itself carries meaning.
   - Use an ordered list, not a flow chart, for a linear step-by-step process.
   - Use a table when comparing several items across the same dimensions.
+- Render every table as an ASCII table inside a fenced code block. Do not use Markdown pipe-table syntax.
+  - Draw the borders with the "+", "-", and "|" characters.
+  - Pad each cell so the column borders line up vertically.
 - Do not add a visual aid that merely restates a list.
 
 ## Formatting constraints

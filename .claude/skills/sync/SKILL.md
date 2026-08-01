@@ -1,164 +1,184 @@
 ---
 name: sync
-description: Sync the full state of the current project across git, OpenSpec, Linear, Supabase, Doppler, Vercel, Sentry and Trigger.dev, then report active tickets/branches/specs and recommend the single best branch + task to work on next. Invoke with /sync.
+description: Pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs and the database, then report in /plain format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, Linear or Supabase are unreachable. Invoke with /sync.
 ---
 
-# /sync — project state sync + work recommendation
+# /sync — project state sync + next-steps report
 
-Gather the live state of every integration this project uses, cross-reference it
-against the code and the spec backlog, then produce one report that ends with a
-concrete recommendation: **which branch to be on and which task to do next.**
+Gather the live state of git, Linear, OpenSpec, the roadmap docs and the
+database, cross-reference all four against the actual code, and produce one
+concise report that ends with the next steps.
 
-This skill is **environment-agnostic**. All project-specific identifiers (which
-Supabase ref, which Linear team, which Doppler config, etc.) come from a config
-file, never from this file. Read the config first; only touch integrations it
-marks `enabled`.
+This skill is **read-only except for `git pull`**. It never mutates Linear,
+OpenSpec, the database, or any deployment.
 
 ## 0. Load config
 
 Read `.claude/sync.config.json` at the repo root.
 
 - If it does **not** exist, do not guess. Tell the user the skill is not yet
-  configured for this project and offer to scaffold one from the schema in
+  configured for this project, offer to scaffold one from
   `sync.config.example.json` (in this skill folder), then stop.
-- For every integration where `enabled` is `false` or absent, **skip that
-  section entirely** — do not call its tools, do not mention it in the report
-  except as a one-line "not configured" note at the end.
-- `mainBranch` is the project's trunk (default `main`). `project` is the
-  human-readable name used in headings.
+- Skip any integration where `enabled` is `false` or absent — do not call its
+  tools, and note it in one line at the end of the report as "not configured".
+- `mainBranch` is the trunk (default `main`); `project` is the name used in the
+  heading.
 
-Run the enabled sections below **in parallel** where possible (independent reads).
+## 1. Access gate — fail loudly, never report partially
 
-## 1. Git (if `git.enabled`)
+Before gathering, confirm the three **required** sources are reachable:
+
+| Source | Check |
+| --- | --- |
+| git | `git rev-parse --is-inside-work-tree` and `git fetch` both succeed |
+| Linear MCP | `list_teams` (or `list_projects`) returns the configured team/project |
+| Supabase | the MCP sees `supabase.projectRef` via `list_projects`, **or** the CLI is linked (`npx supabase projects list`) |
+
+If any required source is unreachable — MCP not authenticated, no network, repo
+not linked, `projectRef` absent from the account the MCP is authenticated to —
+**stop**. Report exactly which source failed and what it needs (authorize the
+MCP, `doppler run`, `supabase link`, etc.). **Do not produce the report from
+partial data**, and do not substitute inference for a source you could not read.
+
+The one allowed degradation: if the Supabase **MCP** cannot see the ref but the
+**CLI** is linked, continue using the CLI and say so. If neither works, stop.
+
+## 2. Gather (run independent reads in parallel)
+
+### Git — `git.enabled`
 
 ```bash
+git pull --ff-only            # pull the latest; report if it cannot fast-forward
+git fetch --all --prune
 git status -sb
-git branch -vv --sort=-committerdate
-git log --oneline -10
-git fetch --quiet && git status -sb   # ahead/behind vs remote
+git branch -a -vv --sort=-committerdate
+git log --oneline --date=short --format='%h %ad %d %s' -15
 ```
 
-Capture: current branch, ahead/behind counts, uncommitted/untracked files,
-recent branches (with last-commit date), and whether the current branch is the
-`mainBranch`. Flag a dirty working tree and any branch that is behind its
-upstream.
+Capture:
+- Current branch; clean or dirty (list uncommitted/untracked paths).
+- Ahead/behind vs upstream for the current branch.
+- **Which branch holds the most recent commit** (local and remote), with its
+  date and subject.
+- Branches merged into `mainBranch` (deletable) vs. unmerged with unique work.
+- Whether `mainBranch` is behind any feature branch.
 
-## 2. OpenSpec (if `openspec.enabled`)
+### OpenSpec — `openspec.enabled`
 
 ```bash
-npx openspec list        # active changes + task progress (e.g. 13/16)
+npx openspec list
 ```
 
-For **each active change**, read `openspec/changes/<name>/tasks.md` (and
-`proposal.md` if present) and classify it by cross-referencing the code:
+For **each active change**, read `openspec/changes/<name>/tasks.md` (plus
+`proposal.md` / `design.md` if present) and classify it by checking the code, not
+the checkboxes:
 
-- **Completed** — all task boxes checked. → recommend archiving
-  (`openspec-verify-change` then `openspec-archive-change`).
-- **In progress** — some boxes checked, remaining boxes describe code that does
-  not yet exist or differs from the spec. → this is candidate work.
-- **Stale** — boxes are unchecked but the described code already exists / was
-  implemented elsewhere (the spec drifted from reality), OR the change has had no
-  related commits for a long time while its files moved on. → flag for
-  reconciliation, do not blindly implement.
-- **Blocked / needs human action** — an unchecked box that cannot be finished in
-  code (live verification, external key, sign-off, a referenced Linear issue).
-  Per this project's spec-governance rules, these should not live as unchecked
-  boxes; recommend moving them to Linear.
+- **Code-complete, needs verification** — every task that can be done in code is
+  done; only testing/live confirmation remains. → the archive candidate. Name the
+  exact verification step required.
+- **In progress** — remaining tasks describe code that does not exist yet. → name
+  the single next actionable task.
+- **Stale / drifted** — unchecked boxes describe code that already exists (or was
+  built differently elsewhere). → flag for reconciliation; never blindly
+  re-implement (this is the process-poisoning vector in `CLAUDE.md`).
+- **Blocked on a human** — an unchecked box that cannot be finished in code. →
+  recommend moving it to Linear and removing the box.
 
-To classify, spot-check the actual files named in the unchecked tasks (do they
-exist? do they match the described behavior?) rather than trusting the checkbox.
-Note for each change: status, % complete, and the single next actionable task.
+Spot-check the files named in unchecked tasks to decide which bucket applies.
 
-## 3. Linear (if `linear.enabled`)
+### Linear — `linear.enabled`
 
-Use the Linear MCP tools. Scope to `linear.team` / `linear.project` from config.
+Scope every query to `linear.team` + `linear.project` from config.
 
-- `list_issues` filtered to the configured team+project, state = active/started
-  and todo, ordered by priority. Also list any issue in "In Progress".
-- For the top issues, capture: identifier (e.g. AZ-78), title, state, priority,
-  assignee, and whether it maps to an active OpenSpec change or a branch.
-- Surface issues that are **promoted-but-not-built** (backlog ideas) separately
-  from **in-flight** issues — per governance, never build straight from Linear;
-  a backlog item must first become an OpenSpec change.
+- `list_issues` for states In Progress, Todo, and In Review, ordered by priority.
+- For each: identifier, title, state, priority, labels (phase labels matter), and
+  whether it maps to an active OpenSpec change or a git branch.
+- Separate three groups explicitly:
+  - **In progress needing verification only** — the code exists; the ticket is
+    open because it has not been tested/confirmed. Say what test closes it.
+  - **In progress with code still to write.**
+  - **Backlog ideas** — never build straight from these; per governance a backlog
+    item must first be promoted into a new OpenSpec change.
 
-## 4. Supabase (if `supabase.enabled`)
+### Code cross-reference
 
-Target `supabase.projectRef`. Honor `supabase.method`:
+For every spec/ticket claimed to be code-complete, verify against the repo:
+locate the files, functions or migrations it names and confirm they exist and
+behave as described. A checked box or a "Done" ticket with no matching code is a
+finding, and so is finished code sitting under an open ticket.
 
-- `method: "mcp"` — use the Supabase MCP tools (`list_migrations`,
-  `get_advisors`, `list_branches`). **First confirm the MCP can actually see
-  `projectRef`** (`list_projects`); if the ref is absent, the MCP is
-  authenticated to a different org — fall back to the CLI and note it.
-- `method: "cli"` — use the linked Supabase CLI:
-  `npx supabase migration list`, `npx supabase branches list`. (Use this when
-  the MCP is pointed at another account.)
+### Database — `supabase.enabled`
 
-Either way:
-- Compare remote migrations to local `supabase/migrations/` — flag any local
-  migration not yet pushed, or remote migration not in the repo.
-- Surface any security/performance advisors (MCP `get_advisors`) when reachable.
-- Note preview branch state if branches are used.
+Use **both** paths where each is stronger, per `supabase.method`:
 
-Do **not** apply migrations or mutate anything; this skill is read-only.
+- CLI: `npx supabase migration list` — local vs remote migration parity.
+- MCP: `list_tables`, `list_migrations`, `get_advisors` (security + performance),
+  `list_branches`; `execute_sql` for **read-only** sanity checks when a spec or
+  ticket depends on live data (row counts, a flag's value, whether a backfill
+  ran). Only query when it changes the report's conclusion.
 
-## 5. Doppler (if `doppler.enabled`)
+Flag: local migrations not pushed, remote migrations missing from the repo, and
+any security/performance advisor.
 
-```bash
-doppler configs --project <doppler.project>
-doppler secrets --project <doppler.project> --config <doppler.config> --only-names
-```
+### Roadmap docs
 
-Confirm the expected config exists and which config is currently selected
-locally (`doppler configure get config`). Flag if the local selection differs
-from `doppler.config`. Never print secret values — names only.
+Find them (`docs/roadmap.md`, `ROADMAP.md`, `docs/**/roadmap*`, plus any doc the
+config or `CLAUDE.md` names). For each:
 
-## 6. Vercel (if `vercel.enabled`)
+- `git log -1 --date=short -- <file>` for last-touched date, and compare against
+  the dates of recent feature commits.
+- Check whether items marked "planned"/"next" are already shipped in code, and
+  whether shipped work is missing from the doc.
+- Verdict per doc: **current** or **stale**, with the specific lines that are
+  wrong.
+- Then a one-or-two-line statement of **where the project actually is** in the
+  roadmap: which phase is done, which is in flight, what the next milestone is.
 
-Prefer the Vercel CLI if available (`vercel ls`, `vercel inspect`); otherwise
-read GitHub deployment status via `gh api repos/<owner>/<repo>/deployments`.
-Report the latest production deployment state (ready/error/building) and the
-commit it points at. Flag a failed latest deploy.
+### Optional integrations
 
-## 7. Sentry (if `sentry.enabled`)
+Run these only when enabled, and keep each to one line in the report unless it
+is red: Doppler (`doppler configs`, `doppler secrets --only-names` — names only,
+never values, and flag if the locally selected config differs from
+`doppler.config`), Vercel (latest production deploy state + commit), Sentry
+(unresolved issues from the last 48h by event count), Trigger.dev (recent run
+statuses; flag failed/stuck).
 
-Via the Sentry MCP/CLI for `sentry.org`/`sentry.project`: list unresolved issues
-from the last 24–48h, ordered by event count. Report the top few with title,
-count, and last-seen. Flag any new-since-last-deploy regression.
+## 3. Report
 
-## 8. Trigger.dev (if `trigger.enabled`)
+Write the whole report in **`/plain` format** — read
+`.claude/skills/plain/SKILL.md` and follow it exactly: bold one-line section
+titles, bulleted facts nested at most two deep, no prose paragraphs, no
+em-dashes, code identifiers in backticks, dates as D-Mon-YYYY. Be very concise:
+facts only, no narration of the gathering process.
 
-For `trigger.project`: list recent runs and their status. Flag failed/stuck runs
-and any task with a rising failure rate.
+Sections, in this order:
 
-## 9. Report + recommendation
+1. **Blockers** — anything red. Omit the section entirely if nothing is red.
+2. **Branches** — current branch, dirty/clean, ahead/behind; branch with the most
+   recent changes; the branch that should be worked on next.
+3. **OpenSpec** — one item per active change: status bucket, tasks done/total,
+   next action. Call out changes that need only verification to archive.
+4. **Linear** — the three groups from above. Call out tickets that need only a
+   test to close, with the test.
+5. **Database** — migration parity, advisors, any live-data finding.
+6. **Roadmap** — per-doc current/stale verdict, and where the project stands.
+7. **Overview** — the synthesis, in two labelled groups:
+   - Code and branches.
+   - Tickets, specs and roadmap alignment (where they agree and where they drift).
+8. **Summary** — very short. Two or three bullets of state, then a bulleted
+   **Next steps** list, ordered, one line each, each naming a concrete ticket,
+   spec or branch and the action (build / test / verify / archive / reconcile).
 
-Produce a single report in this order:
-
-1. **Header** — `<project>` name, current branch, dirty/clean, ahead/behind.
-2. **Per-integration status** — a short subsection each, only for enabled ones.
-   Lead with anything red (failed deploy, security advisor, stuck run, stale
-   spec, blocked task).
-3. **OpenSpec board** — table of active changes: status, % complete, next task,
-   human-action-needed flag.
-4. **Linear board** — in-flight issues vs. backlog ideas.
-5. **Recommendation** (the point of the skill): pick **one** branch + **one**
-   next task and justify it in 2–3 lines. Prefer, in order:
-   - finishing/unblocking an in-progress OpenSpec change over starting new work,
-   - resolving anything red (failed deploy, security advisor) if it blocks
-     shipping,
-   - the highest-priority in-flight Linear issue that already has a spec.
-   Then list runner-up options briefly so the user can override.
-6. **Human-action queue** — bullet list of everything that needs the user (not
-   code): blocked tasks to move to Linear, specs to archive, secrets to set,
-   deploys to investigate.
-
-Keep it scannable. Do not mutate any system — this skill only reads and advises.
+Prioritize next steps in this order: unblock anything red; verify-and-archive
+work that is already code-complete; finish an in-progress spec; reconcile a
+stale spec or roadmap; only then start new work from a promoted backlog item.
 
 ## Installing into a new project
 
 1. Copy this `sync/` folder into the project's `.claude/skills/`.
-2. Copy `sync.config.example.json` to the repo's `.claude/sync.config.json` and
-   fill in the identifiers, setting `enabled: true` only for the integrations
-   that project actually uses.
-3. Keep `.claude/sync.config.json` in the project repo (it is project-specific);
-   updating the skill later never touches it.
+2. Copy `sync.config.example.json` to `.claude/sync.config.json` and fill in the
+   identifiers, enabling only the integrations that project uses.
+3. Keep `.claude/sync.config.json` in the project repo; updating the skill later
+   never touches it.
+4. `/sync` reads `.claude/skills/plain/SKILL.md` for its output format — install
+   the `plain` skill alongside it.
