@@ -96,6 +96,14 @@ async function main() {
   }
   console.log(`host viewer_scores rows deleted: ${hostScores?.length ?? 0}`);
 
+  const { error: attrErr, count: attrCount } = await admin
+    .from("chat_messages")
+    .update({ user_id: ownerUserId }, { count: "exact" })
+    .eq("external_author_id", ycid)
+    .is("user_id", null);
+  if (attrErr) throw new Error(`host chat attribution failed: ${attrErr.message}`);
+  console.log(`host chat messages attributed: ${attrCount ?? 0}`);
+
   const { error: seErr, count: seCount } = await admin
     .from("score_events")
     .delete({ count: "exact" })

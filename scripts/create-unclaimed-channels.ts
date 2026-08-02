@@ -65,12 +65,37 @@ async function main() {
       .filter((id): id is string => !!id)
   );
 
+  // A community owner and a claimed chatter are not chatters to be created.
+  // Creating one for the streamer's own account is exactly the fault that
+  // produced the duplicate profile this job later had to merge away.
+  const { data: ownedOrCommunity } = await admin
+    .from("channels")
+    .select("youtube_channel_id, owner_user_id")
+    .not("youtube_channel_id", "is", null);
+  const skipYt = new Map<string, string>();
+  for (const c of ownedOrCommunity ?? []) {
+    if (c.owner_user_id) skipYt.set(c.youtube_channel_id!, "claimed");
+  }
+  const { data: hostStreams } = await admin
+    .from("streams")
+    .select("youtube_channel_id")
+    .not("youtube_channel_id", "is", null);
+  for (const s of hostStreams ?? []) {
+    skipYt.set(s.youtube_channel_id!, "host");
+  }
+
   const { data: chatters } = await admin
     .from("chatter_stats")
     .select("author_channel_id, author_name");
-  const targets = (chatters ?? []).filter(
-    (c) => !existingYt.has(c.author_channel_id)
-  );
+  const targets = (chatters ?? []).filter((c) => {
+    if (existingYt.has(c.author_channel_id)) return false;
+    const reason = skipYt.get(c.author_channel_id);
+    if (reason) {
+      console.log(`skip ${c.author_channel_id} (${reason})`);
+      return false;
+    }
+    return true;
+  });
   if (targets.length === 0) {
     console.log("no new chatters to create channels for");
     return;

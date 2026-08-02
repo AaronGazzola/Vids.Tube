@@ -22,6 +22,14 @@ export type MeIdentity = {
   displayName: string;
   youtubeChannelId: string | null;
   userId: string | null;
+  isHost: boolean;
+  communityChannelId: string | null;
+};
+
+export type HostStats = {
+  members: number;
+  messagesThisStream: number;
+  streamsToDate: number;
 };
 
 export type MeStats = {
@@ -46,7 +54,8 @@ export function truncateProfile(text: string): string {
 }
 
 export async function resolveMeIdentity(
-  m: BufferedMessage
+  m: BufferedMessage,
+  communityChannelId: string | null = null
 ): Promise<MeIdentity> {
   const { supabaseAdmin } = await deps();
   if (m.origin === "youtube" && m.externalAuthorId) {
@@ -54,7 +63,9 @@ export async function resolveMeIdentity(
       key: `youtube:${m.externalAuthorId}`,
       displayName: m.authorName ?? m.author,
       youtubeChannelId: m.externalAuthorId,
-      userId: null,
+      userId: m.userId,
+      isHost: !!m.isHost,
+      communityChannelId,
     };
   }
   const userId = m.userId;
@@ -74,7 +85,41 @@ export async function resolveMeIdentity(
     displayName: m.author,
     youtubeChannelId,
     userId,
+    isHost: !!m.isHost,
+    communityChannelId,
   };
+}
+
+// The host's reply is about the community, not about them: they have no rank to
+// hold, no level to reach and no streak to keep in their own channel.
+export async function gatherHostStats(
+  communityChannelId: string,
+  streamId: string
+): Promise<HostStats> {
+  const { supabaseAdmin } = await deps();
+  const { count: members } = await supabaseAdmin
+    .from("memberships")
+    .select("*", { count: "exact", head: true })
+    .eq("community_channel_id", communityChannelId);
+  const { count: messagesThisStream } = await supabaseAdmin
+    .from("chat_messages")
+    .select("*", { count: "exact", head: true })
+    .eq("stream_id", streamId);
+  const { count: streamsToDate } = await supabaseAdmin
+    .from("streams")
+    .select("*", { count: "exact", head: true })
+    .eq("channel_id", communityChannelId)
+    .eq("status", "ended");
+  return {
+    members: members ?? 0,
+    messagesThisStream: messagesThisStream ?? 0,
+    streamsToDate: streamsToDate ?? 0,
+  };
+}
+
+export function buildHostReply(name: string, stats: HostStats): string {
+  const mention = `@${name.replace(/^@+/, "")}`;
+  return `${mention} this is your channel — ${stats.members} member${stats.members === 1 ? "" : "s"} across ${stats.streamsToDate} stream${stats.streamsToDate === 1 ? "" : "s"}, ${stats.messagesThisStream} message${stats.messagesThisStream === 1 ? "" : "s"} in chat today.`;
 }
 
 function minIso(a: string | null, b: string | null): string | null {
@@ -241,7 +286,9 @@ export async function gatherRecentMessages(
 async function unclaimedClaimNudge(
   identity: MeIdentity
 ): Promise<string> {
-  if (!identity.youtubeChannelId) {
+  // Never prompt the host to claim a profile: the only one matching their
+  // account would be a duplicate of their own community.
+  if (identity.isHost || !identity.youtubeChannelId) {
     return "";
   }
   const { supabaseAdmin } = await deps();
@@ -300,7 +347,17 @@ function buildMePrompt(
 
 export async function meHandler(ctx: CommandContext): Promise<void> {
   const { supabaseAdmin, runClaude } = await deps();
-  const identity = await resolveMeIdentity(ctx.message);
+  const identity = await resolveMeIdentity(ctx.message, ctx.stream.channelId);
+
+  if (identity.isHost && identity.communityChannelId) {
+    const hostStats = await gatherHostStats(
+      identity.communityChannelId,
+      ctx.stream.id
+    );
+    ctx.reply(buildHostReply(identity.displayName, hostStats));
+    return;
+  }
+
   const stats = await gatherMeStats(identity);
   const mention = `@${identity.displayName.replace(/^@+/, "")}`;
 

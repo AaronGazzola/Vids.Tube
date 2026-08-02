@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildHostReply,
   clipSample,
   needsRegeneration,
   type MeStats,
@@ -81,5 +82,50 @@ describe("clipSample", () => {
     const out = clipSample("x".repeat(300));
     expect(out.length).toBe(120);
     expect(out.endsWith("…")).toBe(true);
+  });
+});
+
+describe("the host's own stats reply", () => {
+  it("reports the community rather than a rank", () => {
+    const reply = buildHostReply("@AzAnything", {
+      members: 148,
+      messagesThisStream: 37,
+      streamsToDate: 168,
+    });
+    expect(reply).toContain("this is your channel");
+    expect(reply).toContain("148 members");
+    expect(reply).toContain("168 streams");
+    expect(reply).toContain("37 messages in chat today");
+  });
+
+  it("carries no rank, level, streak or claim prompt", () => {
+    const reply = buildHostReply("@AzAnything", {
+      members: 148,
+      messagesThisStream: 37,
+      streamsToDate: 168,
+    });
+    for (const word of ["rank", "level", "streak", "claim", "XP"]) {
+      expect(reply.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+
+  it("reads correctly when there is one of something", () => {
+    const reply = buildHostReply("solo", {
+      members: 1,
+      messagesThisStream: 1,
+      streamsToDate: 1,
+    });
+    expect(reply).toContain("1 member ");
+    expect(reply).toContain("1 stream,");
+    expect(reply).toContain("1 message in chat");
+  });
+
+  it("does not double the at sign on a name that already has one", () => {
+    const reply = buildHostReply("@AzAnything", {
+      members: 0,
+      messagesThisStream: 0,
+      streamsToDate: 0,
+    });
+    expect(reply.startsWith("@AzAnything ")).toBe(true);
   });
 });

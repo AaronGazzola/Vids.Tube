@@ -37,7 +37,8 @@
     "enrich:chatters": "doppler run -- tsx scripts/enrich-chatter-channels.ts",
     "verify:credit-merge": "tsx scripts/verify-credit-merge.ts",
     "backfill:scores": "doppler run -- tsx scripts/backfill-chat-scores.ts",
-    "rederive:scores": "doppler run -- tsx scripts/rederive-chat-scores.ts"
+    "rederive:scores": "doppler run -- tsx scripts/rederive-chat-scores.ts",
+    "verify:host-class": "tsx scripts/verify-host-class.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",

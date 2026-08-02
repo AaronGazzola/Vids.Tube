@@ -129,7 +129,27 @@ async function makeStills(mp4: string, dir: string, duration: number): Promise<{
   return { poster, previews };
 }
 
+// The streamer chats from their own YouTube account, so imported chat carries
+// their messages too. Attributing them here keeps the import consistent with
+// live ingest, where the host is recognised and attributed at the moment of
+// arrival.
+async function resolveHostIdentity(): Promise<{
+  ycid: string | null;
+  ownerUserId: string | null;
+}> {
+  const { data } = await admin
+    .from("channels")
+    .select("youtube_channel_id, owner_user_id")
+    .eq("slug", OWNER_CHANNEL_SLUG)
+    .maybeSingle();
+  return {
+    ycid: data?.youtube_channel_id ?? null,
+    ownerUserId: data?.owner_user_id ?? null,
+  };
+}
+
 async function importChat(videoId: string, streamId: string): Promise<number> {
+  const host = await resolveHostIdentity();
   const stored: StoredMessage[] = [];
   const STORED_PAGE = 1000;
   for (let from = 0; ; from += STORED_PAGE) {
@@ -172,7 +192,8 @@ async function importChat(videoId: string, streamId: string): Promise<number> {
     const nameById = new Map((data ?? []).map((m) => [m.message_id, m.author_name]));
     const rows = missing.map((m) => ({
       stream_id: streamId,
-      user_id: null,
+      user_id:
+        host.ycid && m.authorChannelId === host.ycid ? host.ownerUserId : null,
       origin: "youtube",
       external_author_id: m.authorChannelId,
       author_name: nameById.get(m.messageId) ?? null,
