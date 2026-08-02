@@ -27,28 +27,55 @@ SLUG="$1"
 set -a; . /etc/vids-tube/r2.env; set +a
 
 REC_DIR="/var/lib/vids-tube/rec/${SLUG}"
-# All segments of this broadcast, oldest first. A broadcast that disconnected and
-# reconnected leaves several files; they are concatenated into one VOD (jump cuts,
-# no black). MediaMTX writes one file per publish (encoder) session.
-mapfile -t SEGMENTS < <(ls -tr ${REC_DIR}/*.mp4 2>/dev/null || true)
-if [ "${#SEGMENTS[@]}" -eq 0 ]; then
+
+# A segment's start time comes from its own filename. MediaMTX writes
+# recordPath .../%Y-%m-%d_%H-%M-%S-%f, so the name carries the moment recording
+# began. Nothing else does: birth time (stat %W) is unsupported on this
+# filesystem and returns 0, and mtime (%Y) is the LAST write — the end of the
+# recording. Reading mtime is why the trim below was always negative and always
+# discarded, and why no VOD has ever started at go-live.
+segment_epoch() {
+  local base ts
+  base="$(basename "$1")"
+  ts="$(printf '%s' "$base" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' || true)"
+  [ -z "$ts" ] && return 1
+  date -u -d "${ts:0:10} ${ts:11:2}:${ts:14:2}:${ts:17:2}" +%s 2>/dev/null || return 1
+}
+
+# The recorder starts writing a moment before the app records the encoder as
+# connected, so a broadcast's own first segment can predate its startedAt.
+# Generous enough not to discard real footage, far smaller than the gap between
+# two broadcasts.
+BOUNDARY_TOLERANCE=120
+
+ALL_EPOCHS=()
+ALL_PATHS=()
+for F in "${REC_DIR}"/*.mp4; do
+  [ -e "$F" ] || continue
+  if E="$(segment_epoch "$F")"; then
+    ALL_EPOCHS+=("$E")
+    ALL_PATHS+=("$F")
+  else
+    echo "skipping ${F}: filename carries no timestamp"
+  fi
+done
+
+if [ "${#ALL_PATHS[@]}" -eq 0 ]; then
   echo "no recording for ${SLUG}"
   exit 0
 fi
-OLDEST="${SEGMENTS[0]}"
 
-# Session start time. The app uses this to bind the recording to the exact
-# stream session (correct even with multiple channels or back-to-back streams),
-# instead of guessing the newest processing VOD. Use the oldest segment's birth
-# time (fall back to mtime) — when MediaMTX began writing this session.
-REC_EPOCH="$(stat -c %W "$OLDEST" 2>/dev/null || echo 0)"
-if [ -z "${REC_EPOCH:-}" ] || [ "${REC_EPOCH}" -le 0 ]; then
-  REC_EPOCH="$(stat -c %Y "$OLDEST" 2>/dev/null || echo 0)"
-fi
-RECORDED_AT=""
-if [ "${REC_EPOCH:-0}" -gt 0 ]; then
-  RECORDED_AT="$(date -u -d "@${REC_EPOCH}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
-fi
+# Sort by the parsed epoch, oldest first.
+mapfile -t SORTED < <(for i in "${!ALL_PATHS[@]}"; do
+  printf '%s\t%s\n' "${ALL_EPOCHS[$i]}" "${ALL_PATHS[$i]}"
+done | sort -n)
+
+NEWEST_EPOCH="$(printf '%s\n' "${SORTED[-1]}" | cut -f1)"
+
+# Ask about the broadcast using the NEWEST segment, which always belongs to the
+# session being finalized. Asking about the oldest is how debris from a
+# broadcast that ended days ago used to select the wrong session.
+RECORDED_AT="$(date -u -d "@${NEWEST_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)"
 
 TS="$(date +%s)"
 OUT="/var/lib/vids-tube/out/${SLUG}"
@@ -64,24 +91,56 @@ mkdir -p "$PREVIEW_DIR"
 # FIRST segment, clamped to >= 0. A missing live_at means the broadcast never went
 # live, so there is no VOD to build.
 LIVE_AT=""
+STARTED_AT=""
 ENDED="false"
-if [ -n "${RECORDED_AT:-}" ]; then
-  BOUNDS="$(curl -fsS -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
-    "https://vids.tube/api/ingest/recording?path=${SLUG}&recordedAt=${RECORDED_AT}" \
-    2>/dev/null || true)"
-  LIVE_AT="$(printf '%s' "$BOUNDS" | jq -r '.liveAt // empty' 2>/dev/null || true)"
-  ENDED="$(printf '%s' "$BOUNDS" | jq -r '.ended // false' 2>/dev/null || echo false)"
-fi
+BOUNDS="$(curl -fsS -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" \
+  "https://vids.tube/api/ingest/recording?path=${SLUG}&recordedAt=${RECORDED_AT}" \
+  2>/dev/null || true)"
+LIVE_AT="$(printf '%s' "$BOUNDS" | jq -r '.liveAt // empty' 2>/dev/null || true)"
+STARTED_AT="$(printf '%s' "$BOUNDS" | jq -r '.startedAt // empty' 2>/dev/null || true)"
+ENDED="$(printf '%s' "$BOUNDS" | jq -r '.ended // false' 2>/dev/null || echo false)"
 
 if [ -z "${LIVE_AT:-}" ]; then
   echo "no live_at for ${SLUG}; broadcast never went live — no VOD"
   exit 0
 fi
 
+# Split the segments against this broadcast's own start. Everything before the
+# boundary belongs to an earlier broadcast and must not be concatenated onto the
+# front of this one.
+STARTED_EPOCH="$(date -u -d "$STARTED_AT" +%s 2>/dev/null || echo 0)"
+if [ "${STARTED_EPOCH:-0}" -le 0 ]; then
+  echo "no startedAt for ${SLUG} — refusing to guess the session boundary"
+  exit 1
+fi
+BOUNDARY=$(( STARTED_EPOCH - BOUNDARY_TOLERANCE ))
+
+SEGMENTS=()
+DEBRIS=()
+for ROW in "${SORTED[@]}"; do
+  E="$(printf '%s' "$ROW" | cut -f1)"
+  P="$(printf '%s' "$ROW" | cut -f2-)"
+  if [ "$E" -ge "$BOUNDARY" ]; then
+    SEGMENTS+=("$P")
+  else
+    DEBRIS+=("$P")
+    echo "segment from an earlier broadcast, excluded: $(basename "$P")"
+  fi
+done
+
+if [ "${#SEGMENTS[@]}" -eq 0 ]; then
+  echo "every segment predates ${SLUG}'s start — refusing to publish a VOD built from debris"
+  exit 1
+fi
+
+FIRST_EPOCH="$(printf '%s\n' "${SORTED[@]}" | while IFS=$'\t' read -r e p; do
+  if [ "$e" -ge "$BOUNDARY" ]; then echo "$e"; break; fi
+done)"
+
 TRIM=0
 LIVE_EPOCH="$(date -u -d "$LIVE_AT" +%s 2>/dev/null || echo 0)"
-if [ "${LIVE_EPOCH:-0}" -gt 0 ] && [ "${REC_EPOCH:-0}" -gt 0 ]; then
-  DELTA=$(( LIVE_EPOCH - REC_EPOCH ))
+if [ "${LIVE_EPOCH:-0}" -gt 0 ] && [ "${FIRST_EPOCH:-0}" -gt 0 ]; then
+  DELTA=$(( LIVE_EPOCH - FIRST_EPOCH ))
   if [ "$DELTA" -gt 0 ]; then
     TRIM="$DELTA"
   fi
@@ -234,9 +293,24 @@ curl -fsS -o /dev/null -X POST \
 
 rm -rf "$PREVIEW_DIR"
 
-# Keep the raw segments until the broadcast has ended: a reconnect will add more
-# footage and re-finalize (concatenating everything since go-live). Only once the
-# owner ends the broadcast do we remove them.
+# Everything below runs only after the upload and the app notification have both
+# succeeded, so a failure removes nothing.
+
+# Segments from an earlier broadcast go now, whether or not that broadcast was
+# ever marked ended. Waiting for "ended" is what let the 28-Jul-2026 broadcast
+# leave three days of footage lying around for the next stream to absorb.
+if [ "${#DEBRIS[@]}" -gt 0 ]; then
+  FREED=0
+  for SEG in "${DEBRIS[@]}"; do
+    SZ="$(stat -c %s "$SEG" 2>/dev/null || echo 0)"
+    FREED=$(( FREED + SZ ))
+    rm -f "$SEG"
+  done
+  echo "removed ${#DEBRIS[@]} segment(s) from an earlier broadcast, freeing $(( FREED / 1048576 )) MB"
+fi
+
+# This broadcast's own segments stay until it has ended: a reconnect will add
+# more footage and re-finalize, concatenating everything since go-live.
 if [ "${ENDED}" = "true" ]; then
   for SEG in "${SEGMENTS[@]}"; do
     rm -f "$SEG"

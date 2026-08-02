@@ -2,56 +2,56 @@
 
 ## 1. Read the start time from the filename
 
-- [ ] 1.1 In `scripts/vm/mtx-finalize-vod.sh`, add a helper that turns a segment
+- [x] 1.1 In `scripts/vm/mtx-finalize-vod.sh`, add a helper that turns a segment
   path into an epoch by parsing the `%Y-%m-%d_%H-%M-%S-%f` timestamp out of its
   basename, and returns empty when the name does not match.
-- [ ] 1.2 Replace the `stat -c %W` / `%Y` block with that helper. No filesystem
+- [x] 1.2 Replace the `stat -c %W` / `%Y` block with that helper. No filesystem
   timestamp is read for timing anywhere in the script.
-- [ ] 1.3 Log and skip any file in the recording directory whose name does not
+- [x] 1.3 Log and skip any file in the recording directory whose name does not
   parse, so a stray file cannot be given a substitute time.
 
 ## 2. Identify the broadcast from its newest segment
 
-- [ ] 2.1 Build a list of (epoch, path) pairs for every parseable segment, sorted
+- [x] 2.1 Build a list of (epoch, path) pairs for every parseable segment, sorted
   oldest first.
-- [ ] 2.2 Request the bounds endpoint using the NEWEST segment's timestamp rather
+- [x] 2.2 Request the bounds endpoint using the NEWEST segment's timestamp rather
   than the oldest, so debris from an earlier broadcast cannot select the wrong
   broadcast.
-- [ ] 2.3 Read `startedAt` from the response alongside the existing `liveAt` and
+- [x] 2.3 Read `startedAt` from the response alongside the existing `liveAt` and
   `ended`. The endpoint already returns it; no app change is needed.
 
 ## 3. Partition the segments
 
-- [ ] 3.1 Split the segments into those starting at or after
+- [x] 3.1 Split the segments into those starting at or after
   `startedAt - BOUNDARY_TOLERANCE` and those before it, with the tolerance set to
   120 seconds and defined as a named constant with a comment explaining why.
-- [ ] 3.2 Abort with a clear message when the current-broadcast group is empty,
+- [x] 3.2 Abort with a clear message when the current-broadcast group is empty,
   rather than publishing a recording built from debris.
-- [ ] 3.3 Use only the current-broadcast group for the concat list, and compute
+- [x] 3.3 Use only the current-broadcast group for the concat list, and compute
   `TRIM` from `liveAt` minus that group's first segment's start.
 
 ## 4. Delete debris safely
 
-- [ ] 4.1 After the upload and the app notification both succeed, delete every
+- [x] 4.1 After the upload and the app notification both succeed, delete every
   segment in the debris group and log how many were removed and which broadcast
   they appeared to belong to.
-- [ ] 4.2 Keep the existing rule for the current broadcast's own segments: delete
+- [x] 4.2 Keep the existing rule for the current broadcast's own segments: delete
   them only once the broadcast is marked ended, so a reconnect can re-finalize.
-- [ ] 4.3 Confirm by reading the script that no deletion can run before the
+- [x] 4.3 Confirm by reading the script that no deletion can run before the
   recording has been built and published.
 
 ## 5. Verification
 
-- [ ] 5.1 Extract the filename-to-epoch parsing into a form that can be tested,
+- [x] 5.1 Extract the filename-to-epoch parsing into a form that can be tested,
   and add `tests/unit/recording-filenames.test.ts` covering: a well-formed name
   parses to the right instant; a name with a fractional part parses; an
   unrelated filename yields nothing; a directory path with dots does not confuse
   the parse.
-- [ ] 5.2 Add a test for the partition: segments before the boundary are debris,
+- [x] 5.2 Add a test for the partition: segments before the boundary are debris,
   segments after are the broadcast, and a segment inside the tolerance window is
   the broadcast.
-- [ ] 5.3 Run `npx tsc --noEmit`, `npm run lint` and `npx vitest run`.
-- [ ] 5.4 Dry-run the script logic against the segment names currently on the
+- [x] 5.3 Run `npx tsc --noEmit`, `npm run lint` and `npx vitest run`.
+- [x] 5.4 Dry-run the script logic against the segment names currently on the
   streaming machine, printing the partition it would choose, without deleting
   anything.
 
