@@ -5,7 +5,11 @@
   14%. The other 11 exist ONLY on the machine, are referenced by no catalogue
   row, and date from 1-13 June 2026 while the pipeline was being built. Left in
   place pending an owner decision; 5.6 GB.
-- [ ] 7.4 Decide what happens to the 11 unreferenced local-only recordings.
+- [x] 7.4 The 11 unreferenced local-only recordings were deleted on the owner's
+  decision: the full catalogue is held from YouTube, and only future broadcasts
+  need to come off the machine. 5.6 GB freed.
+- [x] 7.5 Machine confirmed clean: 0 files in the output directory, 0 in the
+  recording directory, disk at 6% (3.9 GB of 75 GB).
 - [x] 7.3 AZ-214 checked against the machine: the recording directory is empty
   and holds no stale segments. The premise was wrong, nothing is waiting to be
   concatenated onto the next broadcast, and it does not block streaming. The
