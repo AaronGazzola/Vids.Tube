@@ -1,3 +1,4 @@
+import { ensureChatterChannel, refreshMembership } from "../lib/chatter-onboarding";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { runClaude } from "../lib/claude";
 import {
@@ -15,6 +16,7 @@ import {
   type EligibleStream,
   getStreamEngagement,
   renewLock,
+  resolveEnrichmentMode,
   upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
@@ -269,6 +271,55 @@ export async function applyScoreResult(
       .from("chat_messages")
       .update({ scored_at: nowIso })
       .in("id", scoredIds);
+  }
+
+  await refreshBatchMemberships(streamId, participants);
+}
+
+// Standing has to move while the broadcast is running, so every participant
+// scored in this batch is recomputed now rather than by a script afterwards.
+// This calls the same rebuild a full backfill uses, so live values and rebuilt
+// values cannot disagree.
+async function refreshBatchMemberships(
+  streamId: string,
+  participants: Map<string, { sample: BufferedMessage }>
+): Promise<void> {
+  const { data: streamRow } = await supabaseAdmin
+    .from("streams")
+    .select("channel_id")
+    .eq("id", streamId)
+    .maybeSingle();
+  const communityId = streamRow?.channel_id;
+  if (!communityId) return;
+
+  const channelIds = new Set<string>();
+  for (const [, p] of participants) {
+    const s = p.sample;
+    if (s.externalAuthorId) {
+      const { data } = await supabaseAdmin
+        .from("channels")
+        .select("id, merged_into_channel_id")
+        .eq("youtube_channel_id", s.externalAuthorId)
+        .maybeSingle();
+      const resolved = data?.merged_into_channel_id ?? data?.id;
+      if (resolved) channelIds.add(resolved);
+      continue;
+    }
+    if (s.userId) {
+      const { data } = await supabaseAdmin
+        .from("channels")
+        .select("id")
+        .eq("owner_user_id", s.userId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) channelIds.add(data.id);
+    }
+  }
+
+  for (const channelId of channelIds) {
+    if (channelId === communityId) continue;
+    await refreshMembership(channelId, communityId);
   }
 }
 
@@ -552,6 +603,10 @@ export async function runScoringJob(
     if (!liveChatId) {
       return;
     }
+    const enrichmentMode = channelId
+      ? await resolveEnrichmentMode(channelId)
+      : "full";
+    const onboarded = new Set<string>();
     for await (const m of pollYoutubeChat(liveChatId)) {
       if (stopped) {
         return;
@@ -589,6 +644,19 @@ export async function runScoringJob(
       // command-processed, or bridged back to YouTube.
       if (m.isBot) {
         continue;
+      }
+      // A chatter has to exist before their first message is scored, or the
+      // batch has nothing to credit. The host reaches here only if the host
+      // guard above did not catch them, so the community channel is skipped.
+      if (channelId && !onboarded.has(m.authorChannelId)) {
+        onboarded.add(m.authorChannelId);
+        await ensureChatterChannel({
+          authorChannelId: m.authorChannelId,
+          authorName: m.author,
+          avatarUrl: m.avatarUrl,
+          communityId: channelId,
+          mode: enrichmentMode,
+        });
       }
       ytBuffer.push({
         ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,

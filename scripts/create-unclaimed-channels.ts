@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { RESERVED_HANDLES } from "../lib/handle";
+import { ensureUniqueHandle, normalizeHandleBase } from "../lib/channel-handle";
 import { uploadToR2 } from "../lib/r2";
 import { fetchChannelSnippets, upscaleGgphtAvatar } from "../lib/youtube";
 import type { Database } from "../supabase/types";
@@ -9,35 +9,6 @@ const admin = createClient<Database>(
   process.env.SUPABASE_SECRET_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
-
-function normalizeBase(raw: string): string {
-  let h = raw
-    .trim()
-    .replace(/^@+/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  if (h.length === 0) h = "user";
-  if (h.length < 3) h = (h + "000").slice(0, 3);
-  return h.slice(0, 30);
-}
-
-function ensureUniqueHandle(base: string, taken: Set<string>): string {
-  let candidate = base;
-  let n = 2;
-  while (
-    candidate.length < 3 ||
-    RESERVED_HANDLES.has(candidate) ||
-    taken.has(candidate)
-  ) {
-    const suffix = `_${n}`;
-    candidate = base.slice(0, 30 - suffix.length) + suffix;
-    n += 1;
-  }
-  taken.add(candidate);
-  return candidate;
-}
 
 async function cacheAvatar(
   youtubeChannelId: string,
@@ -115,7 +86,7 @@ async function main() {
     const snippet = snippetById.get(chatter.author_channel_id);
     const baseSource =
       snippet?.customUrl || snippet?.title || chatter.author_name || "chatter";
-    const handle = ensureUniqueHandle(normalizeBase(baseSource), takenHandles);
+    const handle = ensureUniqueHandle(normalizeHandleBase(baseSource), takenHandles);
     const name =
       snippet?.title || chatter.author_name || "YouTube chatter";
 

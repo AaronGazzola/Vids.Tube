@@ -110,6 +110,7 @@ function buildForm(s: StreamSettings): SettingsForm {
     bridgeEnabled: s.bridgeEnabled,
     autoDisplayFeatured: s.autoDisplayFeatured,
     waitingRoomChat: s.waitingRoomChat,
+    chatterEnrichment: s.chatterEnrichment,
     disabledCommands: [...s.disabledCommands].sort(),
   };
 }
@@ -490,6 +491,7 @@ export default function LivePage() {
     bridgeEnabled: f.bridgeEnabled,
     autoDisplayFeatured: f.autoDisplayFeatured,
     waitingRoomChat: f.waitingRoomChat,
+    chatterEnrichment: f.chatterEnrichment,
     disabledCommands: f.disabledCommands,
   });
 

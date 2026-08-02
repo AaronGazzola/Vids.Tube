@@ -523,6 +523,7 @@ export type StreamSettings = {
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  chatterEnrichment: boolean;
   disabledCommands: string[];
   usefulInfoEnabled: boolean;
   competitionStatusEnabled: boolean;
@@ -549,6 +550,7 @@ export type StreamSettingsInput = {
   highlightingEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  chatterEnrichment: boolean;
   disabledCommands: string[];
   usefulInfoEnabled: boolean;
   competitionStatusEnabled: boolean;
@@ -580,6 +582,12 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     console.error(error);
     throw new Error("Failed to load settings");
   }
+
+  const { data: channelSettings } = await supabaseAdmin
+    .from("channels")
+    .select("chatter_enrichment_mode")
+    .eq("id", channel.id)
+    .maybeSingle();
 
   const { data: heartbeat } = await supabaseAdmin
     .from("worker_heartbeats")
@@ -614,6 +622,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       bridgeEnabled: true,
       autoDisplayFeatured: false,
       waitingRoomChat: false,
+      chatterEnrichment: true,
       disabledCommands: [],
       workerRunning,
     };
@@ -661,6 +670,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
+    chatterEnrichment: channelSettings?.chatter_enrichment_mode !== "deferred",
     disabledCommands: stream.disabled_commands ?? [],
     workerRunning,
   };
@@ -852,6 +862,17 @@ export async function saveStreamSettingsAction(
     } catch (e) {
       console.error(e);
     }
+  }
+
+  const { error: enrichError } = await supabaseAdmin
+    .from("channels")
+    .update({
+      chatter_enrichment_mode: input.chatterEnrichment ? "full" : "deferred",
+    })
+    .eq("id", channel.id);
+  if (enrichError) {
+    console.error(enrichError);
+    throw new Error("Failed to save chatter settings");
   }
 
   return { data: { id: streamId } };

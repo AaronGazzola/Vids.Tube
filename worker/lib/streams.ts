@@ -192,3 +192,18 @@ export async function releaseLock(streamId: string): Promise<void> {
     .update({ locked_until: null })
     .eq("stream_id", streamId);
 }
+
+export async function resolveEnrichmentMode(
+  communityChannelId: string
+): Promise<"full" | "deferred"> {
+  const { data, error } = await supabaseAdmin
+    .from("channels")
+    .select("chatter_enrichment_mode")
+    .eq("id", communityChannelId)
+    .maybeSingle();
+  if (error) {
+    console.error("enrichment mode lookup failed:", error.message);
+    return "full";
+  }
+  return data?.chatter_enrichment_mode === "deferred" ? "deferred" : "full";
+}

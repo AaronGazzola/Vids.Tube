@@ -66,6 +66,7 @@ export type SettingsForm = {
   wrapupThanksEnabled: boolean;
   autoDisplayFeatured: boolean;
   waitingRoomChat: boolean;
+  chatterEnrichment: boolean;
   disabledCommands: string[];
 };
 
@@ -828,6 +829,15 @@ export function SettingsTab({
           description="Let viewers chat on the public scheduled page before you go live."
           checked={form.waitingRoomChat}
           onCheckedChange={(v) => set({ waitingRoomChat: v })}
+        />
+      </Section>
+
+      <Section title="Chatters">
+        <SwitchRow
+          label="Fetch chatter profiles immediately"
+          description="On: a new chatter's real handle and avatar are fetched the first time they speak. Off: their profile is built from their chat name and filled in after the stream, which never waits on YouTube."
+          checked={form.chatterEnrichment}
+          onCheckedChange={(v) => set({ chatterEnrichment: v })}
         />
       </Section>
 
