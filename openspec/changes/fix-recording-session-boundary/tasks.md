@@ -1,4 +1,15 @@
-# Tasks: fix the recording session boundary
+# Tasks: fix the recording session boundary- [x] 7.1 Deployed. The replaced version is kept on the machine as a dated backup
+  in root's home, and the new script was syntax-checked there before install.
+- [x] 7.2 Checked each of the 23 against R2 first, which mattered: only 12 were
+  present. Those 12 were deleted, freeing 25 GB and taking the disk from 48% to
+  14%. The other 11 exist ONLY on the machine, are referenced by no catalogue
+  row, and date from 1-13 June 2026 while the pipeline was being built. Left in
+  place pending an owner decision; 5.6 GB.
+- [ ] 7.4 Decide what happens to the 11 unreferenced local-only recordings.
+- [x] 7.3 AZ-214 checked against the machine: the recording directory is empty
+  and holds no stale segments. The premise was wrong, nothing is waiting to be
+  concatenated onto the next broadcast, and it does not block streaming. The
+  guard against it recurring is still worth having.
 
 ## 1. Read the start time from the filename
 
@@ -55,11 +66,21 @@
   streaming machine, printing the partition it would choose, without deleting
   anything.
 
-## 6. Deploy and clear the backlog
+## 6. Stop the finalized recordings accumulating
 
-- [ ] 6.1 Copy the updated script to the streaming machine and confirm the hook
-  still runs by checking the MediaMTX unit's log for a finalize.
-- [ ] 6.2 Clear the stale 28-Jul-2026 segments (AZ-214), recording how many files
-  and how much disk were freed.
-- [ ] 6.3 Confirm the recording directory holds nothing older than the most
-  recent broadcast.
+- [x] 6.0 Delete the concatenated recording and its poster after the upload and
+  the app notification both succeed. Found on the machine: 23 finalized
+  recordings going back to 1-Jun-2026, 30 GB on a 75 GB disk, all already in
+  R2. At about 5 GB a broadcast that was roughly six streams from filling the
+  disk and failing every recording.
+
+## 7. Deploy and clear the backlog
+
+- [ ] 7.1 Copy the updated script to the streaming machine, keeping a copy of
+  the version being replaced.
+- [ ] 7.2 Delete the 23 accumulated recordings from the output directory after
+  confirming each is present in R2, recording how much disk was freed.
+- [x] 7.3 AZ-214 checked against the machine: the recording directory is empty
+  and holds no stale segments. The premise was wrong, nothing is waiting to be
+  concatenated onto the next broadcast, and it does not block streaming. The
+  guard against it recurring is still worth having.

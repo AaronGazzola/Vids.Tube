@@ -296,6 +296,11 @@ rm -rf "$PREVIEW_DIR"
 # Everything below runs only after the upload and the app notification have both
 # succeeded, so a failure removes nothing.
 
+# The finalized MP4 and poster live only to be uploaded. They were never removed,
+# so 23 of them had accumulated to 30 GB on a 75 GB disk — about six more
+# broadcasts before recording would have failed for want of space.
+rm -f "$MP4" "$JPG"
+
 # Segments from an earlier broadcast go now, whether or not that broadcast was
 # ever marked ended. Waiting for "ended" is what let the 28-Jul-2026 broadcast
 # leave three days of footage lying around for the next stream to absorb.
