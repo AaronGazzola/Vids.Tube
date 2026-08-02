@@ -34,7 +34,8 @@
     "verify:abandoned-sweep": "tsx scripts/verify-abandoned-sweep.ts",
     "create:unclaimed-channels": "doppler run -- tsx scripts/create-unclaimed-channels.ts",
     "verify:credit-ledger": "doppler run -- tsx scripts/verify-credit-ledger.ts",
-    "enrich:chatters": "doppler run -- tsx scripts/enrich-chatter-channels.ts"
+    "enrich:chatters": "doppler run -- tsx scripts/enrich-chatter-channels.ts",
+    "verify:credit-merge": "tsx scripts/verify-credit-merge.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",

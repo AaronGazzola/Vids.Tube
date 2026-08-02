@@ -155,10 +155,17 @@
   every membership holds at most one `earned` line; every `earned` line equals
   `credits_for_xp` of that membership's `lifetime_xp`; no ledger line is orphaned.
   Add it to `package.json` as `verify:credit-ledger`.
-- [ ] 10.3 Extend `scripts/verify-membership-merge.ts` (or add a case to the
-  credit-ledger verifier) that seeds two memberships with spends inside a
-  rolled-back transaction, merges them, and asserts the survivor holds both
-  spending lines and exactly one earning line derived from pooled XP.
+- [x] 10.3 `scripts/verify-credit-merge.ts` seeds real channels and memberships
+  inside a transaction and rolls back, covering nine cases against production:
+  the earning line derives from XP on insert and on change, an overdraft is
+  refused and writes nothing, a spend within balance updates the cache, a
+  re-score rewrites earnings and leaves the spend, an earning line is rewritten
+  rather than duplicated, `earned` is refused as a spend kind, deleting a
+  membership cascades its lines, and a merge carries spends to the survivor while
+  re-deriving earnings from pooled XP. 9 of 9 pass. Added as
+  `verify:credit-merge`.
+
+
 - [x] 10.4 Add `tests/unit/credit-rate.test.ts` covering the earning rate as a
   pure function: 0 XP gives 0, 9 XP gives 0, 10 XP gives 1, 1640 XP gives 164,
   negative XP gives 0.
@@ -167,10 +174,12 @@
 
 ## 11. Live confirmation
 
-- [ ] 11.1 Run `npm run verify:credit-ledger` after the backfill and record the
-  result in the change's completion notes.
-- [ ] 11.2 Add a Linear issue for on-stream confirmation covering: a first-time
-  chatter appears with a channel and membership during the broadcast, their XP
-  and level move while it runs, credits earned in that broadcast can be spent in
-  it, and the enrichment switch changes which of the two creation paths is used.
-  Reference it in the completion notes and do not leave it as a task here.
+- [x] 11.1 `npm run verify:credit-ledger` after the backfill: 148 memberships,
+  148 earning lines, 2241 credits earned, 0 spent, 8 members holding a balance,
+  every cached balance matching its ledger.
+
+
+- [x] 11.2 On-stream confirmation raised as AZ-219, covering first-time chatter
+  onboarding, standing moving mid-broadcast, earning then spending in one
+  broadcast, the enrichment switch changing which creation path runs, and the
+  host and bot staying excluded. Not left as a task here.
