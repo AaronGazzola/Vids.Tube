@@ -83,17 +83,3 @@ The finalize step SHALL delete the concatenated recording and its poster image f
 
 - **WHEN** the upload or the notification fails
 - **THEN** the local recording is left in place
-
-### Requirement: The finalized recording is removed from the machine after upload
-
-The finalize step SHALL delete the concatenated recording and its poster image from local disk once both the upload and the app notification have succeeded, because they exist only to be uploaded.
-
-#### Scenario: Local copies do not accumulate
-
-- **WHEN** a recording is uploaded and the app is notified
-- **THEN** the local recording and poster are removed
-
-#### Scenario: A failed upload keeps the local copy
-
-- **WHEN** the upload or the notification fails
-- **THEN** the local recording is left in place

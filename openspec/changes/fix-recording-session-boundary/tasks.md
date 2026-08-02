@@ -80,10 +80,11 @@
 
 ## 7. Deploy and clear the backlog
 
-- [ ] 7.1 Copy the updated script to the streaming machine, keeping a copy of
-  the version being replaced.
-- [ ] 7.2 Delete the 23 accumulated recordings from the output directory after
-  confirming each is present in R2, recording how much disk was freed.
+- [x] 7.1 Deployed. The replaced version is kept on the machine as a dated
+  backup, and the new script was syntax-checked there before install.
+- [x] 7.2 Checked each of the 23 against R2 first, which mattered: only 12 were
+  present. Those 12 were deleted, freeing 25 GB. `verify-vm-outputs.ts` does the
+  checking and never deletes anything itself.
 - [x] 7.3 AZ-214 checked against the machine: the recording directory is empty
   and holds no stale segments. The premise was wrong, nothing is waiting to be
   concatenated onto the next broadcast, and it does not block streaming. The
