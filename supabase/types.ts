@@ -20,7 +20,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      end_abandoned_live_streams: { Args: never; Returns: number }
       graphql: {
         Args: {
           extensions?: Json
@@ -213,7 +212,9 @@ export type Database = {
       channels: {
         Row: {
           avatar_path: string | null
+          awaiting_enrichment: boolean
           banner_path: string | null
+          chatter_enrichment_mode: string
           created_at: string
           description: string
           handle: string
@@ -227,7 +228,9 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          awaiting_enrichment?: boolean
           banner_path?: string | null
+          chatter_enrichment_mode?: string
           created_at?: string
           description?: string
           handle: string
@@ -241,7 +244,9 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          awaiting_enrichment?: boolean
           banner_path?: string | null
+          chatter_enrichment_mode?: string
           created_at?: string
           description?: string
           handle?: string
@@ -668,6 +673,44 @@ export type Database = {
           },
         ]
       }
+      credit_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          kind: string
+          membership_id: string
+          source_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          kind: string
+          membership_id: string
+          source_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          membership_id?: string
+          source_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_entries_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       featured_messages: {
         Row: {
           author_avatar_url: string | null
@@ -1014,6 +1057,44 @@ export type Database = {
           },
         ]
       }
+      stream_chapters: {
+        Row: {
+          created_at: string
+          id: string
+          prompt_version: string
+          start_s: number
+          status: string
+          stream_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt_version: string
+          start_s: number
+          status?: string
+          stream_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt_version?: string
+          start_s?: number
+          status?: string
+          stream_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_chapters_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stream_gaps: {
         Row: {
           gap_end_at: string | null
@@ -1109,6 +1190,103 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: true
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_moments: {
+        Row: {
+          created_at: string
+          end_s: number
+          id: string
+          kind: string
+          label: string
+          prompt_version: string
+          scores: Json
+          start_s: number
+          stream_id: string
+          summary: string
+          tags: string[]
+        }
+        Insert: {
+          created_at?: string
+          end_s: number
+          id?: string
+          kind: string
+          label: string
+          prompt_version: string
+          scores: Json
+          start_s: number
+          stream_id: string
+          summary: string
+          tags?: string[]
+        }
+        Update: {
+          created_at?: string
+          end_s?: number
+          id?: string
+          kind?: string
+          label?: string
+          prompt_version?: string
+          scores?: Json
+          start_s?: number
+          stream_id?: string
+          summary?: string
+          tags?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_moments_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_sections: {
+        Row: {
+          created_at: string
+          end_s: number | null
+          id: string
+          label: string
+          prompt_version: string
+          scores: Json
+          start_s: number
+          stream_id: string
+          summary: string
+          tags: string[]
+        }
+        Insert: {
+          created_at?: string
+          end_s?: number | null
+          id?: string
+          label: string
+          prompt_version: string
+          scores: Json
+          start_s: number
+          stream_id: string
+          summary: string
+          tags?: string[]
+        }
+        Update: {
+          created_at?: string
+          end_s?: number | null
+          id?: string
+          label?: string
+          prompt_version?: string
+          scores?: Json
+          start_s?: number
+          stream_id?: string
+          summary?: string
+          tags?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_sections_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
             referencedColumns: ["id"]
           },
         ]
@@ -1578,13 +1756,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      credits_for_xp: { Args: { xp: number }; Returns: number }
       email_signup_status: { Args: { p_email: string }; Returns: string }
+      end_abandoned_live_streams: { Args: never; Returns: number }
       is_participant_banned: { Args: { p_user: string }; Returns: boolean }
       level_for_xp: { Args: { xp: number }; Returns: number }
+      membership_credit_balance: {
+        Args: { p_membership_id: string }
+        Returns: number
+      }
       merge_youtube_identity: { Args: { p_user_id: string }; Returns: Json }
       recompute_membership: {
         Args: { p_channel_id: string; p_community_channel_id: string }
         Returns: undefined
+      }
+      spend_credits: {
+        Args: {
+          p_amount: number
+          p_kind: string
+          p_membership_id: string
+          p_source_id?: string
+        }
+        Returns: Json
+      }
+      sync_membership_credits: {
+        Args: { p_membership_id: string }
+        Returns: number
+      }
+      write_earned_credits: {
+        Args: { p_membership_id: string; p_xp: number }
+        Returns: number
       }
     }
     Enums: {

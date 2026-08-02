@@ -14,6 +14,30 @@ The `credits` column SHALL be a cached copy of the membership's credit-ledger ba
 - **WHEN** a membership's lifetime XP changes and it is recomputed
 - **THEN** its earning line and `credits` both reflect the new XP total
 
+### Requirement: Deterministic recompute routine
+
+The system SHALL provide a `recompute_membership(p_channel_id, p_community_channel_id)` SQL function that derives the membership row and fully rebuilds its `membership_stream_stats` (delete then insert) from raw events, creating the membership when the identity has any history in the community, preserving `credits` and `rewards`, and touching no other membership. Where the identity has no history in the community and a membership already exists, the function SHALL clear that membership's per-broadcast rows and zero its derived columns rather than leaving stale values in place. The function SHALL be executable by the service role only.
+
+#### Scenario: Recompute is idempotent
+
+- **WHEN** `recompute_membership` runs twice in a row with no new raw events between runs
+- **THEN** the second run produces identical membership and stream-stats rows
+
+#### Scenario: Client roles cannot recompute
+
+- **WHEN** an `anon` or `authenticated` role calls `recompute_membership`
+- **THEN** the call is rejected (EXECUTE not granted)
+
+#### Scenario: A membership whose history disappears is zeroed
+
+- **WHEN** every message behind a membership is deleted and the membership is recomputed
+- **THEN** its per-broadcast rows are removed and its experience, level, message count, attendance and streaks are all zero, while its credits and rewards are untouched
+
+#### Scenario: No membership is created for an identity with no history
+
+- **WHEN** `recompute_membership` runs for a channel with no messages in the community and no existing membership
+- **THEN** no membership row is created
+
 ## ADDED Requirements
 
 ### Requirement: Memberships refresh live during a broadcast
