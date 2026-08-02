@@ -1021,6 +1021,7 @@ export type Database = {
           metadata: Json
           origin: string
           points: number
+          scoring_version: string | null
           stream_id: string
           type: string
           user_id: string | null
@@ -1032,6 +1033,7 @@ export type Database = {
           metadata?: Json
           origin?: string
           points?: number
+          scoring_version?: string | null
           stream_id: string
           type: string
           user_id?: string | null
@@ -1043,6 +1045,7 @@ export type Database = {
           metadata?: Json
           origin?: string
           points?: number
+          scoring_version?: string | null
           stream_id?: string
           type?: string
           user_id?: string | null

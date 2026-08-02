@@ -1,6 +1,8 @@
+import { buildRubric, SCORING_CONFIG } from "@/lib/scoring-config";
+import { pointsForMessage } from "@/lib/scoring-points";
 import { extractJson } from "./claude";
 
-export const VIDSTUBE_MULTIPLIER = 1.5;
+export const VIDSTUBE_MULTIPLIER = SCORING_CONFIG.vidstubeMultiplier;
 
 export type ScoringOrigin = "vidstube" | "youtube";
 
@@ -25,9 +27,9 @@ export type FeaturedPick = {
 
 export type AuthorScoreDelta = {
   ref: string;
-  engagement: number;
   humour: number;
-  contribution: number;
+  insight: number;
+  community: number;
 };
 
 export type ModerationAction = "hide" | "ban";
@@ -44,35 +46,12 @@ export type ScoreResult = {
   moderation: ModerationFlag[];
 };
 
-const RUBRIC = `You score live-stream chat participation. You are given the recent stream
-transcript (what the streamer is saying) and a batch of new chat messages from two
-sources: "vidstube" (the native Vids.Tube audience) and "youtube" (simulcast YouTube
-chat). Vids.Tube participation matters MORE than YouTube — rate vidstube messages more
-generously.
-
-For each message, rate three dimensions 0-100:
-- engagement: relevance and responsiveness to what's happening on stream
-- humour: how funny/entertaining it is
-- contribution: insight, helpfulness, or moving the conversation forward
-
-Then choose the few best messages to FEATURE on the overlay (only genuinely good ones;
-feature none if nothing stands out). A featured message gets an overall score 0-100, a
-short reason, and 1-3 category tags from: engagement, humour, contribution, insight,
-hype, question.
-
-Finally, FLAG any message that clearly breaks chat rules — spam/flooding, slurs, hate,
-harassment, threats, or explicit sexual abuse. Be conservative: flag ONLY clear abuse,
-never borderline, merely negative, critical, or off-topic messages. For each flag give an
-action ("hide" to remove the message, or "ban" for repeat/severe abuse where the author
-should be removed) and a short reason. Most batches have NO flags — return an empty list
-when nothing clearly breaks the rules.`;
-
 export function buildScoringPrompt(input: ScoringInput): string {
   const messageLines = input.messages
     .map((m, i) => `[m${i}] (${m.origin}) ${m.author}: ${m.text}`)
     .join("\n");
 
-  return `${RUBRIC}
+  return `${buildRubric({ includeModeration: true })}
 
 ## Recent transcript
 ${input.transcript || "(no transcript yet)"}
@@ -84,7 +63,7 @@ ${messageLines || "(none)"}
 Return ONLY a JSON object, no prose, of this exact shape:
 {
   "featured":   [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>" } ],
-  "scores":     [ { "ref": "<ref>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ],
+  "scores":     [ { "ref": "<ref>", "humour": 0-100, "insight": 0-100, "community": 0-100 } ],
   "moderation": [ { "ref": "<ref>", "action": "hide"|"ban", "reason": "<short>" } ]
 }
 Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "m3"). Include every message in "scores". Keep "featured" small and "moderation" usually empty.`;
@@ -99,12 +78,12 @@ audience) and "youtube" (simulcast YouTube chat). Vids.Tube participation matter
 than YouTube — rate vidstube messages more generously.
 
 For each message, rate three dimensions 0-100:
-- engagement: relevance and responsiveness to what's happening on stream
+- humour: a genuinely funny or entertaining contribution
 - humour: how funny/entertaining it is
-- contribution: insight, helpfulness, or moving the conversation forward
+- community: talking with other chatters, welcoming someone new, keeping the conversation alive
 
 Also give each message an overall highlight score 0-100, a short reason it stands out,
-and 1-3 category tags from: engagement, humour, contribution, insight, hype, question.
+and 1-3 category tags from: humour, insight, community, question, hype.
 The owner already chose to feature these messages, so score every one of them — never
 skip or reject a message.`;
 
@@ -124,7 +103,7 @@ ${messageLines || "(none)"}
 ## Output
 Return ONLY a JSON object, no prose, of this exact shape:
 {
-  "highlights": [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>", "engagement": 0-100, "humour": 0-100, "contribution": 0-100 } ]
+  "highlights": [ { "ref": "<ref>", "score": 0-100, "categories": ["..."], "reason": "<short>", "humour": 0-100, "insight": 0-100, "community": 0-100 } ]
 }
 Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "m3"). Include every message.`;
 }
@@ -150,9 +129,9 @@ export function parseHighlightResult(raw: string): HighlightPick[] {
         ? (h.categories as unknown[]).map(String)
         : [],
       reason: typeof h.reason === "string" ? h.reason : "",
-      engagement: clampScore(h.engagement),
       humour: clampScore(h.humour),
-      contribution: clampScore(h.contribution),
+      insight: clampScore(h.insight),
+      community: clampScore(h.community),
     }));
 }
 
@@ -206,9 +185,9 @@ export function parseScoreResult(raw: string): ScoreResult {
         .filter((s) => typeof s.ref === "string")
         .map((s) => ({
           ref: normalizeRef(s.ref),
-          engagement: clampScore(s.engagement),
           humour: clampScore(s.humour),
-          contribution: clampScore(s.contribution),
+          insight: clampScore(s.insight),
+          community: clampScore(s.community),
         }))
     : [];
 
@@ -231,7 +210,5 @@ export function parseScoreResult(raw: string): ScoreResult {
 }
 
 export function pointsFor(delta: AuthorScoreDelta, origin: ScoringOrigin): number {
-  const base = delta.engagement + delta.humour + delta.contribution;
-  const weighted = origin === "vidstube" ? base * VIDSTUBE_MULTIPLIER : base;
-  return Math.round(weighted);
+  return pointsForMessage(delta, origin);
 }

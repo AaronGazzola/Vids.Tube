@@ -1,5 +1,6 @@
 import { ensureChatterChannel, refreshMembership } from "../lib/chatter-onboarding";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import { SCORING_CONFIG } from "@/lib/scoring-config";
 import { runClaude } from "../lib/claude";
 import {
   buildHighlightScoringPrompt,
@@ -130,9 +131,9 @@ export async function applyScoreResult(
 
   type BreakdownItem = {
     text: string;
-    engagement: number;
     humour: number;
-    contribution: number;
+    insight: number;
+    community: number;
     points: number;
   };
   type Participant = {
@@ -161,9 +162,9 @@ export async function applyScoreResult(
     p.points += points;
     p.items.push({
       text: m.text.slice(0, 200),
-      engagement: s.engagement,
       humour: s.humour,
-      contribution: s.contribution,
+      insight: s.insight,
+      community: s.community,
       points,
     });
   }
@@ -256,6 +257,7 @@ export async function applyScoreResult(
         external_author_id: p.sample.externalAuthorId,
         type: "score",
         points: p.points,
+        scoring_version: SCORING_CONFIG.version,
         metadata: { reasons: p.features.map((f) => f.reason), items: p.items },
       });
     }
@@ -453,15 +455,16 @@ export async function scoreManualHighlights(streamId: string): Promise<void> {
       external_author_id: row.external_author_id,
       type: "score",
       points,
+      scoring_version: SCORING_CONFIG.version,
       metadata: {
         reasons: [pick.reason],
         items: points
           ? [
               {
                 text: (row.body ?? "").slice(0, 200),
-                engagement: pick.engagement,
                 humour: pick.humour,
-                contribution: pick.contribution,
+                insight: pick.insight,
+                community: pick.community,
                 points,
               },
             ]

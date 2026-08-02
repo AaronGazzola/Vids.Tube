@@ -21,7 +21,8 @@ The chat is complete and the identities are correct. What is missing is a pass t
 
 ### Modified Capabilities
 
-- `chat-scoring-engine`: the rubric becomes a versioned configuration shared by the live scorer and the backfill, and every rating records the version that produced it.
+- `chat-scoring-engine`: the rubric becomes a versioned configuration shared by the live scorer and the backfill; every rating records the version that produced it; points reward quality rather than volume and can be re-derived without re-scoring.
+- `memberships`: the level curve is recalibrated for quality-weighted scoring.
 
 ## Impact
 
