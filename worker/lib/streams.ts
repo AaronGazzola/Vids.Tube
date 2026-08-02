@@ -207,3 +207,40 @@ export async function resolveEnrichmentMode(
   }
   return data?.chatter_enrichment_mode === "deferred" ? "deferred" : "full";
 }
+
+// The streamer is a fourth participant class: present in chat, never scored, no
+// membership. Detection is automatic from the YouTube account recorded on the
+// broadcast, falling back to the one on the community channel for broadcasts
+// that predate that field being written.
+export async function resolveHostChannelId(
+  streamId: string,
+  communityChannelId: string | null
+): Promise<string | null> {
+  const { data: stream } = await supabaseAdmin
+    .from("streams")
+    .select("youtube_channel_id")
+    .eq("id", streamId)
+    .maybeSingle();
+  if (stream?.youtube_channel_id) {
+    return stream.youtube_channel_id;
+  }
+  if (!communityChannelId) return null;
+  const { data: channel } = await supabaseAdmin
+    .from("channels")
+    .select("youtube_channel_id")
+    .eq("id", communityChannelId)
+    .maybeSingle();
+  return channel?.youtube_channel_id ?? null;
+}
+
+export async function resolveCommunityOwner(
+  communityChannelId: string | null
+): Promise<string | null> {
+  if (!communityChannelId) return null;
+  const { data } = await supabaseAdmin
+    .from("channels")
+    .select("owner_user_id")
+    .eq("id", communityChannelId)
+    .maybeSingle();
+  return data?.owner_user_id ?? null;
+}

@@ -2,40 +2,40 @@
 
 ## 1. Repair the existing broken identity
 
-- [ ] 1.1 Create `scripts/repair-host-identity.ts` (service role, env/client pattern
+- [x] 1.1 Create `scripts/repair-host-identity.ts` (service role, env/client pattern
   of `scripts/create-unclaimed-channels.ts`). It resolves the owner community as
   the earliest-created channel, reads that owner's verified `youtube_links` row,
   and aborts with a clear message if the link is unverified or absent.
-- [ ] 1.2 In that script, step one: set `channels.youtube_channel_id` on the owner
+- [x] 1.2 In that script, step one: set `channels.youtube_channel_id` on the owner
   community to the verified link's `youtube_channel_id`, skipping if already set.
-- [ ] 1.3 Step two: call `supabaseAdmin.rpc("merge_youtube_identity", { p_user_id })`
+- [x] 1.3 Step two: call `supabaseAdmin.rpc("merge_youtube_identity", { p_user_id })`
   and log the returned `{ merged, communities }` payload; abort the script if
   `merged` is false.
-- [ ] 1.4 Step three: delete `viewer_scores` rows whose `participant_key` is
+- [x] 1.4 Step three: delete `viewer_scores` rows whose `participant_key` is
   `youtube:<owner ycid>` or whose `external_author_id` is the owner's YouTube id,
   logging the deleted count (currently 2).
-- [ ] 1.5 Step four: assert and log the post-conditions: the community channel has
+- [x] 1.5 Step four: assert and log the post-conditions: the community channel has
   a non-null `youtube_channel_id`, exactly one channel is tombstoned into it,
   0 `chat_messages` remain with `external_author_id` equal to the owner's
   YouTube id and a null `user_id`, and 0 memberships exist whose `channel_id`
   equals their `community_channel_id`.
-- [ ] 1.6 Run the script once against production and record the before/after counts
+- [x] 1.6 Run the script once against production and record the before/after counts
   in the change's completion notes.
 
 ## 2. Detection and ingest
 
-- [ ] 2.1 Add `resolveHostChannelId(stream, channel)` to `worker/lib/streams.ts`
+- [x] 2.1 Add `resolveHostChannelId(stream, channel)` to `worker/lib/streams.ts`
   returning `streams.youtube_channel_id` when set, otherwise the community
   channel's `channels.youtube_channel_id`, otherwise null.
-- [ ] 2.2 In `worker/jobs/score.ts` `consumeYoutube`, resolve the host id once
+- [x] 2.2 In `worker/jobs/score.ts` `consumeYoutube`, resolve the host id once
   before the poll loop and compare each message's `authorChannelId` against it to
   derive `isHost`.
-- [ ] 2.3 For a host message, insert into `chat_messages` with `user_id` set to the
+- [x] 2.3 For a host message, insert into `chat_messages` with `user_id` set to the
   community channel's `owner_user_id`, keeping `origin: "youtube"` and
   `external_author_id`; leave `user_id` null when the channel has no owner.
-- [ ] 2.4 Skip `ytBuffer.push` for host messages so they never reach scoring, while
+- [x] 2.4 Skip `ytBuffer.push` for host messages so they never reach scoring, while
   leaving the existing bot `continue` at line 590 untouched.
-- [ ] 2.5 Confirm host messages still reach command dispatch by tracing the path a
+- [x] 2.5 Confirm host messages still reach command dispatch by tracing the path a
   buffered-but-unscored message takes, and add a unit test in
   `tests/unit/host-class.test.ts` asserting a host message is not scored and is
   still command-dispatched.

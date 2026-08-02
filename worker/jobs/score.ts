@@ -17,7 +17,9 @@ import {
   type EligibleStream,
   getStreamEngagement,
   renewLock,
+  resolveCommunityOwner,
   resolveEnrichmentMode,
+  resolveHostChannelId,
   upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
@@ -44,6 +46,7 @@ export type BufferedMessage = {
   authorAvatarUrl: string | null;
   chatMessageId: string | null;
   createdAt: string;
+  isHost?: boolean;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -609,6 +612,11 @@ export async function runScoringJob(
     const enrichmentMode = channelId
       ? await resolveEnrichmentMode(channelId)
       : "full";
+    const hostChannelId = await resolveHostChannelId(stream.id, channelId);
+    const hostUserId = await resolveCommunityOwner(channelId);
+    if (hostChannelId) {
+      console.error(`[chat:yt] host recognised as ${hostChannelId}`);
+    }
     const onboarded = new Set<string>();
     for await (const m of pollYoutubeChat(liveChatId)) {
       if (stopped) {
@@ -618,12 +626,17 @@ export async function runScoringJob(
         continue;
       }
       const extMsgId = m.id || `${m.authorChannelId}:${m.publishedAt}`;
+      // The streamer chats from YouTube like anyone else, but is not a viewer of
+      // their own broadcast. Attribute their messages to their account so chat
+      // history is whole, then keep them out of scoring entirely.
+      const isHost = !m.isBot && !!hostChannelId && m.authorChannelId === hostChannelId;
       let chatMessageId: string | null = null;
       const { data: row, error } = await supabaseAdmin
         .from("chat_messages")
         .insert({
           stream_id: stream.id,
           origin: m.isBot ? "bot" : "youtube",
+          user_id: isHost ? hostUserId : null,
           external_author_id: m.authorChannelId,
           author_name: m.author,
           author_avatar_url: m.avatarUrl,
@@ -649,9 +662,9 @@ export async function runScoringJob(
         continue;
       }
       // A chatter has to exist before their first message is scored, or the
-      // batch has nothing to credit. The host reaches here only if the host
-      // guard above did not catch them, so the community channel is skipped.
-      if (channelId && !onboarded.has(m.authorChannelId)) {
+      // batch has nothing to credit. The host is never onboarded: they own the
+      // community rather than belonging to it.
+      if (!isHost && channelId && !onboarded.has(m.authorChannelId)) {
         onboarded.add(m.authorChannelId);
         await ensureChatterChannel({
           authorChannelId: m.authorChannelId,
@@ -661,17 +674,21 @@ export async function runScoringJob(
           mode: enrichmentMode,
         });
       }
+      // Host messages are buffered so their commands still dispatch — the
+      // streamer runs commands from YouTube chat — but are dropped before the
+      // batch reaches the scorer.
       ytBuffer.push({
         ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,
         origin: "youtube",
         author: m.author,
         text: m.text,
-        userId: null,
+        userId: isHost ? hostUserId : null,
         externalAuthorId: m.authorChannelId,
         authorName: m.author,
         authorAvatarUrl: m.avatarUrl,
         chatMessageId,
         createdAt: m.publishedAt,
+        isHost,
       });
     }
   }
@@ -739,15 +756,18 @@ export async function runScoringJob(
         }
       }
 
-      if (batch.length) {
+      // Commands have dispatched by now, so the host drops out here: present in
+      // chat and in replay, never scored, never on a leaderboard.
+      const scorable = batch.filter((m) => !m.isHost);
+      if (scorable.length) {
         const transcript = await fetchTranscriptWindow(stream.id);
         console.error(
-          `[score] scoring ${batch.length} msg(s): ${vid.length} vidstube + ${yt.length} youtube` +
+          `[score] scoring ${scorable.length} msg(s): ${vid.length} vidstube + ${yt.length} youtube` +
             (transcript ? ` (with ${transcript.length} chars transcript)` : " (no transcript)")
         );
         const prompt = buildScoringPrompt({
           transcript,
-          messages: batch.map(toScoringMessage),
+          messages: scorable.map(toScoringMessage),
         });
         let raw = "";
         try {
@@ -761,17 +781,17 @@ export async function runScoringJob(
             `[score] result: ${result.scores.length} scored, ${result.featured.length} featured, ${result.moderation.length} flagged`
           );
           for (const f of result.featured) {
-            const m = batch[Number(f.ref.replace(/^m/, ""))];
+            const m = scorable[Number(f.ref.replace(/^m/, ""))];
             console.error(
               `[score]   ★ featured (${f.score}) ${m ? `"${m.text.slice(0, 60)}"` : f.ref}${f.reason ? ` — ${f.reason}` : ""}`
             );
           }
           const settings = await fetchScoringSettings(stream.id);
-          await applyScoreResult(stream.id, batch, result, settings);
+          await applyScoreResult(stream.id, scorable, result, settings);
           await applyModeration(
             stream.id,
             channelId,
-            batch,
+            scorable,
             result.moderation,
             settings.mode
           );
