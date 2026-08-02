@@ -559,7 +559,7 @@ export async function runScoringJob(
       if (m.isBot && consumeSelfEcho(m.text)) {
         continue;
       }
-      const extMsgId = `${m.authorChannelId}:${m.publishedAt}`;
+      const extMsgId = m.id || `${m.authorChannelId}:${m.publishedAt}`;
       let chatMessageId: string | null = null;
       const { data: row, error } = await supabaseAdmin
         .from("chat_messages")

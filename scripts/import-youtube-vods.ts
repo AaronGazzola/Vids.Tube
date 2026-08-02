@@ -6,6 +6,7 @@ import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync, statSy
 import { tmpdir } from "os";
 import { join } from "path";
 import { promisify } from "util";
+import { selectMissing, type StoredMessage } from "../lib/chat-dedup";
 import type { Database } from "../supabase/types";
 
 const execFileAsync = promisify(execFile);
@@ -129,14 +130,26 @@ async function makeStills(mp4: string, dir: string, duration: number): Promise<{
 }
 
 async function importChat(videoId: string, streamId: string): Promise<number> {
-  const { count: existing } = await admin
-    .from("chat_messages")
-    .select("*", { count: "exact", head: true })
-    .eq("stream_id", streamId)
-    .eq("origin", "youtube");
-  if ((existing ?? 0) > 0) {
-    return 0;
+  const stored: StoredMessage[] = [];
+  const STORED_PAGE = 1000;
+  for (let from = 0; ; from += STORED_PAGE) {
+    const { data, error } = await admin
+      .from("chat_messages")
+      .select("external_message_id, external_author_id, body, created_at")
+      .eq("stream_id", streamId)
+      .range(from, from + STORED_PAGE - 1);
+    if (error) throw new Error(error.message);
+    stored.push(
+      ...(data ?? []).map((m) => ({
+        externalMessageId: m.external_message_id,
+        externalAuthorId: m.external_author_id,
+        body: m.body,
+        createdAt: m.created_at,
+      }))
+    );
+    if ((data ?? []).length < STORED_PAGE) break;
   }
+
   let inserted = 0;
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -147,20 +160,38 @@ async function importChat(videoId: string, streamId: string): Promise<number> {
       .order("published_at", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
-    const rows = (data ?? []).map((m) => ({
+    const { missing } = selectMissing(
+      (data ?? []).map((m) => ({
+        messageId: m.message_id,
+        authorChannelId: m.author_channel_id,
+        body: m.body,
+        publishedAt: m.published_at,
+      })),
+      stored
+    );
+    const nameById = new Map((data ?? []).map((m) => [m.message_id, m.author_name]));
+    const rows = missing.map((m) => ({
       stream_id: streamId,
       user_id: null,
       origin: "youtube",
-      external_author_id: m.author_channel_id,
-      author_name: m.author_name,
-      external_message_id: m.message_id,
+      external_author_id: m.authorChannelId,
+      author_name: nameById.get(m.messageId) ?? null,
+      external_message_id: m.messageId,
       body: m.body,
-      created_at: m.published_at,
+      created_at: m.publishedAt,
     }));
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error: insErr } = await admin.from("chat_messages").insert(rows.slice(i, i + BATCH));
       if (insErr) throw new Error(insErr.message);
       inserted += Math.min(BATCH, rows.length - i);
+    }
+    for (const m of missing) {
+      stored.push({
+        externalMessageId: m.messageId,
+        externalAuthorId: m.authorChannelId,
+        body: m.body,
+        createdAt: m.publishedAt,
+      });
     }
     if ((data ?? []).length < PAGE) break;
   }

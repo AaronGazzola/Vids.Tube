@@ -187,6 +187,7 @@ export async function fetchLiveChatPage(
   const data = await res.json();
   const messages = (data.items ?? []).map(
     (it: {
+      id?: string;
       snippet?: { displayMessage?: string; publishedAt?: string };
       authorDetails?: {
         displayName?: string;
@@ -194,6 +195,7 @@ export async function fetchLiveChatPage(
         profileImageUrl?: string;
       };
     }) => ({
+      id: it.id ?? "",
       author: it.authorDetails?.displayName ?? "",
       authorChannelId: it.authorDetails?.channelId ?? "",
       avatarUrl: upscaleGgphtAvatar(it.authorDetails?.profileImageUrl ?? ""),

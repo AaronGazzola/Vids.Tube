@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -171,7 +171,7 @@ async function originalVideoId(streamId: string, path: string) {
 
 function readDetached(path: string): Record<string, string> {
   try {
-    const raw = require("fs").readFileSync(path, "utf8");
+    const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as { detached: { id: string; youtube_video_id: string }[] };
     return Object.fromEntries(parsed.detached.map((d) => [d.id, d.youtube_video_id]));
   } catch {
