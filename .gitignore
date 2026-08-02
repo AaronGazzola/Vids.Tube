@@ -47,3 +47,6 @@ next-env.d.ts
 
 # claude code agent worktrees (ephemeral)
 .claude/worktrees/
+
+# local data snapshots taken before destructive repairs
+/.snapshots/

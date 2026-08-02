@@ -42,10 +42,7 @@ const flag = (name: string) => {
 const ONLY_VIDEO = flag("--video");
 const LIMIT = flag("--limit") ? Number(flag("--limit")) : Infinity;
 
-const SKIP_NATIVE_REASONS: Record<string, string> = {
-  vsuPzcGncLA:
-    "Recorded natively on-platform: stream 2984b4f8 (2026-07-04 14:08-16:34) already has a ready 8772s VOD covering the whole session. Importing the YouTube copy would duplicate it. Verified 2026-07-31 (AZ-207).",
-};
+const SKIP_NATIVE_REASONS: Record<string, string> = {};
 const SKIP_NATIVE = new Set(Object.keys(SKIP_NATIVE_REASONS));
 
 async function upload(key: string, filePath: string, contentType: string) {
