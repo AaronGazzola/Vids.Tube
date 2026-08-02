@@ -17,6 +17,7 @@ const admin = createClient<Database>(
 
 const YTDLP = process.env.YTDLP_BIN ?? "yt-dlp";
 const FORCE = process.argv.includes("--force");
+const ONLY_EMPTY = process.argv.includes("--only-empty");
 const URL_FILE = join(process.cwd(), "data", "youtube-vod-urls.txt");
 const BATCH = 500;
 
@@ -336,8 +337,16 @@ async function main() {
 
   const { data: doneRows } = await admin
     .from("youtube_vods")
-    .select("video_id");
-  const done = new Set((doneRows ?? []).map((r) => r.video_id));
+    .select("video_id, message_count");
+  const done = new Set(
+    (doneRows ?? [])
+      .filter((r) => !ONLY_EMPTY || (r.message_count ?? 0) > 0)
+      .map((r) => r.video_id)
+  );
+  if (ONLY_EMPTY) {
+    const empties = (doneRows ?? []).filter((r) => (r.message_count ?? 0) === 0).length;
+    console.log(`only-empty mode: retrying ${empties} videos that previously returned no chat`);
+  }
 
   let processed = 0;
   let newMessages = 0;
