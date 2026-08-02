@@ -1,3 +1,4 @@
+import { echoKey } from "@/lib/bot-echo";
 import {
   forceNightbotRefresh,
   getNightbotToken,
@@ -5,7 +6,10 @@ import {
 } from "./nightbot-token";
 
 const NIGHTBOT_SEND_URL = "https://api.nightbot.tv/1/channel/send";
-const MAX_YOUTUBE_CHARS = 400;
+// YouTube live chat accepts 200 characters. Chunking at 400 meant every long
+// reply arrived cut in half with its continuation marker missing, and made the
+// echo unrecognisable because the text that returned was not the text sent.
+const MAX_YOUTUBE_CHARS = 200;
 const MAX_REPLY_CHUNKS = 3;
 export const MAX_AI_REPLY_CHARS = 600;
 
@@ -80,17 +84,21 @@ const ECHO_MEMORY = 200;
 // Everything we push through Nightbot comes back through the YouTube poller as
 // a Nightbot message. We already persist our own sends, so those echoes are
 // dropped; anything else Nightbot says is genuinely its own and is kept.
+// Stored as a normalised prefix rather than exact text, because the transport
+// truncates and pads what it returns.
 const sentTexts: string[] = [];
 
 function rememberSent(text: string): void {
-  sentTexts.push(text.trim());
+  sentTexts.push(echoKey(text));
   while (sentTexts.length > ECHO_MEMORY) {
     sentTexts.shift();
   }
 }
 
 export function consumeSelfEcho(text: string): boolean {
-  const i = sentTexts.indexOf(text.trim());
+  const key = echoKey(text);
+  if (!key) return false;
+  const i = sentTexts.indexOf(key);
   if (i === -1) {
     return false;
   }
