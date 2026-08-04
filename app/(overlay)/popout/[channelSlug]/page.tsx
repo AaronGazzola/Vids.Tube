@@ -15,10 +15,10 @@ function PreviewPopout() {
   return (
     <div className="flex h-screen flex-col bg-background p-3 text-foreground">
       {src ? (
-        <div className="relative">
-          <LivePlayer src={src} />
-          {disconnected && <DisconnectedOverlay />}
-        </div>
+        <LivePlayer
+          src={src}
+          overlay={disconnected ? <DisconnectedOverlay /> : null}
+        />
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-lg border text-sm text-muted-foreground">
           Start your encoder to see the private preview here.

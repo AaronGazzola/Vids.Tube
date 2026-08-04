@@ -296,9 +296,12 @@ test("an ad-hoc preview session is deleted on disconnect and creates no VOD", as
 
 test("portrait VOD renders in a vertical container", async ({ page }) => {
   await page.goto(`/watch/${portraitVideoId}`);
-  await expect(
-    page.getByRole("region", { name: "Video player" })
-  ).toHaveClass(/aspect-\[9\/16\]/);
+  const player = page.getByRole("region", { name: "Video player" });
+  // Sizing comes from the frame's own ratio now, so the shape is what to
+  // assert, along with the cap that keeps a tall video inside the viewport.
+  await expect(player).toHaveClass(/max-w-\[min\(420px,calc\(80vh\*9\/16\)\)\]/);
+  const box = (await player.boundingBox())!;
+  expect(box.height).toBeGreaterThan(box.width);
 });
 
 test("VOD with source-stream chat shows the replay panel", async ({ page }) => {

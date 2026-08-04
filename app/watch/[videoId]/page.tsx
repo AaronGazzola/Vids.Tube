@@ -5,7 +5,7 @@ import { CollapsibleDescription } from "@/components/collapsible-description";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VideoPlayer } from "@/components/video-player";
-import { cn } from "@/lib/utils";
+import { WatchLayoutProvider, WatchStage } from "@/components/watch-layout";
 import { useParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { useChatReplay, useVideo } from "./page.hooks";
@@ -82,31 +82,34 @@ export default function WatchPage() {
         </div>
       ) : video?.mp4_path ? (
         <div className="flex flex-col gap-4">
-          <div
-            className={cn(
-              "flex flex-col gap-4",
-              replayExpanded && "lg:grid lg:grid-cols-[1fr_340px]"
-            )}
-          >
-            <VideoPlayer
-              src={vodUrl(video.mp4_path)!}
-              poster={vodUrl(video.thumbnail_path)}
-              width={video.width}
-              height={video.height}
-              onTimeUpdate={(time) => setCurrentTimeMs(time * 1000)}
-            />
-            {hasReplay && (
-              <div className={cn(replayExpanded && "lg:h-[70vh]")}>
-                <ChatReplay
-                  messages={replayMessages}
-                  currentTimeMs={currentTimeMs}
-                  collapsed={replayCollapsed}
-                  onToggleCollapsed={toggleReplayCollapsed}
-                  className="h-full"
+          <WatchLayoutProvider chatAvailable={replayExpanded}>
+            <WatchStage
+              chatBounded={replayExpanded}
+              player={
+                <VideoPlayer
+                  source={{
+                    kind: "mp4",
+                    src: vodUrl(video.mp4_path)!,
+                    poster: vodUrl(video.thumbnail_path),
+                  }}
+                  width={video.width}
+                  height={video.height}
+                  onTimeUpdate={(time) => setCurrentTimeMs(time * 1000)}
                 />
-              </div>
-            )}
-          </div>
+              }
+              chat={
+                hasReplay ? (
+                  <ChatReplay
+                    messages={replayMessages}
+                    currentTimeMs={currentTimeMs}
+                    collapsed={replayCollapsed}
+                    onToggleCollapsed={toggleReplayCollapsed}
+                    className="h-full"
+                  />
+                ) : undefined
+              }
+            />
+          </WatchLayoutProvider>
           <h1 className="text-2xl font-bold">{video.title ?? "Untitled"}</h1>
           {video.description && (
             <CollapsibleDescription text={video.description} />

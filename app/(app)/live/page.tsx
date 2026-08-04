@@ -638,8 +638,8 @@ export default function LivePage() {
                       : null
                   }
                   onPortraitChange={setPreviewPortrait}
+                  overlay={disconnected ? <DisconnectedOverlay /> : null}
                 />
-                {disconnected && <DisconnectedOverlay />}
                 {state === "preview" && (
                   <Badge variant="secondary" className="absolute left-2 top-2">
                     Preview — only you can see this

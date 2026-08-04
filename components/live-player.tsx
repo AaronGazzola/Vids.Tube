@@ -7,108 +7,47 @@ import {
   MobileChromeOverlay,
   MobileChromeTopBar,
 } from "@/components/mobile-chrome";
-import Hls from "hls.js";
-import { VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { VideoPlayer } from "@/components/video-player";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+// The live surface is the shared player with a live HLS source. What is left
+// here is only the chrome that is not the player: the phone frame mock and
+// whatever overlay the caller wants above the video.
 export function LivePlayer({
   src,
   mobileChrome,
   onPortraitChange,
+  overlay,
 }: {
   src: string;
   mobileChrome?: { handle: string | null; avatarUrl: string | null } | null;
   onPortraitChange?: (portrait: boolean | null) => void;
+  overlay?: ReactNode;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
-  const [portrait, setPortrait] = useState<boolean | null>(null);
+  // Orientation is recorded against the source it was measured from, so a new
+  // source reads as unknown again without an effect resetting it.
+  const [measured, setMeasured] = useState<{
+    src: string;
+    portrait: boolean;
+  } | null>(null);
   const [videoWidth, setVideoWidth] = useState(0);
-  const portraitCallbackRef = useRef(onPortraitChange);
+  const portrait = measured?.src === src ? measured.portrait : null;
 
+  const portraitCallbackRef = useRef(onPortraitChange);
   useEffect(() => {
     portraitCallbackRef.current = onPortraitChange;
   }, [onPortraitChange]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) {
-      return;
-    }
+    portraitCallbackRef.current?.(portrait);
+  }, [portrait]);
 
-    video.muted = true;
-    const syncMuted = () => setMuted(video.muted);
-    video.addEventListener("volumechange", syncMuted);
-
-    setPortrait(null);
-    portraitCallbackRef.current?.(null);
-    const syncPortrait = () => {
-      if (!video.videoWidth || !video.videoHeight) {
-        return;
-      }
-      const isPortrait = video.videoHeight > video.videoWidth;
-      setPortrait(isPortrait);
-      portraitCallbackRef.current?.(isPortrait);
-    };
-    video.addEventListener("loadedmetadata", syncPortrait);
-
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (rect) {
-        setVideoWidth(rect.width);
-      }
-    });
-    observer.observe(video);
-
-    let hls: Hls | undefined;
-
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-    } else if (Hls.isSupported()) {
-      hls = new Hls({
-        lowLatencyMode: true,
-        liveDurationInfinity: true,
-        backBufferLength: 30,
-        maxLiveSyncPlaybackRate: 1.5,
-      });
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal) {
-          return;
-        }
-        console.error("HLS fatal error", data.type, data.details);
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          hls!.startLoad();
-        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          hls!.recoverMediaError();
-        } else {
-          hls!.destroy();
-        }
-      });
-    } else {
-      console.error("HLS is not supported in this browser");
-    }
-
-    video.play().catch(() => {});
-
-    return () => {
-      video.removeEventListener("volumechange", syncMuted);
-      video.removeEventListener("loadedmetadata", syncPortrait);
-      observer.disconnect();
-      hls?.destroy();
-    };
-  }, [src]);
-
-  const unmute = () => {
-    const video = videoRef.current;
-    if (!video) {
-      return;
-    }
-    video.muted = false;
-    video.volume = 1;
-    video.play().catch(() => {});
-  };
+  const handleDimensions = useCallback(
+    (width: number, height: number) => {
+      setMeasured({ src, portrait: height > width });
+    },
+    [src]
+  );
 
   const chromeActive = !!mobileChrome && portrait === true && videoWidth > 0;
   const scale = videoWidth / MOBILE_CHROME_REF_WIDTH;
@@ -125,13 +64,12 @@ export function LivePlayer({
           : undefined
       }
     >
-      <div className="relative flex max-w-full justify-center">
-        <video
-          ref={videoRef}
-          controls
-          playsInline
-          className="max-h-[80vh] w-auto max-w-full"
-        />
+      <VideoPlayer
+        source={{ kind: "hls", src, live: true }}
+        onDimensions={handleDimensions}
+        onResize={setVideoWidth}
+        containerClassName={chromeActive ? "overflow-visible" : undefined}
+      >
         {chromeActive && (
           <>
             <div className="absolute bottom-full left-0 right-0">
@@ -144,17 +82,8 @@ export function LivePlayer({
             <MobileChromeOverlay scale={scale} />
           </>
         )}
-      </div>
-      {muted && (
-        <button
-          type="button"
-          onClick={unmute}
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur transition hover:bg-black"
-        >
-          <VolumeX className="h-4 w-4" />
-          Tap to unmute
-        </button>
-      )}
+        {overlay}
+      </VideoPlayer>
     </div>
   );
 }

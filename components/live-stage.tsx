@@ -53,9 +53,9 @@ export function LiveStage({
   const disconnected = isFeedDisconnected(stream);
 
   return (
-    <div className="relative">
-      <LivePlayer src={stream.hls_path!} />
-      {disconnected && <DisconnectedOverlay />}
-    </div>
+    <LivePlayer
+      src={stream.hls_path!}
+      overlay={disconnected ? <DisconnectedOverlay /> : null}
+    />
   );
 }

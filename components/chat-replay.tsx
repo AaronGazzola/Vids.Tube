@@ -48,7 +48,12 @@ export function ChatReplay({
   }
 
   return (
-    <div className={cn("flex h-full min-h-80 flex-col rounded-lg border", className)}>
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background",
+        className
+      )}
+    >
       <div className="flex items-center justify-between border-b p-3 text-sm font-medium">
         <span>Chat replay</span>
         <Button
@@ -65,6 +70,7 @@ export function ChatReplay({
         <div
           ref={containerRef}
           onScroll={onScroll}
+          data-testid="chat-messages"
           className="h-full space-y-2 overflow-y-auto p-3"
         >
           {visible.length === 0 ? (

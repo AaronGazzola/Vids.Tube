@@ -20,13 +20,14 @@ export function LiveChat({ streamId }: { streamId: string | null }) {
     useStickyScroll(messages.length);
 
   return (
-    <div className="flex h-full min-h-80 flex-col rounded-lg border">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background">
       <div className="border-b p-3 text-sm font-medium">Live chat</div>
       <YoutubeVerifyBanner live={!!streamId} />
       <div className="relative min-h-0 flex-1">
         <div
           ref={containerRef}
           onScroll={onScroll}
+          data-testid="chat-messages"
           className="h-full space-y-2 overflow-y-auto p-3"
         >
         {!streamId ? (

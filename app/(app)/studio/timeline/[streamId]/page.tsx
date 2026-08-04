@@ -174,8 +174,11 @@ export default function StudioTimelinePage() {
 
           {data.vod.src ? (
             <VideoPlayer
-              src={data.vod.src}
-              poster={data.vod.poster ?? undefined}
+              source={{
+                kind: "mp4",
+                src: data.vod.src,
+                poster: data.vod.poster ?? undefined,
+              }}
               width={data.vod.width}
               height={data.vod.height}
               seekRequest={seekRequest}

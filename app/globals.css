@@ -117,6 +117,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* The stage fills what is left of the viewport below whatever sits above it,
+   so the chat under the player ends exactly at the bottom edge. */
+@utility h-stage {
+  height: calc(100vh - var(--stage-top, 0px));
+  height: calc(100dvh - var(--stage-top, 0px));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

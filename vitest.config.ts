@@ -10,7 +10,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/integration/**/*.test.ts", "tests/unit/**/*.test.ts"],
+    include: [
+      "tests/integration/**/*.test.ts",
+      "tests/unit/**/*.test.ts",
+      "tests/unit/**/*.test.tsx",
+    ],
     setupFiles: ["tests/setup-env.ts"],
   },
 });

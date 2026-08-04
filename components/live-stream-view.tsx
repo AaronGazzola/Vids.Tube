@@ -10,6 +10,7 @@ import { LiveChat } from "@/components/live-chat";
 import { LiveStage } from "@/components/live-stage";
 import { ScheduledCard } from "@/components/scheduled-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WatchLayoutProvider, WatchStage } from "@/components/watch-layout";
 import { Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -54,9 +55,12 @@ export function LiveStreamView({ slug }: { slug: string }) {
       {!settled || shouldRedirect ? (
         <LiveStreamSkeleton />
       ) : isLive ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+        <WatchLayoutProvider chatAvailable chatOverlayDefault>
           <div className="space-y-3">
-            <LiveStage stream={stream} loading={false} />
+            <WatchStage
+              player={<LiveStage stream={stream} loading={false} />}
+              chat={<LiveChat streamId={streamId} />}
+            />
             {stream?.title && (
               <h2 className="text-xl font-semibold tracking-tight">
                 {stream.title}
@@ -66,38 +70,32 @@ export function LiveStreamView({ slug }: { slug: string }) {
               <CollapsibleDescription text={stream.description} />
             )}
           </div>
-          <div className="lg:h-[70vh]">
-            <LiveChat streamId={streamId} />
-          </div>
-        </div>
+        </WatchLayoutProvider>
       ) : (
-        <div
-          className={
-            waitingChatOpen
-              ? "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]"
-              : "mx-auto w-full max-w-3xl"
-          }
-        >
-          <div className="space-y-3">
-            <ScheduledCard broadcast={upcoming} />
-            {upcoming?.title && (
-              <h2 className="text-xl font-semibold tracking-tight">
-                {upcoming.title}
-              </h2>
-            )}
-            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              {waitingCount === 1
-                ? "1 person waiting"
-                : `${waitingCount} people waiting`}
-            </p>
-          </div>
-          {waitingChatOpen && (
-            <div className="lg:h-[70vh]">
-              <LiveChat streamId={streamId} />
-            </div>
-          )}
-        </div>
+        <WatchLayoutProvider chatAvailable={waitingChatOpen}>
+          <WatchStage
+            className={waitingChatOpen ? undefined : "mx-auto max-w-3xl"}
+            player={
+              <div className="space-y-3">
+                <ScheduledCard broadcast={upcoming} />
+                {upcoming?.title && (
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    {upcoming.title}
+                  </h2>
+                )}
+                <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                  {waitingCount === 1
+                    ? "1 person waiting"
+                    : `${waitingCount} people waiting`}
+                </p>
+              </div>
+            }
+            chat={
+              waitingChatOpen ? <LiveChat streamId={streamId} /> : undefined
+            }
+          />
+        </WatchLayoutProvider>
       )}
     </main>
   );

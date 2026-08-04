@@ -68,9 +68,14 @@ test("the owner channel lists ready VODs newest-first", async ({ page }) => {
   const older = page.getByText("E2E Older VOD", { exact: true });
   await expect(newer).toBeVisible();
   await expect(older).toBeVisible();
+  // The listing is a grid, so the newer card is either on an earlier row or
+  // further left on the same one.
   const newerBox = await newer.boundingBox();
   const olderBox = await older.boundingBox();
-  expect(newerBox!.y).toBeLessThan(olderBox!.y);
+  const earlier =
+    newerBox!.y < olderBox!.y ||
+    (newerBox!.y === olderBox!.y && newerBox!.x < olderBox!.x);
+  expect(earlier).toBe(true);
 });
 
 test("watch page renders the player for a ready video", async ({ page }) => {

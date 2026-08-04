@@ -30,9 +30,12 @@ test("home renders the owner channel experience", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("live path redirects to the owner channel page", async ({ page }) => {
+// The broadcaster page sends anyone who is not the owner to the owner channel
+// experience, which the home page now is.
+test("live path redirects a non-owner to the owner channel", async ({ page }) => {
   await page.goto("/live");
-  await expect(page).toHaveURL(new RegExp(`/${ownerSlug}$`));
+  await expect(page).toHaveURL(new RegExp(`(/${ownerSlug}|/)$`));
+  await expect(page.getByRole("heading", { name: ownerName })).toBeVisible();
   await expect(page.getByText("Live chat")).toHaveCount(0);
 });
 
