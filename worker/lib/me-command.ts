@@ -123,12 +123,6 @@ export function buildHostReply(name: string, stats: HostStats): string {
   return `${mention} this is your channel — ${stats.members} member${stats.members === 1 ? "" : "s"} across ${stats.streamsToDate} stream${stats.streamsToDate === 1 ? "" : "s"}, ${stats.messagesThisStream} message${stats.messagesThisStream === 1 ? "" : "s"} in chat today.`;
 }
 
-function minIso(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return Date.parse(a) <= Date.parse(b) ? a : b;
-}
-
 export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
   const { supabaseAdmin } = await deps();
 
