@@ -9,6 +9,12 @@ const admin = createClient<Database>(
 );
 
 const APPLY = process.argv.includes("--apply");
+// Scoped to one broadcast when asked: the post-broadcast pass only needs the
+// memberships of the people who were in that broadcast, and rebuilding all 152
+// channels once per broadcast would make a catch-up over the history quadratic.
+const ONLY_STREAM = process.argv.includes("--stream")
+  ? process.argv[process.argv.indexOf("--stream") + 1]
+  : null;
 const SNAPSHOT = process.argv.includes("--snapshot")
   ? process.argv[process.argv.indexOf("--snapshot") + 1]
   : "memberships-snapshot.json";
@@ -56,13 +62,32 @@ async function main() {
 
   const { data: channels, error: chErr } = await admin
     .from("channels")
-    .select("id, slug, merged_into_channel_id")
+    .select("id, slug, merged_into_channel_id, youtube_channel_id, owner_user_id")
     .order("created_at", { ascending: true });
   if (chErr) throw new Error(chErr.message);
 
-  const targets = (channels ?? []).filter(
+  let targets = (channels ?? []).filter(
     (c) => c.id !== community.id && !c.merged_into_channel_id
   );
+
+  if (ONLY_STREAM) {
+    const { data: scored } = await admin
+      .from("score_events")
+      .select("external_author_id, user_id")
+      .eq("stream_id", ONLY_STREAM);
+    const accounts = new Set(
+      (scored ?? []).map((r) => r.external_author_id).filter(Boolean)
+    );
+    const users = new Set((scored ?? []).map((r) => r.user_id).filter(Boolean));
+    targets = targets.filter(
+      (c) =>
+        (c.youtube_channel_id && accounts.has(c.youtube_channel_id)) ||
+        (c.owner_user_id && users.has(c.owner_user_id))
+    );
+    console.log(
+      `scoped to one broadcast: ${targets.length} channel(s) took part`
+    );
+  }
   const before = await readMemberships(community.id);
   writeFileSync(
     SNAPSHOT,

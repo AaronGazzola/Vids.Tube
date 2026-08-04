@@ -4,7 +4,9 @@ import {
   nightbotConfigured,
   nightbotTokenDaysRemaining,
 } from "./lib/nightbot-token";
+import { catchUpEndedBroadcasts, runPostBroadcastPass } from "./lib/post-broadcast";
 import { runScoringJob } from "./jobs/score";
+import { supabaseAdmin } from "./supabase";
 import { runTranscriptionJob } from "./jobs/transcribe";
 import {
   type EligibleStream,
@@ -71,6 +73,20 @@ async function tick(): Promise<void> {
   } finally {
     await releaseLock(stream.id);
     console.error(`stopped engaging stream ${stream.id}`);
+    // Engagement ends when the broadcast does, so this is the moment the
+    // broadcast can be turned into complete community data.
+    try {
+      const { data: fresh } = await supabaseAdmin
+        .from("streams")
+        .select("status")
+        .eq("id", stream.id)
+        .maybeSingle();
+      if (fresh?.status === "ended") {
+        await runPostBroadcastPass(stream.id);
+      }
+    } catch (e) {
+      console.error("post-broadcast pass failed:", e);
+    }
   }
 }
 
@@ -93,6 +109,11 @@ async function primeNightbotToken(): Promise<void> {
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
   await primeNightbotToken();
+  try {
+    await catchUpEndedBroadcasts();
+  } catch (e) {
+    console.error("catch-up failed:", e);
+  }
   for (;;) {
     try {
       await tick();

@@ -165,6 +165,47 @@ export type Database = {
           },
         ]
       }
+      broadcast_completions: {
+        Row: {
+          attempts: number
+          clean: boolean
+          created_at: string
+          finished_at: string | null
+          started_at: string
+          steps: Json
+          stream_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          clean?: boolean
+          created_at?: string
+          finished_at?: string | null
+          started_at?: string
+          steps?: Json
+          stream_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          clean?: boolean
+          created_at?: string
+          finished_at?: string | null
+          started_at?: string
+          steps?: Json
+          stream_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcast_completions_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: true
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_projects: {
         Row: {
           blurb: string | null
