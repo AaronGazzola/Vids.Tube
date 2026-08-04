@@ -1,0 +1,11 @@
+-- chatter_stats was a pre-aggregated summary of the YouTube archive, read by the
+-- viewer stats command alongside a watermarked count of stored chat. Before a
+-- chatter linked their YouTube account the two did not overlap, because imported
+-- rows carried no user id; after the identity merge attached their user to those
+-- same rows, both sources counted them, so claiming an identity inflated its own
+-- totals.
+--
+-- Stored chat is now the only source of who said what, and nothing reads this
+-- table. Dropping it removes the second counting path rather than adding another
+-- filter to reconcile it.
+drop table if exists public.chatter_stats;

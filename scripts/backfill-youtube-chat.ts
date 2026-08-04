@@ -235,92 +235,6 @@ async function backfillVideo(videoId: string): Promise<number> {
   }
 }
 
-async function rebuildChatterStats(): Promise<number> {
-  type Agg = {
-    author_name: string | null;
-    nameAt: string;
-    total: number;
-    videos: Set<string>;
-    first: string;
-    last: string;
-  };
-  const aggs = new Map<string, Agg>();
-
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await admin
-      .from("youtube_chat_archive")
-      .select("author_channel_id, author_name, video_id, published_at")
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) {
-      throw new Error(error.message);
-    }
-    for (const r of data ?? []) {
-      const agg = aggs.get(r.author_channel_id);
-      if (!agg) {
-        aggs.set(r.author_channel_id, {
-          author_name: r.author_name,
-          nameAt: r.published_at,
-          total: 1,
-          videos: new Set([r.video_id]),
-          first: r.published_at,
-          last: r.published_at,
-        });
-      } else {
-        agg.total += 1;
-        agg.videos.add(r.video_id);
-        if (r.published_at < agg.first) agg.first = r.published_at;
-        if (r.published_at > agg.last) agg.last = r.published_at;
-        if (r.author_name && r.published_at >= agg.nameAt) {
-          agg.author_name = r.author_name;
-          agg.nameAt = r.published_at;
-        }
-      }
-    }
-    if ((data ?? []).length < PAGE) {
-      break;
-    }
-  }
-
-  const statRows = [...aggs.entries()].map(([author_channel_id, a]) => ({
-    author_channel_id,
-    author_name: a.author_name,
-    total_messages: a.total,
-    videos_attended: a.videos.size,
-    first_seen_at: a.first,
-    last_seen_at: a.last,
-    updated_at: new Date().toISOString(),
-  }));
-
-  for (let i = 0; i < statRows.length; i += BATCH) {
-    const { error } = await admin
-      .from("chatter_stats")
-      .upsert(statRows.slice(i, i + BATCH), {
-        onConflict: "author_channel_id",
-      });
-    if (error) {
-      throw new Error(error.message);
-    }
-  }
-
-  const keep = statRows.map((r) => r.author_channel_id);
-  if (keep.length) {
-    const { error } = await admin
-      .from("chatter_stats")
-      .delete()
-      .not(
-        "author_channel_id",
-        "in",
-        `(${keep.map((k) => `"${k}"`).join(",")})`
-      );
-    if (error) {
-      console.error("stale stats cleanup failed:", error.message);
-    }
-  }
-  return statRows.length;
-}
-
 async function main() {
   const channelId = await resolveChannelId();
   const sources: string[][] = [];
@@ -368,12 +282,10 @@ async function main() {
     }
   }
 
-  const chatters = await rebuildChatterStats();
 
   console.log("--- summary");
   console.log(`processed: ${processed}, skipped (already done): ${skipped}`);
   console.log(`new messages archived: ${newMessages}`);
-  console.log(`chatter_stats rows: ${chatters}`);
   if (failures.length) {
     console.log(`failures (${failures.length}):`);
     for (const f of failures) console.log(`  ${f}`);

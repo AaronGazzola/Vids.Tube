@@ -1,3 +1,4 @@
+import { summariseChat, type ChatRow } from "@/lib/chatter-stats";
 import type { BufferedMessage } from "../jobs/score";
 import type { CommandContext } from "./commands";
 
@@ -130,39 +131,53 @@ function minIso(a: string | null, b: string | null): string | null {
 
 export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
   const { supabaseAdmin } = await deps();
-  let totalMessages = 0;
-  let videosAttended = 0;
-  let firstSeenAt: string | null = null;
 
-  if (identity.youtubeChannelId) {
-    const { data } = await supabaseAdmin
-      .from("chatter_stats")
-      .select("total_messages, videos_attended, first_seen_at, last_seen_at")
-      .eq("author_channel_id", identity.youtubeChannelId)
-      .maybeSingle();
-    if (data) {
-      totalMessages += data.total_messages;
-      videosAttended += data.videos_attended;
-      firstSeenAt = data.first_seen_at;
-    }
-
-    let liveQuery = supabaseAdmin
+  // One query, one source. The old path added a pre-aggregated summary of the
+  // YouTube archive to a watermarked count of stored chat, which double-counted
+  // the moment an identity was linked and the merge attached the user id to rows
+  // the summary had already counted.
+  const rows: ChatRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    let q = supabaseAdmin
       .from("chat_messages")
-      .select("stream_id, created_at")
-      .eq("origin", "youtube")
-      .eq("external_author_id", identity.youtubeChannelId)
+      .select("stream_id, created_at, user_id, external_author_id")
       .order("created_at", { ascending: true })
-      .limit(2000);
-    if (data?.last_seen_at) {
-      liveQuery = liveQuery.gt("created_at", data.last_seen_at);
+      .range(from, from + PAGE - 1);
+    if (identity.userId && identity.youtubeChannelId) {
+      q = q.or(
+        `user_id.eq.${identity.userId},external_author_id.eq.${identity.youtubeChannelId}`
+      );
+    } else if (identity.userId) {
+      q = q.eq("user_id", identity.userId);
+    } else if (identity.youtubeChannelId) {
+      q = q.eq("external_author_id", identity.youtubeChannelId);
+    } else {
+      break;
     }
-    const { data: live } = await liveQuery;
-    if (live?.length) {
-      totalMessages += live.length;
-      videosAttended += new Set(live.map((m) => m.stream_id)).size;
-      firstSeenAt = minIso(firstSeenAt, live[0].created_at);
+    const { data, error } = await q;
+    if (error) {
+      console.error("chatter stats read failed:", error.message);
+      break;
     }
+    rows.push(
+      ...(data ?? []).map((m) => ({
+        streamId: m.stream_id,
+        createdAt: m.created_at,
+        userId: m.user_id,
+        externalAuthorId: m.external_author_id,
+      }))
+    );
+    if ((data ?? []).length < PAGE) break;
   }
+
+  const totals = summariseChat(rows, {
+    userId: identity.userId,
+    youtubeChannelId: identity.youtubeChannelId,
+  });
+  const totalMessages = totals.totalMessages;
+  const videosAttended = totals.videosAttended;
+  const firstSeenAt = totals.firstSeenAt;
 
   let vidstubeScore = 0;
   let vidstubeFeatures = 0;
@@ -176,18 +191,6 @@ export async function gatherMeStats(identity: MeIdentity): Promise<MeStats> {
       vidstubeScore += row.total_score;
       vidstubeFeatures += row.features_count;
       vidstubeStreams += 1;
-    }
-    videosAttended += vidstubeStreams;
-
-    const { count, data: earliest } = await supabaseAdmin
-      .from("chat_messages")
-      .select("created_at", { count: "exact" })
-      .eq("user_id", identity.userId)
-      .order("created_at", { ascending: true })
-      .limit(1);
-    if (count) {
-      totalMessages += count;
-      firstSeenAt = minIso(firstSeenAt, earliest?.[0]?.created_at ?? null);
     }
   }
 

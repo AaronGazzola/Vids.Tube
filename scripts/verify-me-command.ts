@@ -53,13 +53,34 @@ async function main() {
     disabledCommands: [],
   };
 
-  const { data: knownChatter } = await admin
-    .from("chatter_stats")
-    .select("author_channel_id, author_name, total_messages")
-    .order("total_messages", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!knownChatter) fail("no chatter_stats rows — run the backfill first");
+  // Pick the busiest chatter straight from stored chat, which is now the only
+  // source of who has spoken.
+  const counts = new Map<string, { name: string | null; n: number }>();
+  {
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await admin
+        .from("chat_messages")
+        .select("external_author_id, author_name")
+        .eq("origin", "youtube")
+        .not("external_author_id", "is", null)
+        .range(from, from + PAGE - 1);
+      if (error) fail(error.message);
+      for (const m of data ?? []) {
+        const cur = counts.get(m.external_author_id!) ?? { name: m.author_name, n: 0 };
+        cur.n += 1;
+        counts.set(m.external_author_id!, cur);
+      }
+      if ((data ?? []).length < PAGE) break;
+    }
+  }
+  const busiest = [...counts.entries()].sort((a, b) => b[1].n - a[1].n)[0];
+  if (!busiest) fail("no stored YouTube chat — run the import first");
+  const knownChatter = {
+    author_channel_id: busiest[0],
+    author_name: busiest[1].name,
+    total_messages: busiest[1].n,
+  };
 
   const knownKey = `youtube:${knownChatter.author_channel_id}`;
   await admin.from("me_profiles").delete().eq("profile_key", knownKey);

@@ -454,36 +454,6 @@ export type Database = {
           },
         ]
       }
-      chatter_stats: {
-        Row: {
-          author_channel_id: string
-          author_name: string | null
-          first_seen_at: string | null
-          last_seen_at: string | null
-          total_messages: number
-          updated_at: string
-          videos_attended: number
-        }
-        Insert: {
-          author_channel_id: string
-          author_name?: string | null
-          first_seen_at?: string | null
-          last_seen_at?: string | null
-          total_messages?: number
-          updated_at?: string
-          videos_attended?: number
-        }
-        Update: {
-          author_channel_id?: string
-          author_name?: string | null
-          first_seen_at?: string | null
-          last_seen_at?: string | null
-          total_messages?: number
-          updated_at?: string
-          videos_attended?: number
-        }
-        Relationships: []
-      }
       clip_markers: {
         Row: {
           author_name: string | null

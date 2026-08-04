@@ -84,10 +84,30 @@ async function main() {
     skipYt.set(s.youtube_channel_id!, "host");
   }
 
-  const { data: chatters } = await admin
-    .from("chatter_stats")
-    .select("author_channel_id, author_name");
-  const targets = (chatters ?? []).filter((c) => {
+  // Stored chat is the only source of who has spoken. The summary table it used
+  // to read is a build artifact of the archive and is going away.
+  const chatters: { author_channel_id: string; author_name: string | null }[] = [];
+  {
+    const seen = new Map<string, string | null>();
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await admin
+        .from("chat_messages")
+        .select("external_author_id, author_name")
+        .eq("origin", "youtube")
+        .not("external_author_id", "is", null)
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      for (const m of data ?? []) {
+        if (!seen.has(m.external_author_id!)) seen.set(m.external_author_id!, m.author_name);
+      }
+      if ((data ?? []).length < PAGE) break;
+    }
+    for (const [id, name] of seen) {
+      chatters.push({ author_channel_id: id, author_name: name });
+    }
+  }
+  const targets = chatters.filter((c) => {
     if (existingYt.has(c.author_channel_id)) return false;
     const reason = skipYt.get(c.author_channel_id);
     if (reason) {
