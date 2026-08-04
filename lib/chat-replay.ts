@@ -1,8 +1,8 @@
 import type { ChatReplay, ReplayGap, ReplayMessage } from "@/app/watch/[videoId]/page.types";
 
-type NormalizedGap = { startMs: number; endMs: number };
+export type NormalizedGap = { startMs: number; endMs: number };
 
-function normalizeGaps(gaps: ReplayGap[], baseMs: number): NormalizedGap[] {
+export function normalizeGaps(gaps: ReplayGap[], baseMs: number): NormalizedGap[] {
   return gaps
     .map((g) => ({
       startMs: new Date(g.startAt).getTime(),

@@ -68,8 +68,18 @@ export function exec(
     });
 
     if (opts.input) {
-      child.stdin.write(opts.input);
-      child.stdin.end();
+      child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EPIPE" || err.code === "EOF") {
+          return;
+        }
+        if (timer) clearTimeout(timer);
+        reject(err);
+      });
+      child.stdin.write(opts.input, (err) => {
+        if (!err) {
+          child.stdin.end();
+        }
+      });
     }
   });
 }

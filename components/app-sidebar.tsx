@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  Clapperboard,
   LogIn,
   Menu,
   Radio,
@@ -41,7 +42,15 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/account", label: "Account", icon: User },
   { href: "/live", label: "Go Live", icon: Radio, ownerOnly: true },
+  { href: "/studio", label: "Studio", icon: Clapperboard, ownerOnly: true },
 ];
+
+function isActiveHref(pathname: string, href: string): boolean {
+  if (href === "/") {
+    return pathname === "/";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function useVisibleNavItems() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -194,7 +203,7 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
           {channelItem && (
             <NavRow
               item={channelItem}
-              active={pathname === channelItem.href}
+              active={isActiveHref(pathname, channelItem.href)}
               collapsed={collapsed}
             />
           )}
@@ -202,7 +211,7 @@ function AppSidebarBody({ collapsed }: { collapsed: boolean }) {
             <NavRow
               key={item.href}
               item={item}
-              active={pathname === item.href}
+              active={isActiveHref(pathname, item.href)}
               collapsed={collapsed}
             />
           ))}
