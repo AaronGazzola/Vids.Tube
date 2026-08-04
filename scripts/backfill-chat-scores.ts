@@ -26,6 +26,10 @@ const flag = (name: string) => {
 };
 const ONLY_STREAM = flag("--stream");
 const LIMIT = flag("--limit") ? Number(flag("--limit")) : Infinity;
+// A long run over the whole history will be interrupted — a dropped network, a
+// sleeping machine. Skipping broadcasts that already carry ratings for this
+// configuration makes the run resumable without re-paying for what is done.
+const SKIP_SCORED = argv.includes("--skip-scored");
 
 type Broadcast = { id: string; started_at: string; title: string | null; channel_id: string };
 
@@ -71,13 +75,34 @@ async function resolveHost(communityId: string): Promise<string | null> {
   return data?.owner_user_id ?? null;
 }
 
+async function alreadyScored(streamId: string): Promise<number> {
+  const { count } = await admin
+    .from("score_events")
+    .select("*", { count: "exact", head: true })
+    .eq("stream_id", streamId)
+    .eq("scoring_version", SCORING_CONFIG.version);
+  return count ?? 0;
+}
+
 async function scoreBroadcast(b: Broadcast): Promise<{
-  status: "scored" | "skipped" | "refused";
+  status: "scored" | "skipped" | "refused" | "done" | "partial" | "failed";
   messages: number;
   batches: number;
   participants: number;
   detail?: string;
 }> {
+  if (SKIP_SCORED && APPLY) {
+    const existing = await alreadyScored(b.id);
+    if (existing > 0) {
+      return {
+        status: "done",
+        messages: 0,
+        batches: 0,
+        participants: 0,
+        detail: `${existing} ratings already`,
+      };
+    }
+  }
   const raw = await pageAll<{
     id: string;
     origin: string;
@@ -137,6 +162,7 @@ async function scoreBroadcast(b: Broadcast): Promise<{
     .eq("scoring_version", SCORING_CONFIG.version);
 
   const totals = new Map<string, { points: number; sample: ScorableMessage }>();
+  let failedBatches = 0;
 
   for (const [i, batch] of batches.entries()) {
     const context = transcriptWindow(segments, batch, b.started_at);
@@ -164,8 +190,16 @@ Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "
     try {
       parsed = parseScoreResult(await runClaude(prompt));
     } catch (e) {
-      console.error(`  batch ${i + 1}/${batches.length} failed: ${(e as Error).message}`);
-      continue;
+      console.error(`  batch ${i + 1}/${batches.length} failed, retrying once: ${(e as Error).message}`);
+      try {
+        parsed = parseScoreResult(await runClaude(prompt));
+      } catch (retryErr) {
+        console.error(
+          `  batch ${i + 1}/${batches.length} failed again: ${(retryErr as Error).message}`
+        );
+        failedBatches += 1;
+        continue;
+      }
     }
 
     const byRef = new Map<string, ScorableMessage>();
@@ -260,11 +294,21 @@ Use the exact id shown in [brackets] for each message as its "ref" (e.g. "m0", "
     if (error) console.error(`  recompute failed for ${channelId}: ${error.message}`);
   }
 
+  if (failedBatches === batches.length) {
+    return {
+      status: "failed",
+      messages: eligible.length,
+      batches: batches.length,
+      participants: 0,
+      detail: `all ${batches.length} batches failed`,
+    };
+  }
   return {
-    status: "scored",
+    status: failedBatches > 0 ? "partial" : "scored",
     messages: eligible.length,
     batches: batches.length,
     participants: totals.size,
+    detail: failedBatches > 0 ? `${failedBatches} batch(es) failed` : undefined,
   };
 }
 
@@ -283,9 +327,7 @@ async function main() {
   console.log(`broadcasts to consider: ${targets.length}`);
   console.log(APPLY ? "" : "dry run — nothing will be written\n");
 
-  let scored = 0;
-  let skipped = 0;
-  let refused = 0;
+  const tally: Record<string, number> = {};
   let messages = 0;
   let batches = 0;
 
@@ -294,15 +336,18 @@ async function main() {
     const res = await scoreBroadcast(b);
     messages += res.messages;
     batches += res.batches;
-    if (res.status === "scored") scored += 1;
-    if (res.status === "skipped") skipped += 1;
-    if (res.status === "refused") refused += 1;
+    tally[res.status] = (tally[res.status] ?? 0) + 1;
     console.log(
       `${res.status.padEnd(8)} ${label} — ${res.messages} messages, ${res.batches} batches, ${res.participants} chatters${res.detail ? ` (${res.detail})` : ""}`
     );
   }
 
-  console.log(`\nscored ${scored}, skipped ${skipped}, refused ${refused}`);
+  console.log(
+    `\n` +
+      Object.entries(tally)
+        .map(([k, n]) => `${k} ${n}`)
+        .join(", ")
+  );
   console.log(`messages ${messages}, model calls ${APPLY ? batches : 0} (${batches} batches)`);
   if (!APPLY) console.log("dry run — add --apply to write.");
 }

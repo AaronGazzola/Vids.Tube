@@ -90,17 +90,37 @@
 
 ## 6. The full-history run
 
-- [ ] 6.1 Delete the ratings from the two superseded generations before the run:
+- [x] 6.1 Delete the ratings from the two superseded generations before the run:
   207 unversioned ratings written by the live scorer under the old rubric, and 35
   `v1` ratings from the first trial. Neither can be re-derived, because the old
   dimensions do not mean what the new ones mean. Report the counts removed.
-- [ ] 6.2 Run `backfill:scores --all` across all 168 broadcasts. 138 hold chat;
+- [x] 6.2 Run `backfill:scores --all` across all 168 broadcasts. 138 hold chat;
   the other 30 are recorded as having none and will be skipped.
-- [ ] 6.3 Run it in batches rather than one pass, so a failure costs one batch
+- [x] 6.3 Run it in batches rather than one pass, so a failure costs one batch
   and not the whole history, and report progress per broadcast.
-- [ ] 6.4 After the run, recompute every membership and run
+- [x] 6.4 After the run, recompute every membership and run
   `npm run verify:credit-ledger`, confirming one earning line per membership and
   every cached balance matching.
-- [ ] 6.5 Record the resulting leaderboard: the top ten chatters by experience
-  with their level, credits, message count and broadcasts attended, so the
-  calibration can be judged against the whole history rather than one broadcast.
+- [x] 6.5 Leaderboard across the full history, top ten by experience:
+
+  | rank | chatter | xp | level | credits | messages | broadcasts |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 1 | lehmolabs | 3038 | 11 | 303 | 855 | 13 |
+  | 2 | henrycook859 | 1795 | 8 | 179 | 354 | 18 |
+  | 3 | kuroma | 1637 | 8 | 163 | 1078 | 28 |
+  | 4 | gtasanandreaser | 491 | 4 | 49 | 97 | 4 |
+  | 5 | carlandj | 484 | 4 | 48 | 93 | 10 |
+  | 6 | flipwithkyle | 479 | 4 | 47 | 93 | 3 |
+  | 7 | productivedude | 473 | 4 | 47 | 152 | 12 |
+  | 8 | ravgupta20 | 468 | 4 | 46 | 209 | 10 |
+  | 9 | maran_ath4 | 391 | 3 | 39 | 36 | 2 |
+  | 10 | clippana_by_yorker | 335 | 3 | 33 | 205 | 32 |
+
+  The calibration holds against the whole history rather than one broadcast.
+  Kuroma wrote the most messages of anyone and sits third; henrycook wrote a
+  third of Kuroma's and outranks them; maran_ath4 reached ninth on 36 messages
+  across 2 broadcasts. Volume no longer decides the order.
+
+  Level spread: 113 at 0, 13 at 1, 9 at 2, 5 at 3, 5 at 4, 2 at 8, 1 at 11.
+  673 ratings over 2854 rated messages, 13121 points awarded, highest single
+  rating 249 of a possible 300.
