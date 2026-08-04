@@ -13,4 +13,4 @@
 ## 3. Mount + verify
 
 - [x] 3.1 Mount the banner at the top of `components/live-chat.tsx`, directly under the "Live chat" header, so it sits above the message list without disrupting the sticky-scroll container.
-- [ ] 3.2 `npm run build` + e2e; add a test asserting the banner shows for a signed-in unverified user, hides for a verified user and for anonymous visitors, and that dismiss hides it for the session.
+- [x] 3.2 `npm run build` + e2e; add a test asserting the banner shows for a signed-in unverified user, hides for a verified user and for anonymous visitors, and that dismiss hides it for the session.

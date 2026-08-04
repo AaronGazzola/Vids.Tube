@@ -251,7 +251,7 @@
   all pass.
 - [x] 9.2 Run `npx tsc --noEmit` and confirm no type errors.
 - [x] 9.3 Run `doppler run -- npm run build` and confirm a clean production build.
-- [ ] 9.4 Run `doppler run -- npm run backfill:timeline -- --limit 1 --dry-run` and
+- [x] 9.4 Run `doppler run -- npm run backfill:timeline -- --limit 1 --dry-run` and
   confirm it selects the newest unlabelled stream, assembles a prompt, and writes
   nothing.
 - [x] 9.5 Add `tests/e2e/studio-timeline.spec.ts` asserting: a non-owner is redirected
