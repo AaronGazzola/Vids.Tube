@@ -42,12 +42,19 @@ Every membership value except `credits` and `rewards` SHALL be derivable from ra
 
 ### Requirement: Level derives from lifetime XP
 
-The system SHALL compute `level` as `level_for_xp(lifetime_xp)`, an immutable SQL function defined as `floor(sqrt(xp / 100))`. Level SHALL never be written except as the output of this function during recompute.
+The system SHALL compute `level` as `level_for_xp(lifetime_xp)`, an immutable SQL function defined as `floor(sqrt(xp / 25))`. Level SHALL never be written except as the output of this function during recompute.
 
-#### Scenario: Level thresholds
+The divisor was lowered from 100 to 25 because the original curve was set when a single message could pay over 100 points. Under quality-weighted scoring the most prolific chatter in a year of broadcasts would have reached level 2. At 25, the busiest contributor lands near level 9, a regular attender near level 4, and an occasional chatter at level 0 or 1.
 
-- **WHEN** a membership's `lifetime_xp` is 99, 100, 399, or 400
-- **THEN** its recomputed `level` is 0, 1, 1, and 2 respectively
+#### Scenario: Levels follow the curve
+
+- **WHEN** a membership holds 0, 25, 100, or 225 lifetime XP
+- **THEN** its recomputed `level` is 0, 1, 2, and 3 respectively
+
+#### Scenario: Level is never written directly
+
+- **WHEN** a membership is recomputed
+- **THEN** its level is the output of the level function for its lifetime XP, and no other value can be stored
 
 ### Requirement: Streaks derive from the attendance timeline
 
@@ -60,16 +67,21 @@ Streaks SHALL be computed over community K's ended streams (including synthetic 
 
 ### Requirement: Credits are a balance, not a derived value
 
-The `credits` column SHALL never be modified by recompute. It SHALL only change through explicit operations (spend/award flows arrive in V3; the identity merge sums the two balances).
+The `credits` column SHALL be a cached copy of the membership's credit-ledger balance. `recompute_membership` SHALL rewrite that membership's single earning line from its lifetime XP and SHALL rewrite `credits` to the resulting ledger sum. Recompute SHALL NOT create, modify or delete any spending line, so credits already spent SHALL survive any number of recomputes and any re-score. The ledger SHALL be the source of truth and `credits` SHALL never be modified independently of it.
 
-#### Scenario: Recompute preserves credits
+#### Scenario: Recompute preserves spends
 
-- **WHEN** a membership with a non-zero `credits` balance is recomputed
-- **THEN** every derived column is rewritten and `credits` is unchanged
+- **WHEN** a membership holding a spending line is recomputed
+- **THEN** every derived column is rewritten, the spending line is unchanged, and `credits` equals the sum of the membership's ledger lines
+
+#### Scenario: Recompute rewrites earnings from XP
+
+- **WHEN** a membership's lifetime XP changes and it is recomputed
+- **THEN** its earning line and `credits` both reflect the new XP total
 
 ### Requirement: Deterministic recompute routine
 
-The system SHALL provide a `recompute_membership(p_channel_id, p_community_channel_id)` SQL function that derives the membership row and fully rebuilds its `membership_stream_stats` (delete then insert) from raw events, creating the membership when the identity has any history in the community, preserving `credits` and `rewards`, and touching no other membership. The function SHALL be executable by the service role only.
+The system SHALL provide a `recompute_membership(p_channel_id, p_community_channel_id)` SQL function that derives the membership row and fully rebuilds its `membership_stream_stats` (delete then insert) from raw events, creating the membership when the identity has any history in the community, preserving `credits` and `rewards`, and touching no other membership. Where the identity has no history in the community and a membership already exists, the function SHALL clear that membership's per-broadcast rows and zero its derived columns rather than leaving stale values in place. The function SHALL be executable by the service role only.
 
 #### Scenario: Recompute is idempotent
 
@@ -80,6 +92,16 @@ The system SHALL provide a `recompute_membership(p_channel_id, p_community_chann
 
 - **WHEN** an `anon` or `authenticated` role calls `recompute_membership`
 - **THEN** the call is rejected (EXECUTE not granted)
+
+#### Scenario: A membership whose history disappears is zeroed
+
+- **WHEN** every message behind a membership is deleted and the membership is recomputed
+- **THEN** its per-broadcast rows are removed and its experience, level, message count, attendance and streaks are all zero, while its credits and rewards are untouched
+
+#### Scenario: No membership is created for an identity with no history
+
+- **WHEN** `recompute_membership` runs for a channel with no messages in the community and no existing membership
+- **THEN** no membership row is created
 
 ### Requirement: Public read, service-role write
 
@@ -94,4 +116,53 @@ The system SHALL provide a `recompute_membership(p_channel_id, p_community_chann
 
 - **WHEN** an authenticated client attempts to insert or update a membership row
 - **THEN** row-level security rejects the write
+
+### Requirement: Memberships refresh live during a broadcast
+
+At the end of each scoring batch, the worker SHALL call `recompute_membership` once for each participant scored in that batch, against the broadcast's community. A participant's XP, level, message count, broadcasts attended, streaks and credit balance SHALL therefore reflect their participation while the broadcast is still running.
+
+#### Scenario: Standing moves during the broadcast
+
+- **WHEN** a chatter's messages are scored in a batch during a live broadcast
+- **THEN** their membership's XP, level and message count reflect those messages without any script being run
+
+#### Scenario: Credits are spendable in the broadcast that earned them
+
+- **WHEN** a chatter earns credits in one scoring batch and spends them later in the same broadcast
+- **THEN** the spend is permitted against the balance earned during that broadcast
+
+#### Scenario: Live values equal rebuilt values
+
+- **WHEN** a membership updated live during a broadcast is recomputed again after the broadcast ends, with no new messages between
+- **THEN** every column holds the same value as it did before the second recompute
+
+#### Scenario: Only scored participants are refreshed
+
+- **WHEN** a scoring batch contains messages from two chatters out of a hundred with memberships
+- **THEN** only those two memberships are recomputed
+
+### Requirement: The host holds no membership in their own community
+
+The system SHALL NOT create, carry, or recompute a membership whose member
+channel is the community channel itself. Host activity SHALL be represented by
+raw `chat_messages` rows attributed to the channel owner, never by a membership
+row, and SHALL therefore never appear in a member count, roster, leaderboard, or
+streak list for the community they host.
+
+#### Scenario: Recompute is asked to build a self-membership
+
+- **WHEN** `recompute_membership` is called with the same channel as member and
+  community
+- **THEN** it returns without creating or updating any row
+
+#### Scenario: Merge would carry a self-membership
+
+- **WHEN** the merge survivor is the community channel and the source held a
+  membership in that community
+- **THEN** the membership is dropped rather than carried, and the merge completes
+
+#### Scenario: Host is absent from community aggregates
+
+- **WHEN** a community's member count, roster, or leaderboard is produced
+- **THEN** the host's own channel appears in none of them
 

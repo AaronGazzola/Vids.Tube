@@ -121,10 +121,10 @@ shorter sections nested inside it.
 
 ### Requirement: Transcript source precedence
 
-When both a live-captured transcript and YouTube captions exist for a stream, the
-labelling pass SHALL use the live `transcript_segments` and SHALL NOT concatenate
-the two sources. It SHALL fall back to `youtube_transcripts` for the stream's VOD
-only when no live transcript exists.
+The labelling pass SHALL use the live `transcript_segments` when both a live-captured
+transcript and YouTube captions exist for a stream, and SHALL NOT concatenate the two
+sources. It SHALL fall back to `youtube_transcripts` for the stream's VOD only when no
+live transcript exists.
 
 #### Scenario: Live transcript wins
 

@@ -8,11 +8,13 @@ scoring when their handle link is verified, capped at 400 characters.
 ## Requirements
 ### Requirement: Identity resolution and merging
 
-The system SHALL resolve a `!me` caller's identity as: YouTube-origin callers by
-their author channel id; vids.tube callers by their user id, additionally merged
-with their YouTube history when (and only when) they have a **verified**
-`youtube_links` row. The merged identity SHALL share one cached profile keyed by
-the YouTube channel id, so the same person gets the same bio from either chat.
+The system SHALL resolve a `!me` caller's identity as: **host callers** by the
+community channel they own, when the caller's YouTube author channel id matches
+the broadcast's YouTube channel id; other YouTube-origin callers by their author
+channel id; vids.tube callers by their user id, additionally merged with their
+YouTube history when (and only when) they have a **verified** `youtube_links`
+row. The merged identity SHALL share one cached profile keyed by the YouTube
+channel id, so the same person gets the same bio from either chat.
 
 #### Scenario: Verified link merges history
 
@@ -24,6 +26,12 @@ the YouTube channel id, so the same person gets the same bio from either chat.
 
 - **WHEN** a vids.tube user with an unverified link calls `!me`
 - **THEN** only their vids.tube history is used
+
+#### Scenario: Host resolves as the community, not a chatter
+
+- **WHEN** the host calls `!me` in their own stream
+- **THEN** the caller resolves to the community channel and not to any chatter
+  identity, whether or not their link is verified
 
 ### Requirement: Cached AI profile with regeneration thresholds
 
@@ -72,14 +80,13 @@ warm welcome line (no AI call), inviting them to stick around.
 
 ### Requirement: Live-accruing stats
 
-The system SHALL keep `!me` stats current from live-captured chat without
-requiring the YouTube backfill to rerun: message totals SHALL combine the
-`chatter_stats` archive with `chat_messages` rows recorded after the
-chatter's archive watermark (`last_seen_at`; all rows when the chatter has no
-archive entry), streams attended SHALL grow by the distinct live streams the
-chatter spoke in after the watermark, the identity's own vids.tube messages
-SHALL count toward the total, and first-seen SHALL fall back to the earliest
-live message when no archive entry exists.
+The system SHALL derive `!me` stats from `chat_messages` alone, with no
+archive watermark and no pre-aggregated total added to a raw count. Message
+totals SHALL be the count of `chat_messages` rows matching the identity by
+`user_id` or by `origin` `youtube` with the identity's `external_author_id`;
+streams attended SHALL be the distinct `stream_id` values across those rows; and
+first-seen SHALL be the earliest `created_at` among them. Stats SHALL stay
+current from live capture without rerunning the YouTube backfill.
 
 #### Scenario: New stream grows the totals without a backfill
 
@@ -90,15 +97,20 @@ live message when no archive entry exists.
 
 #### Scenario: Archive plus live never double-counts
 
-- **WHEN** a chatter has archived history and new live messages
-- **THEN** only messages after the archive watermark are added to the
-  archived total
+- **WHEN** a chatter has imported archive history and new live messages
+- **THEN** each message is counted exactly once, whether or not their identity
+  is linked
+
+#### Scenario: Totals are unchanged by linking
+
+- **WHEN** an identity's totals are captured, the identity is merged into an
+  account, and the totals are read again
+- **THEN** the message total, attended-stream count and first-seen are identical
 
 #### Scenario: Live-only chatter
 
-- **WHEN** a chatter has no archive entry but has live-captured messages
-- **THEN** their stats derive entirely from `chat_messages`, including
-  first-seen
+- **WHEN** a chatter has no imported history but has live-captured messages
+- **THEN** their stats derive from those messages, including first-seen
 
 ### Requirement: Contextual claim prompt for unclaimed identities
 
@@ -113,4 +125,23 @@ When `!me` resolves to an identity that is not yet claimed (a YouTube identity w
 
 - **WHEN** a claimed identity runs `!me`
 - **THEN** the reply contains no claim prompt
+
+### Requirement: Host reply is community-scoped and never prompts a claim
+
+The system SHALL answer a host `!me` with community-scoped figures (members,
+messages so far in the current stream, streams to date) drawn from a single
+source, and SHALL NOT include XP, level, rank, streak, or the unclaimed-identity
+claim prompt.
+
+#### Scenario: Host calls the command mid-stream
+
+- **WHEN** the host sends `!me` during their own stream
+- **THEN** the bot replies with community-scoped figures and no rank, level, or
+  claim line
+
+#### Scenario: Host with an unclaimed duplicate identity
+
+- **WHEN** the host calls `!me` while an unclaimed channel still exists for
+  their YouTube id
+- **THEN** the reply contains no claim prompt and no link to that profile
 

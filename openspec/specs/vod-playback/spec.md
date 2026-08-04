@@ -73,12 +73,23 @@ decoded display orientation including any rotation. Before runtime dimensions ar
 known, the container SHALL use the stored `videos.width`/`videos.height` as a
 first-paint hint, falling back to 16:9 when those are absent.
 
+The full video frame SHALL always be visible: the system SHALL NOT crop the video to
+fill its container. A landscape source whose aspect ratio differs from the container's
+SHALL be letterboxed or pillarboxed within it, or the container SHALL be sized to the
+source's own ratio. Cropping the frame to fill a fixed 16:9 container is prohibited.
+
 #### Scenario: Landscape video
 
 - **WHEN** the playing video's intrinsic `videoWidth >= videoHeight` (or no
   dimensions are yet known)
 - **THEN** the player renders inside a 16:9 container at the page's standard
   watch width
+
+#### Scenario: Landscape video that is not 16:9
+
+- **WHEN** the playing video is landscape but its intrinsic aspect ratio is not 16:9,
+  such as 4:3 or an ultrawide ratio
+- **THEN** the entire frame remains visible, with no edge of the picture cut off
 
 #### Scenario: Vertical video
 
@@ -103,8 +114,9 @@ first-paint hint, falling back to 16:9 when those are absent.
 
 ### Requirement: Custom player controls
 
-The system SHALL render its own controls UI for VOD playback, with the
-following controls available to the viewer:
+The system SHALL render its own controls UI for VOD playback, through the shared player
+component and its slot-based control bar, with the following controls available to the
+viewer:
 
 - Play / pause toggle
 - Seek bar with elapsed, total, and buffered-range indicators
@@ -112,7 +124,8 @@ following controls available to the viewer:
 - Volume slider with mute toggle
 - Fullscreen toggle
 - Playback-speed selector with the options `0.5x`, `0.75x`, `1x`, `1.25x`,
-  `1.5x`, `2x`
+  `1.5x`, `2x`, presented within the player's consolidated settings menu rather than as
+  a standalone menu
 
 The native browser controls SHALL be suppressed.
 
@@ -135,14 +148,14 @@ The native browser controls SHALL be suppressed.
 
 #### Scenario: Viewer changes playback speed
 
-- **WHEN** a viewer selects a playback speed from the menu
+- **WHEN** a viewer selects a playback speed from the settings menu
 - **THEN** the `<video>` element's `playbackRate` updates to that value and
   the selector reflects the new speed
 
 #### Scenario: Viewer enters fullscreen
 
 - **WHEN** a viewer clicks the fullscreen control (or presses `f`)
-- **THEN** the player enters fullscreen mode via the standard fullscreen API,
+- **THEN** the watch stage enters fullscreen mode via the standard fullscreen API,
   and exits on the next toggle (or `Escape`)
 
 ### Requirement: Player keyboard shortcuts
