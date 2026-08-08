@@ -23,10 +23,11 @@ export function MemberCountStrip({ count }: { count: number }) {
 
       {/* The mark carries the meaning a label used to: the site's own logo beside
           a figure says what is being counted without spending a word on it.
-          Forced white in both themes — the overlay sits on a broadcast, not on a
-          page, so it must not follow the owner's light or dark preference. */}
+          Same size class as the sidebar, and pinned to the dark-mode letter in
+          both themes — an overlay sits on a broadcast, not on a page, so it must
+          not follow the owner's light or dark preference. */}
       <div className="flex shrink-0 items-center gap-2.5 leading-none">
-        <Logo className="h-auto w-10 shrink-0 text-white dark:text-white" />
+        <Logo className="h-auto w-9 shrink-0 text-black dark:text-black" />
         <span className="text-[38px] font-bold tabular-nums tracking-tight">
           {count.toLocaleString("en-US")}
         </span>
