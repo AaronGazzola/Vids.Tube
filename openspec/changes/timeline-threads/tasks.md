@@ -73,6 +73,11 @@
   finding the same subject in other streams, so they should be the words that would
   still make sense on a different broadcast — not a quality (which the scores measure)
   and not an event type (which a moment's kind carries).
+
+  **Superseded by section 9.** Measuring the result showed the premise was wrong: on a
+  channel whose every broadcast covers the same ground, a word that survives on a
+  different broadcast is a constant and distinguishes nothing. A tag now names what
+  departed from the stream's steady state.
 - [x] 3.5 Update the output shape in the prompt to the new JSON, keeping the "return
   ONLY a JSON object" instruction and the absolute-scoring and timestamp rules verbatim.
 - [x] 3.6 Keep the score rubric text unchanged, including that engagement is read from
@@ -176,30 +181,30 @@
 
 ## 9. Tags mark what departs from the background
 
-- [ ] 9.1 Add a `background` field to the labelling payload: before anything else the
+- [x] 9.1 Add a `background` field to the labelling payload: before anything else the
   pass states this stream's steady state — the activity, subject matter and setting that
   persist through most of it. Validate it as a non-empty string.
-- [ ] 9.2 Rewrite the TAGS part of the rubric around that background. A tag names
+- [x] 9.2 Rewrite the TAGS part of the rubric around that background. A tag names
   something that happened and is notable *against* the steady state, never a topic the
   stream is about. State the test explicitly: a tag that could sit on most of this
   channel's broadcasts is not a tag, however central the thing is.
-- [ ] 9.3 Illustrate what qualifies without fixing a taxonomy — a joke that landed, an
+- [x] 9.3 Illustrate what qualifies without fixing a taxonomy — a joke that landed, an
   awkward or embarrassing turn, a problem solved or a bug found, something achieved or
   reached for the first time, a surprise, a mistake, an argument, a change of mind, a
   digression into something unrelated — and say plainly that the list is illustrative
   rather than a menu, so the instruction does not overfit to one kind of content.
-- [ ] 9.4 Require a tag to be written as the specific thing rather than its category,
+- [x] 9.4 Require a tag to be written as the specific thing rather than its category,
   with a worked contrast in the prompt, and forbid naming the stack, the tools or the
   genre.
-- [ ] 9.5 Add `timeline_background text` to `public.streams` in a migration; push and
+- [x] 9.5 Add `timeline_background text` to `public.streams` in a migration; push and
   regenerate types.
-- [ ] 9.6 Store the background on the stream in the backfill writer, and clear it when a
+- [x] 9.6 Store the background on the stream in the backfill writer, and clear it when a
   stream is relabelled.
-- [ ] 9.7 Show the background on the Studio timeline page above the map, so the ground
+- [x] 9.7 Show the background on the Studio timeline page above the map, so the ground
   the tags are figured against is visible while reviewing them.
-- [ ] 9.8 Bump `PROMPT_VERSION` to `timeline-3`.
-- [ ] 9.9 Unit tests: a payload with no background is rejected; a payload with one is
+- [x] 9.8 Bump `PROMPT_VERSION` to `timeline-3`.
+- [x] 9.9 Unit tests: a payload with no background is rejected; a payload with one is
   accepted and carries it through.
-- [ ] 9.10 Relabel one recent broadcast, then report its background and its tags against
+- [x] 9.10 Relabel one recent broadcast, then report its background and its tags against
   the six already labelled — whether the tags now name happenings rather than topics, and
   whether any of the channel's constants survived.
