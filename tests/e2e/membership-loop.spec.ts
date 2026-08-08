@@ -262,7 +262,7 @@ test("the opacity control dims the overlay backing and leaves the text alone", a
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   await page.goto(`/overlay/${ownerSlug}?token=${layout!.token}`);
-  await page.waitForSelector("text=Chat to become a member at Vids.Tube", {
+  await page.waitForSelector("text=Chat to become a Vids.Tube member", {
     timeout: 25_000,
   });
 
@@ -320,16 +320,16 @@ test("the members strip reads as one phrase down its right-hand side", async ({
   await page.goto(`/overlay/${ownerSlug}?token=${layout!.token}`);
 
   await expect(
-    page.getByText("Chat to become a member at Vids.Tube")
+    page.getByText("Chat to become a Vids.Tube member")
   ).toBeVisible({ timeout: 25_000 });
   await expect(
-    page.getByText("Chat to become a member at Vids.Tube", { exact: true })
+    page.getByText("Chat to become a Vids.Tube member", { exact: true })
   ).toBeVisible();
   await expect(page.getByText("Members", { exact: true })).toBeVisible();
   await expect(page.getByText(/See your stats/)).toHaveCount(0);
 
   const surface = page.locator("div.overlay-surface").filter({
-    has: page.getByText("Chat to become a member at Vids.Tube"),
+    has: page.getByText("Chat to become a Vids.Tube member"),
   });
   const style = await surface.evaluate((el) => {
     const cs = getComputedStyle(el);

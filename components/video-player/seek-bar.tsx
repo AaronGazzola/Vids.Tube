@@ -14,6 +14,9 @@ type SeekBarProps = {
   duration: number;
   buffered: number;
   onSeek: (time: number) => void;
+  // Where one section gives way to the next, in the same clock as currentTime.
+  // Drawn so a fused piece reads as its parts while still scrubbing as one.
+  segments?: number[];
 };
 
 export function SeekBar({
@@ -21,6 +24,7 @@ export function SeekBar({
   duration,
   buffered,
   onSeek,
+  segments,
 }: SeekBarProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [dragValue, setDragValue] = useState<number | null>(null);
@@ -96,6 +100,15 @@ export function SeekBar({
         className="absolute inset-y-0 left-0 rounded-full bg-primary"
         style={{ width: `${progress}%` }}
       />
+      {duration > 0 &&
+        segments?.map((at) => (
+          <div
+            key={at}
+            aria-hidden
+            className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-background"
+            style={{ left: `${(at / duration) * 100}%` }}
+          />
+        ))}
       <div
         className={cn(
           "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 shadow transition-opacity",

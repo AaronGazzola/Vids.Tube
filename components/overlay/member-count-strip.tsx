@@ -11,21 +11,19 @@ export function MemberCountStrip({ count }: { count: number }) {
   return (
     <div
       style={{ width: STRIP_WIDTH }}
-      className="overlay-surface flex items-center gap-8 rounded-2xl border border-white px-8 py-5 text-white shadow-lg"
+      className="overlay-surface flex items-center gap-6 rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
     >
       {/* One line, never wrapped: the strip is a glance, and a call to action
           that breaks mid-sentence stops being one. */}
       <p className="min-w-0 flex-1 whitespace-nowrap text-[30px] font-semibold leading-[1.15]">
-        Chat to become a member at Vids.Tube
+        Chat to become a Vids.Tube member
       </p>
 
       <div className="flex shrink-0 flex-col items-center leading-none">
-        <span className="text-[46px] font-bold tabular-nums tracking-tight">
+        <span className="text-[38px] font-bold tabular-nums tracking-tight">
           {count.toLocaleString("en-US")}
         </span>
-        <span className="mt-2 text-[22px] font-semibold uppercase tracking-[0.2em] text-white/80">
-          Members
-        </span>
+        <span className="mt-1.5 text-[22px] font-semibold">Members</span>
       </div>
     </div>
   );

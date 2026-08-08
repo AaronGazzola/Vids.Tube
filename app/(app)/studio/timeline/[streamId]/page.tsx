@@ -18,12 +18,18 @@ import type {
   TimelineScores,
 } from "@/lib/timeline.types";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 const CRITERIA: ScoreCriterion[] = ["humour", "interest", "engagement"];
+
+// One card is open at a time, and whatever is open is what the player follows.
+type Selection =
+  | { kind: "thread"; id: string }
+  | { kind: "moment"; id: string }
+  | null;
 
 function readScores(value: unknown): Record<string, number> {
   if (typeof value !== "object" || value === null) {
@@ -74,9 +80,7 @@ export default function StudioTimelinePage() {
   const streamId = params.streamId;
   const { data, isPending, error } = useStreamTimeline(streamId);
   const [seekRequest, setSeekRequest] = useState<SeekRequest | null>(null);
-  const [playingThread, setPlayingThread] = useState<ThreadWithSpans | null>(
-    null
-  );
+  const [selected, setSelected] = useState<Selection>(null);
 
   const sortBy = useTimelineViewStore((s) => s.sortBy);
   const minScore = useTimelineViewStore((s) => s.minScore);
@@ -116,15 +120,29 @@ export default function StudioTimelinePage() {
     threads.kept.length +
     (moments.all.length - moments.kept.length);
 
+  const selectedThread =
+    selected?.kind === "thread"
+      ? threads.all.find((thread) => thread.id === selected.id) ?? null
+      : null;
+  const selectedMoment =
+    selected?.kind === "moment"
+      ? moments.all.find((moment) => moment.id === selected.id) ?? null
+      : null;
+
+  // A thread plays as its appearances fused; a moment plays as its own window,
+  // which is the same machinery with one span.
   const fusedSpans: FusedSpan[] | null = useMemo(() => {
-    if (!playingThread) {
-      return null;
+    if (selectedThread) {
+      return selectedThread.spans.map((span) => ({
+        startS: span.start_s,
+        endS: span.end_s,
+      }));
     }
-    return playingThread.spans.map((span) => ({
-      startS: span.start_s,
-      endS: span.end_s,
-    }));
-  }, [playingThread]);
+    if (selectedMoment) {
+      return [{ startS: selectedMoment.start_s, endS: selectedMoment.end_s }];
+    }
+    return null;
+  }, [selectedThread, selectedMoment]);
 
   // The id only has to differ from the last one, so that clicking the same entry
   // twice seeks twice. A counter says that; a clock only implies it.
@@ -138,22 +156,31 @@ export default function StudioTimelinePage() {
     });
   };
 
+  const openThread = (thread: ThreadWithSpans, atS?: number) => {
+    setSelected({ kind: "thread", id: thread.id });
+    seekTo(atS ?? thread.spans[0].start_s);
+  };
+
+  const openMoment = (moment: StreamMomentRow) => {
+    setSelected({ kind: "moment", id: moment.id });
+    seekTo(moment.start_s);
+  };
+
+  const clearSelection = () => {
+    setSelected(null);
+  };
+
   const handleSelect = (selection: TimelineSelection) => {
     if (selection.type === "thread") {
-      setPlayingThread(selection.row);
+      openThread(selection.row, selection.span.start_s);
       return;
     }
-    setPlayingThread(null);
+    if (selection.type === "moment") {
+      openMoment(selection.row);
+      return;
+    }
+    clearSelection();
     seekTo(selection.row.start_s);
-  };
-
-  const leaveThread = () => {
-    setPlayingThread(null);
-  };
-
-  const selectMoment = (moment: StreamMomentRow) => {
-    setPlayingThread(null);
-    seekTo(moment.start_s);
   };
 
   return (
@@ -186,29 +213,24 @@ export default function StudioTimelinePage() {
               {data.threads.reduce((n, t) => n + t.spans.length, 0)} spans ·{" "}
               {data.moments.length} moments · {data.chapters.length} chapters
             </p>
-            {/* The ground the tags are figured against, so a tag that merely
-                restates it is visibly wrong while reviewing. */}
-            {data.background && (
-              <p className="mt-2 rounded-lg border bg-muted/30 p-3 text-sm">
-                <span className="font-medium">Mostly: </span>
-                <span className="text-muted-foreground">{data.background}</span>
-              </p>
-            )}
           </div>
 
-          {playingThread && (
+          {(selectedThread || selectedMoment) && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
               <span className="font-medium">
-                Playing “{playingThread.title}”
+                {selectedThread
+                  ? `Playing “${selectedThread.title}”`
+                  : `Playing “${selectedMoment!.label}”`}
               </span>
               <span className="text-muted-foreground">
-                {playingThread.spans.length} span
-                {playingThread.spans.length === 1 ? "" : "s"} fused, gaps cut
+                {selectedThread
+                  ? `${selectedThread.spans.length} span${selectedThread.spans.length === 1 ? "" : "s"} fused, gaps cut`
+                  : `${Math.round(selectedMoment!.end_s - selectedMoment!.start_s)}s window`}
               </span>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={leaveThread}
+                onClick={clearSelection}
                 className="ml-auto"
               >
                 <X className="mr-1 h-4 w-4" />
@@ -302,63 +324,79 @@ export default function StudioTimelinePage() {
                 chapters={data.chapters}
                 durationS={data.vod.durationS}
                 criterion={sortBy}
-                selectedThreadId={playingThread?.id ?? null}
+                selectedThreadId={selectedThread?.id ?? null}
+                selectedMomentId={selectedMoment?.id ?? null}
                 onSelect={handleSelect}
               />
 
-              <ul className="space-y-2">
+              <ul className="space-y-1.5">
                 {threads.ranked.map((thread) => {
                   const scores = readScores(thread.scores);
+                  const open = selected?.kind === "thread" && selected.id === thread.id;
                   return (
                     <li key={thread.id}>
                       <div
                         className={cn(
-                          "rounded-lg border p-3",
-                          playingThread?.id === thread.id && "border-primary"
+                          "rounded-lg border",
+                          open && "border-primary"
                         )}
                       >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setPlayingThread(thread)}
-                            className="truncate text-left text-sm font-medium hover:underline"
-                          >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            open ? clearSelection() : openThread(thread)
+                          }
+                          className="flex w-full items-center gap-2 p-3 text-left"
+                        >
+                          {open ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="truncate text-sm font-medium">
                             {thread.title}
-                          </button>
-                          <span className="shrink-0 text-xs text-muted-foreground">
+                          </span>
+                          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                             {thread.spans.length} span
                             {thread.spans.length === 1 ? "" : "s"}
                           </span>
-                        </div>
-                        {thread.summary && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {thread.summary}
-                          </p>
+                          <Badge variant="secondary" className="shrink-0">
+                            {sortBy} {scores[sortBy] ?? 0}
+                          </Badge>
+                        </button>
+
+                        {open && (
+                          <div className="space-y-2 border-t p-3">
+                            {thread.summary && (
+                              <p className="text-xs text-muted-foreground">
+                                {thread.summary}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-1">
+                              <ScoreBadges scores={scores} active={sortBy} />
+                              {thread.tags.map((value) => (
+                                <Badge key={value} variant="secondary">
+                                  {value}
+                                </Badge>
+                              ))}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {thread.spans.map((span) => (
+                                <button
+                                  key={span.id}
+                                  type="button"
+                                  onClick={() =>
+                                    openThread(thread, span.start_s)
+                                  }
+                                  className="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
+                                >
+                                  {formatClock(span.start_s)}–
+                                  {formatClock(span.end_s)} {span.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          <ScoreBadges scores={scores} active={sortBy} />
-                          {thread.tags.map((value) => (
-                            <Badge key={value} variant="secondary">
-                              {value}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {thread.spans.map((span) => (
-                            <button
-                              key={span.id}
-                              type="button"
-                              onClick={() => {
-                                setPlayingThread(null);
-                                seekTo(span.start_s);
-                              }}
-                              className="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
-                            >
-                              {formatClock(span.start_s)}–
-                              {formatClock(span.end_s)} {span.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </li>
                   );
@@ -366,36 +404,61 @@ export default function StudioTimelinePage() {
 
                 {moments.ranked.map((moment) => {
                   const scores = readScores(moment.scores);
+                  const open = selected?.kind === "moment" && selected.id === moment.id;
                   return (
                     <li key={moment.id}>
-                      <button
-                        type="button"
-                        onClick={() => selectMoment(moment)}
-                        className="w-full rounded-lg border border-amber-500/40 p-3 text-left transition-colors hover:bg-accent/50"
+                      <div
+                        className={cn(
+                          "rounded-lg border border-amber-500/40",
+                          open && "border-amber-500"
+                        )}
                       >
-                        <div className="flex items-baseline justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            open ? clearSelection() : openMoment(moment)
+                          }
+                          className="flex w-full items-center gap-2 p-3 text-left"
+                        >
+                          {open ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
                           <span className="truncate text-sm font-medium">
                             {moment.kind}: {moment.label}
                           </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {formatClock(moment.start_s)}–
-                            {formatClock(moment.end_s)}
+                          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                            {formatClock(moment.start_s)}
                           </span>
-                        </div>
-                        {moment.summary && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {moment.summary}
-                          </p>
+                          <Badge variant="secondary" className="shrink-0">
+                            {sortBy} {scores[sortBy] ?? 0}
+                          </Badge>
+                        </button>
+
+                        {open && (
+                          <div className="space-y-2 border-t p-3">
+                            {moment.summary && (
+                              <p className="text-xs text-muted-foreground">
+                                {moment.summary}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-1">
+                              <ScoreBadges scores={scores} active={sortBy} />
+                              {moment.tags.map((value) => (
+                                <Badge key={value} variant="secondary">
+                                  {value}
+                                </Badge>
+                              ))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatClock(moment.start_s)}–
+                              {formatClock(moment.end_s)}, peaking at{" "}
+                              {formatClock(moment.peak_s)}
+                            </div>
+                          </div>
                         )}
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          <ScoreBadges scores={scores} active={sortBy} />
-                          {moment.tags.map((value) => (
-                            <Badge key={value} variant="secondary">
-                              {value}
-                            </Badge>
-                          ))}
-                        </div>
-                      </button>
+                      </div>
                     </li>
                   );
                 })}

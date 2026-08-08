@@ -8,13 +8,16 @@ import {
 import type {
   StreamChapterRow,
   StreamMomentRow,
+  StreamThreadSpanRow,
   ThreadWithSpans,
   TimelineScores,
 } from "@/lib/timeline.types";
 import { cn } from "@/lib/utils";
 
 export type TimelineSelection =
-  | { type: "thread"; row: ThreadWithSpans }
+  // The span carries which appearance was clicked, so playback lands on that
+  // part of the thread rather than always at its beginning.
+  | { type: "thread"; row: ThreadWithSpans; span: StreamThreadSpanRow }
   | { type: "moment"; row: StreamMomentRow }
   | { type: "chapter"; row: StreamChapterRow };
 
@@ -59,6 +62,7 @@ export function TimelineLanes({
   durationS,
   criterion,
   selectedThreadId,
+  selectedMomentId,
   onSelect,
   className,
 }: {
@@ -68,6 +72,7 @@ export function TimelineLanes({
   durationS: number;
   criterion: string;
   selectedThreadId: string | null;
+  selectedMomentId: string | null;
   onSelect: (selection: TimelineSelection) => void;
   className?: string;
 }) {
@@ -138,7 +143,7 @@ export function TimelineLanes({
                 key={span.id}
                 type="button"
                 data-thread-id={thread.id}
-                onClick={() => onSelect({ type: "thread", row: thread })}
+                onClick={() => onSelect({ type: "thread", row: thread, span })}
                 title={`${thread.title}\n${thread.summary}\n${thread.tags.join(", ")}`}
                 className={cn(
                   "absolute flex items-center gap-1.5 overflow-hidden rounded px-1.5 text-left text-[11px] leading-none transition-colors",
@@ -194,7 +199,12 @@ export function TimelineLanes({
               type="button"
               onClick={() => onSelect({ type: "moment", row })}
               title={`${row.kind}: ${row.label}\n${row.summary}`}
-              className="absolute top-1 flex h-4.5 items-center overflow-hidden rounded bg-amber-500 px-1 text-left text-[10px] leading-none text-amber-950 hover:bg-amber-400"
+              className={cn(
+                "absolute top-1 flex h-4.5 items-center overflow-hidden rounded px-1 text-left text-[10px] leading-none text-amber-950",
+                row.id === selectedMomentId
+                  ? "bg-amber-300 ring-2 ring-amber-600"
+                  : "bg-amber-500 hover:bg-amber-400"
+              )}
               style={{
                 left: `${pct(row.start_s)}%`,
                 width: `${Math.max(0.4, pct(row.end_s - row.start_s))}%`,

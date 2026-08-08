@@ -20,11 +20,13 @@ export function TransportVod({
   duration,
   buffered,
   onSeek,
+  segments,
 }: {
   currentTime: number;
   duration: number;
   buffered: number;
   onSeek: (time: number) => void;
+  segments?: number[];
 }) {
   return (
     <SeekBar
@@ -32,6 +34,7 @@ export function TransportVod({
       duration={duration}
       buffered={buffered}
       onSeek={onSeek}
+      segments={segments}
     />
   );
 }

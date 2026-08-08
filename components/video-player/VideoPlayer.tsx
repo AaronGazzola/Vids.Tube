@@ -502,6 +502,21 @@ export function VideoPlayer({
     ? realToFused(fused, state.buffered) ?? transportTime
     : state.buffered;
 
+  // Where each section hands over to the next, so the seek bar reads as the
+  // pieces it is made of while still scrubbing continuously across them.
+  const transportSegments = useMemo(() => {
+    if (!fused || fused.length < 2) {
+      return undefined;
+    }
+    const boundaries: number[] = [];
+    let consumed = 0;
+    for (const span of fused.slice(0, -1)) {
+      consumed += Math.max(0, span.endS - span.startS);
+      boundaries.push(consumed);
+    }
+    return boundaries;
+  }, [fused]);
+
   return (
     <div
       ref={containerRef}
@@ -576,6 +591,7 @@ export function VideoPlayer({
               duration={transportDuration}
               buffered={transportBuffered}
               onSeek={seekTransport}
+              segments={transportSegments}
             />
           ) : null
         }
