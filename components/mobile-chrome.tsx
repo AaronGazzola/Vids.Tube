@@ -19,27 +19,32 @@ import {
 // exactly 1080x1920, so the 9:16 assumption this whole model rests on holds. The
 // numbers below are that screenshot's, expressed relative to the video.
 export const MOBILE_CHROME_REF_WIDTH = 1080;
-// The channel header above the video: rows 110..194, header plus its gap.
-export const CHROME_ABOVE = 85;
-// The chat input below it: rows 2115..2194, and it sits wholly below the video
-// rather than overlapping it.
-export const CHROME_BELOW = 80;
 
-const TOP_BAR = {
-  height: 96,
-  padX: 24,
-  backIcon: 40,
-  avatar: 64,
-  handleSize: 34,
+// The channel header sits in rows 110..194 of the screenshot: 85 tall, arrow to
+// menu. Read off a ruler laid over the header crop.
+export const TOP_BAR = {
+  height: 85,
+  padX: 45,
+  backIcon: 60,
+  avatar: 76,
+  handleSize: 44,
   countsSize: 28,
   liveDot: 14,
   countIcon: 26,
-  subscribeH: 62,
-  subscribeW: 200,
+  subscribeH: 66,
+  subscribeW: 225,
   subscribeText: 30,
   menuIcon: 40,
   gap: 18,
 };
+
+// The space reserved above the video is the header, by definition — derived
+// rather than written down twice, because the two drifting apart is what put the
+// header's own height at odds with the gap left for it.
+export const CHROME_ABOVE = TOP_BAR.height;
+
+// The chat input below the video: rows 2115..2194, wholly clear of the picture.
+export const CHROME_BELOW = 80;
 
 export const CHAT_GEOMETRY = {
   left: 36,
@@ -64,7 +69,7 @@ export const CHAT_GEOMETRY = {
 export const HEART_GEOMETRY = { size: 100, right: 35, bottom: 37, glyph: 60 };
 
 export const INPUT_GEOMETRY = {
-  width: 920,
+  width: 970,
   height: 80,
   left: 36,
   textSize: 34,

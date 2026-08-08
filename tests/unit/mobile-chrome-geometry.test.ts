@@ -6,6 +6,7 @@ import {
   HEART_GEOMETRY,
   INPUT_GEOMETRY,
   MOBILE_CHROME_REF_WIDTH,
+  TOP_BAR,
 } from "@/components/mobile-chrome";
 
 // Measured by sampling the pixels of data/Screenshot_20260717-120823(1).png,
@@ -125,5 +126,17 @@ describe("the chat input", () => {
       SHOT.inputBottom - SHOT.inputTop + 1,
       -1
     );
+  });
+});
+
+describe("the header the model draws", () => {
+  it("is exactly the space reserved above the video", () => {
+    // Written down once and derived, so the bar's height and the gap left for it
+    // cannot drift apart the way they had.
+    expect(CHROME_ABOVE).toBe(TOP_BAR.height);
+  });
+
+  it("matches the header band measured on the phone", () => {
+    expect(TOP_BAR.height).toBe(SHOT.videoTop - SHOT.headerTop);
   });
 });

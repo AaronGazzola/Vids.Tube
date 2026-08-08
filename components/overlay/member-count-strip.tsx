@@ -27,7 +27,7 @@ export function MemberCountStrip({ count }: { count: number }) {
           both themes — an overlay sits on a broadcast, not on a page, so it must
           not follow the owner's light or dark preference. */}
       <div className="flex shrink-0 items-center gap-2.5 leading-none">
-        <Logo className="h-auto w-9 shrink-0 text-black dark:text-black" />
+        <Logo solid className="h-auto w-9 shrink-0 text-black dark:text-black" />
         <span className="text-[38px] font-bold tabular-nums tracking-tight">
           {count.toLocaleString("en-US")}
         </span>

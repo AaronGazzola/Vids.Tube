@@ -4,6 +4,10 @@ import { execFileSync } from "child_process";
 import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import type { Database } from "../../supabase/types";
+import {
+  MOBILE_CHROME_REF_WIDTH,
+  TOP_BAR,
+} from "../../components/mobile-chrome";
 
 const admin = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -176,8 +180,8 @@ test("demo stage mobile chrome keeps reference proportions at two sizes", async 
   });
   const large = await chromeGeometry(page);
   expect(large, "chrome geometry resolvable at large size").toBeTruthy();
-  expect(large!.topBarH / large!.anchorW).toBeCloseTo(96 / 1080, 2);
-  expect(large!.subscribeW / large!.anchorW).toBeCloseTo(200 / 1080, 2);
+  expect(large!.topBarH / large!.anchorW).toBeCloseTo(TOP_BAR.height / MOBILE_CHROME_REF_WIDTH, 2);
+  expect(large!.subscribeW / large!.anchorW).toBeCloseTo(TOP_BAR.subscribeW / MOBILE_CHROME_REF_WIDTH, 2);
   const overlapLarge =
     (large!.anchorBottom - (large!.inputBottom - large!.inputH)) /
     large!.inputH;
@@ -199,8 +203,8 @@ test("demo stage mobile chrome keeps reference proportions at two sizes", async 
   const small = await chromeGeometry(page);
   expect(small, "chrome geometry resolvable at small size").toBeTruthy();
   expect(small!.anchorW, "stage rescaled").toBeLessThan(large!.anchorW);
-  expect(small!.topBarH / small!.anchorW).toBeCloseTo(96 / 1080, 2);
-  expect(small!.subscribeW / small!.anchorW).toBeCloseTo(200 / 1080, 2);
+  expect(small!.topBarH / small!.anchorW).toBeCloseTo(TOP_BAR.height / MOBILE_CHROME_REF_WIDTH, 2);
+  expect(small!.subscribeW / small!.anchorW).toBeCloseTo(TOP_BAR.subscribeW / MOBILE_CHROME_REF_WIDTH, 2);
 
   await page.reload();
   await page
