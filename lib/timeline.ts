@@ -3,12 +3,13 @@ import type {
   TimelineMoment,
   TimelinePayload,
   TimelineScores,
-  TimelineSection,
+  TimelineSpan,
+  TimelineThread,
 } from "@/lib/timeline.types";
 
 export const SCORE_CRITERIA = ["humour", "interest", "engagement"] as const;
 
-export const PROMPT_VERSION = "timeline-1";
+export const PROMPT_VERSION = "timeline-2";
 
 export const CHAPTER_START_EPSILON_S = 1;
 
@@ -76,6 +77,48 @@ function validateTags(raw: unknown, where: string): string[] | string {
   return tags;
 }
 
+function validateSpan(
+  raw: unknown,
+  where: string,
+  durationS: number
+): TimelineSpan | string {
+  if (!isRecord(raw)) {
+    return `${where} must be an object`;
+  }
+  if (!isFiniteNumber(raw.start_s) || raw.start_s < 0) {
+    return `${where}: start_s must be a number at or above 0`;
+  }
+  if (raw.start_s > durationS) {
+    return `${where}: start_s ${raw.start_s} is past the stream duration ${durationS}`;
+  }
+  if (!isFiniteNumber(raw.end_s)) {
+    return `${where}: end_s must be a number`;
+  }
+  if (raw.end_s < raw.start_s) {
+    return `${where}: end_s ${raw.end_s} is before start_s ${raw.start_s}`;
+  }
+  if (raw.end_s > durationS) {
+    return `${where}: end_s ${raw.end_s} is past the stream duration ${durationS}`;
+  }
+  if (!nonEmptyString(raw.label)) {
+    return `${where}: label must be a non-empty string`;
+  }
+  const scores = validateScores(raw.scores, where);
+  if (typeof scores === "string") {
+    return scores;
+  }
+  return {
+    start_s: raw.start_s,
+    end_s: raw.end_s,
+    label: raw.label.trim(),
+    scores,
+  };
+}
+
+function normaliseTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
 export function validateTimelinePayload(
   raw: unknown,
   durationS: number
@@ -84,7 +127,7 @@ export function validateTimelinePayload(
     return { error: "payload must be a JSON object" };
   }
 
-  const expected = ["sections", "moments", "chapters"];
+  const expected = ["threads", "moments", "chapters"];
   const keys = Object.keys(raw);
   const missing = expected.filter((key) => !keys.includes(key));
   if (missing.length > 0) {
@@ -100,37 +143,14 @@ export function validateTimelinePayload(
     }
   }
 
-  const sections: TimelineSection[] = [];
-  for (const [index, entry] of (raw.sections as unknown[]).entries()) {
-    const where = `sections[${index}]`;
+  const threads: TimelineThread[] = [];
+  for (const [index, entry] of (raw.threads as unknown[]).entries()) {
+    const where = `threads[${index}]`;
     if (!isRecord(entry)) {
       return { error: `${where} must be an object` };
     }
-    if (!isFiniteNumber(entry.start_s) || entry.start_s < 0) {
-      return { error: `${where}: start_s must be a number at or above 0` };
-    }
-    if (entry.start_s > durationS) {
-      return {
-        error: `${where}: start_s ${entry.start_s} is past the stream duration ${durationS}`,
-      };
-    }
-    let endS: number | null = null;
-    if (entry.end_s !== null && entry.end_s !== undefined) {
-      if (!isFiniteNumber(entry.end_s)) {
-        return { error: `${where}: end_s must be a number or null` };
-      }
-      if (entry.end_s < entry.start_s) {
-        return { error: `${where}: end_s ${entry.end_s} is before start_s ${entry.start_s}` };
-      }
-      if (entry.end_s > durationS) {
-        return {
-          error: `${where}: end_s ${entry.end_s} is past the stream duration ${durationS}`,
-        };
-      }
-      endS = entry.end_s;
-    }
-    if (!nonEmptyString(entry.label)) {
-      return { error: `${where}: label must be a non-empty string` };
+    if (!nonEmptyString(entry.title)) {
+      return { error: `${where}: title must be a non-empty string` };
     }
     if (typeof entry.summary !== "string") {
       return { error: `${where}: summary must be a string` };
@@ -143,15 +163,28 @@ export function validateTimelinePayload(
     if (typeof scores === "string") {
       return { error: scores };
     }
-    sections.push({
-      start_s: entry.start_s,
-      end_s: endS,
-      label: entry.label.trim(),
+    if (!Array.isArray(entry.spans) || entry.spans.length === 0) {
+      return { error: `${where}: spans must be a non-empty array` };
+    }
+    const spans: TimelineSpan[] = [];
+    for (const [spanIndex, spanRaw] of entry.spans.entries()) {
+      const span = validateSpan(spanRaw, `${where}.spans[${spanIndex}]`, durationS);
+      if (typeof span === "string") {
+        return { error: span };
+      }
+      spans.push(span);
+    }
+    spans.sort((a, b) => a.start_s - b.start_s);
+    threads.push({
+      title: entry.title.trim(),
       summary: entry.summary.trim(),
       tags,
       scores,
+      spans,
     });
   }
+
+  const titles = new Set(threads.map((thread) => normaliseTitle(thread.title)));
 
   const moments: TimelineMoment[] = [];
   for (const [index, entry] of (raw.moments as unknown[]).entries()) {
@@ -162,21 +195,26 @@ export function validateTimelinePayload(
     if (!isFiniteNumber(entry.start_s) || entry.start_s < 0) {
       return { error: `${where}: start_s must be a number at or above 0` };
     }
-    if (entry.start_s > durationS) {
-      return {
-        error: `${where}: start_s ${entry.start_s} is past the stream duration ${durationS}`,
-      };
-    }
-    const endS = entry.end_s === undefined || entry.end_s === null ? entry.start_s : entry.end_s;
-    if (!isFiniteNumber(endS)) {
+    if (!isFiniteNumber(entry.end_s)) {
       return { error: `${where}: end_s must be a number` };
     }
-    if (endS < entry.start_s) {
-      return { error: `${where}: end_s ${endS} is before start_s ${entry.start_s}` };
-    }
-    if (endS > durationS) {
+    if (entry.end_s <= entry.start_s) {
       return {
-        error: `${where}: end_s ${endS} is past the stream duration ${durationS}`,
+        error: `${where}: a moment must be a window a clip can be cut from, but end_s ${entry.end_s} is not after start_s ${entry.start_s}`,
+      };
+    }
+    if (entry.end_s > durationS) {
+      return {
+        error: `${where}: end_s ${entry.end_s} is past the stream duration ${durationS}`,
+      };
+    }
+    const peakS = entry.peak_s === undefined || entry.peak_s === null ? entry.start_s : entry.peak_s;
+    if (!isFiniteNumber(peakS)) {
+      return { error: `${where}: peak_s must be a number` };
+    }
+    if (peakS < entry.start_s || peakS > entry.end_s) {
+      return {
+        error: `${where}: peak_s ${peakS} falls outside the window ${entry.start_s}-${entry.end_s}`,
       };
     }
     if (!nonEmptyString(entry.kind)) {
@@ -196,14 +234,22 @@ export function validateTimelinePayload(
     if (typeof scores === "string") {
       return { error: scores };
     }
+    // A dangling thread reference is dropped rather than failing the payload: it is
+    // not worth discarding a four-minute call over one unmatched title.
+    const referenced =
+      nonEmptyString(entry.thread) && titles.has(normaliseTitle(entry.thread))
+        ? entry.thread.trim()
+        : null;
     moments.push({
       start_s: entry.start_s,
-      end_s: endS,
+      peak_s: peakS,
+      end_s: entry.end_s,
       kind: entry.kind.trim(),
       label: entry.label.trim(),
       summary: entry.summary.trim(),
       tags,
       scores,
+      thread: referenced,
     });
   }
 
@@ -243,7 +289,7 @@ export function validateTimelinePayload(
     }
   }
 
-  return { sections, moments, chapters };
+  return { threads, moments, chapters };
 }
 
 function nearestBoundary(
@@ -266,7 +312,7 @@ function nearestBoundary(
   return best;
 }
 
-export function snapSectionBoundaries(
+export function snapSpanBoundaries(
   payload: TimelinePayload,
   boundaries: number[],
   toleranceS: number
@@ -274,48 +320,58 @@ export function snapSectionBoundaries(
   if (boundaries.length === 0 || toleranceS <= 0) {
     return payload;
   }
-  const sections = payload.sections.map((section) => {
-    const startS = nearestBoundary(section.start_s, boundaries, toleranceS);
-    const endS =
-      section.end_s === null
-        ? null
-        : nearestBoundary(section.end_s, boundaries, toleranceS);
-    if (endS !== null && endS < startS) {
-      return section;
-    }
-    return { ...section, start_s: startS, end_s: endS };
-  });
-  return { ...payload, sections };
+  const threads = payload.threads.map((thread) => ({
+    ...thread,
+    spans: thread.spans.map((span) => {
+      const startS = nearestBoundary(span.start_s, boundaries, toleranceS);
+      const endS = nearestBoundary(span.end_s, boundaries, toleranceS);
+      // A short span whose ends snap to the same boundary would collapse to
+      // nothing: it would vanish from the map and contribute no playable time.
+      if (endS <= startS) {
+        return span;
+      }
+      return { ...span, start_s: startS, end_s: endS };
+    }),
+  }));
+  return { ...payload, threads };
 }
 
-function sameLabel(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
+function sameTitle(a: string, b: string): boolean {
+  return normaliseTitle(a) === normaliseTitle(b);
 }
 
+// Halves of one stream are merged by subject: a thread the model recognised in both
+// halves becomes one thread holding both halves' spans, rather than two threads that
+// would then need re-linking.
 export function mergeTimelinePayloads(
   payloads: TimelinePayload[],
   overlapS: number
 ): TimelinePayload {
-  const sections: TimelineSection[] = [];
+  const threads: TimelineThread[] = [];
   const moments: TimelineMoment[] = [];
   const chapters: TimelineChapter[] = [];
 
   for (const payload of payloads) {
-    for (const section of payload.sections) {
-      const duplicate = sections.some(
-        (kept) =>
-          sameLabel(kept.label, section.label) &&
-          Math.abs(kept.start_s - section.start_s) <= overlapS
-      );
-      if (!duplicate) {
-        sections.push(section);
+    for (const thread of payload.threads) {
+      const existing = threads.find((kept) => sameTitle(kept.title, thread.title));
+      if (!existing) {
+        threads.push({ ...thread, spans: [...thread.spans] });
+        continue;
+      }
+      for (const span of thread.spans) {
+        const duplicate = existing.spans.some(
+          (kept) => Math.abs(kept.start_s - span.start_s) <= overlapS
+        );
+        if (!duplicate) {
+          existing.spans.push(span);
+        }
       }
     }
     for (const moment of payload.moments) {
       const duplicate = moments.some(
         (kept) =>
-          sameLabel(kept.label, moment.label) &&
-          Math.abs(kept.start_s - moment.start_s) <= overlapS
+          sameTitle(kept.label, moment.label) &&
+          Math.abs(kept.peak_s - moment.peak_s) <= overlapS
       );
       if (!duplicate) {
         moments.push(moment);
@@ -331,7 +387,10 @@ export function mergeTimelinePayloads(
     }
   }
 
-  sections.sort((a, b) => a.start_s - b.start_s);
+  for (const thread of threads) {
+    thread.spans.sort((a, b) => a.start_s - b.start_s);
+  }
+  threads.sort((a, b) => a.spans[0].start_s - b.spans[0].start_s);
   moments.sort((a, b) => a.start_s - b.start_s);
   chapters.sort((a, b) => a.start_s - b.start_s);
 
@@ -342,5 +401,5 @@ export function mergeTimelinePayloads(
     }
   }
 
-  return { sections, moments, chapters: spine };
+  return { threads, moments, chapters: spine };
 }

@@ -1,4 +1,9 @@
 import { ensureChatterChannel, refreshMembership } from "../lib/chatter-onboarding";
+import {
+  clearPendingGreetings,
+  queuePendingGreeting,
+  runChatterGreetings,
+} from "../lib/chatter-greeting";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import { SCORING_CONFIG } from "@/lib/scoring-config";
 import { runClaude } from "../lib/claude";
@@ -577,6 +582,34 @@ export async function applyModeration(
   }
 }
 
+// The host and software channels never reach the queue at all. Bans do have to
+// be checked here: greetings are queued during the chat poll, which runs before
+// the batch is moderated. The owner's per-broadcast switch is read once per tick.
+async function runGreetings(
+  streamId: string,
+  communityId: string,
+  communitySlug: string,
+  bannedKeys: Set<string>
+): Promise<void> {
+  if (!communitySlug) return;
+  const { data: state } = await supabaseAdmin
+    .from("chat_scoring_state")
+    .select("greet_returning")
+    .eq("stream_id", streamId)
+    .maybeSingle();
+  try {
+    await runChatterGreetings({
+      streamId,
+      communityId,
+      communitySlug,
+      greetReturning: state?.greet_returning ?? true,
+      bannedKeys,
+    });
+  } catch (e) {
+    console.error("chatter greetings failed:", e);
+  }
+}
+
 export async function runScoringJob(
   stream: EligibleStream,
   onEngagement?: (fresh: EligibleStream) => void
@@ -666,13 +699,38 @@ export async function runScoringJob(
       // community rather than belonging to it.
       if (!isHost && channelId && !onboarded.has(m.authorChannelId)) {
         onboarded.add(m.authorChannelId);
-        await ensureChatterChannel({
+        const result = await ensureChatterChannel({
           authorChannelId: m.authorChannelId,
           authorName: m.author,
           avatarUrl: m.avatarUrl,
           communityId: channelId,
           mode: enrichmentMode,
         });
+        // Queued here rather than sent here: composing a welcome-back line can
+        // need an AI call, and the chat poll must not stall behind it. The
+        // dispatcher tick drains the queue, which is also what lets it see how
+        // many are waiting and decide between individual and combined greetings.
+        if (result && !result.isSoftware) {
+          queuePendingGreeting(stream.id, {
+            channelId: result.channelId,
+            handle: result.awaitingEnrichment ? null : result.handle,
+            displayName: m.author,
+            isNew: result.isNew,
+            sample: {
+              ref: `youtube:${m.authorChannelId}:${m.publishedAt}`,
+              origin: "youtube",
+              author: m.author,
+              text: m.text,
+              userId: null,
+              externalAuthorId: m.authorChannelId,
+              authorName: m.author,
+              authorAvatarUrl: m.avatarUrl,
+              chatMessageId,
+              createdAt: m.publishedAt,
+              isHost: false,
+            },
+          });
+        }
       }
       // Host messages are buffered so their commands still dispatch — the
       // streamer runs commands from YouTube chat — but are dropped before the
@@ -720,6 +778,7 @@ export async function runScoringJob(
       await deliverApprovedAskAnswers(stream.id);
       await scoreManualHighlights(stream.id);
       if (channelId) {
+        await runGreetings(stream.id, channelId, channelSlug, bannedKeys);
         await runProactiveMoments(stream, channelId);
         await runWrapupIfRequested(stream, channelId);
       }
@@ -812,5 +871,8 @@ export async function runScoringJob(
   } finally {
     stopped = true;
     await ytTask;
+    // Anyone still queued when the broadcast ends is dropped rather than greeted
+    // into an empty chat; who was already greeted is recorded in the database.
+    clearPendingGreetings(stream.id);
   }
 }

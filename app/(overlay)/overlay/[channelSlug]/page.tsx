@@ -3,11 +3,12 @@
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
 import type { GoalMetric } from "@/app/layout.types";
-import { GOAL_METRICS } from "@/app/layout.types";
+import { OVERLAY_GOAL_METRICS } from "@/app/layout.types";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GoalBar } from "@/components/overlay/goal-bar";
+import { MemberCountStrip } from "@/components/overlay/member-count-strip";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
 import type { DemoLayoutConfig } from "@/app/(app)/live/demo.types";
@@ -38,6 +39,7 @@ import {
 import {
   useDemoOverlaySnapshot,
   useLiveOverlayLayout,
+  useMemberCount,
   useOverlayChime,
   usePlayableAsk,
   usePlayableTts,
@@ -343,6 +345,7 @@ export default function OverlayFramePage({
   const { data: goalData } = useGoalProgress(channelSlug, 10, !demo);
   const { data: scores } = useCompetition(channelSlug, 5);
   const breakQuery = useBreakState(channelSlug);
+  const { data: memberCount } = useMemberCount(channelSlug);
 
   if (!layout.isSuccess || !layout.config) {
     return null;
@@ -410,8 +413,15 @@ export default function OverlayFramePage({
         </Positioned>
       )}
 
-      {GOAL_METRICS.map((m) => {
+      {visible.members && (
+        <Positioned box={boxes.members} opacity={config.boxOpacity.members}>
+          <MemberCountStrip count={memberCount ?? 0} />
+        </Positioned>
+      )}
+
+      {OVERLAY_GOAL_METRICS.map((m) => {
         const boxKey = GOAL_METRIC_BOX[m];
+        if (!boxKey) return null;
         const data = visible[boxKey] ? goalMetric(m) : null;
         if (!data) return null;
         return (

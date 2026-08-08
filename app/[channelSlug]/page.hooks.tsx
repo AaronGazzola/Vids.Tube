@@ -1,13 +1,21 @@
 "use client";
 
 import { CustomToast } from "@/components/CustomToast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  channelHasHostedAction,
   getChannelBySlugAction,
-  getChannelMembershipStatsAction,
+  getChannelCommunityAction,
+  getChannelMembershipsAction,
   getChannelProcessingVideosAction,
   getChannelVideosAction,
+  getLiveChattersAction,
   getUpcomingScheduledBroadcastAction,
   uploadChannelBrandingAction,
 } from "./page.actions";
@@ -19,14 +27,48 @@ export function useChannel(slug: string) {
   });
 }
 
-export function useChannelMembershipStats(
+export function useChannelMemberships(channelId: string | undefined) {
+  return useQuery({
+    queryKey: ["channel-memberships", channelId],
+    queryFn: () => getChannelMembershipsAction(channelId!),
+    enabled: !!channelId,
+  });
+}
+
+export function useChannelHasHosted(channelId: string | undefined) {
+  return useQuery({
+    queryKey: ["channel-has-hosted", channelId],
+    queryFn: () => channelHasHostedAction(channelId!),
+    enabled: !!channelId,
+  });
+}
+
+// Paged rather than fetched whole: the leaderboard opens with five and reveals
+// the rest in place, so a 143-member community never ships 143 rows to show 5.
+export function useChannelCommunity(
   channelId: string | undefined,
-  enabled: boolean
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: ["channel-community", channelId],
+    queryFn: ({ pageParam }) =>
+      getChannelCommunityAction(channelId!, pageParam as number),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) =>
+      last.hasMore ? pages.length : undefined,
+    enabled: !!channelId && enabled,
+  });
+}
+
+export function useLiveChatters(
+  streamId: string | undefined,
+  communityId: string | undefined
 ) {
   return useQuery({
-    queryKey: ["membership-stats", channelId],
-    queryFn: () => getChannelMembershipStatsAction(channelId!),
-    enabled: !!channelId && enabled,
+    queryKey: ["live-chatters", streamId],
+    queryFn: () => getLiveChattersAction(streamId!, communityId!),
+    enabled: !!streamId && !!communityId,
+    refetchInterval: 20_000,
   });
 }
 

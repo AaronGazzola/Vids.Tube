@@ -1,6 +1,13 @@
 "use client";
 
 import { useWatchLayout } from "@/components/watch-layout";
+import {
+  fusedDuration,
+  fusedToReal,
+  realToFused,
+  spanAfter,
+  type FusedSpan,
+} from "@/lib/fused-timeline";
 import { cn } from "@/lib/utils";
 import {
   Loader2,
@@ -15,6 +22,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -43,6 +51,9 @@ export type VideoPlayerProps = {
   onDimensions?: (width: number, height: number) => void;
   onResize?: (width: number) => void;
   seekRequest?: SeekRequest | null;
+  // An ordered set of spans within the source. Given one, only those spans play, in
+  // order, and the transport measures the fused piece rather than the whole source.
+  spans?: FusedSpan[] | null;
   children?: ReactNode;
 };
 
@@ -74,6 +85,7 @@ export function VideoPlayer({
   onDimensions,
   onResize,
   seekRequest,
+  spans,
   children,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -115,6 +127,64 @@ export function VideoPlayer({
     video.muted = true;
     void video.play().catch(() => {});
   }, [live, source.src]);
+
+  // Held stable against its own contents, so a caller passing a fresh array each
+  // render does not restart the piece on every render.
+  const fusedKey = spans
+    ? spans.map((span) => `${span.startS}-${span.endS}`).join(",")
+    : "";
+  const fused = useMemo(
+    () => (spans && spans.length > 0 ? spans : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fusedKey]
+  );
+  const fusedTotal = fused ? fusedDuration(fused) : 0;
+
+  // Entering a fused piece, or changing which one, starts at its beginning.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !fused) {
+      return;
+    }
+    const first = fusedToReal(fused, 0);
+    if (first) {
+      video.currentTime = first.realS;
+    }
+  }, [fused]);
+
+  // The playhead is nudged forward at each seam. Nothing is buffered or re-encoded:
+  // playing a thread is seeking past the stream time between its spans.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !fused) {
+      return;
+    }
+    const follow = () => {
+      const current = video.currentTime;
+      const inside = fused.some(
+        (span) => current >= span.startS && current < span.endS
+      );
+      if (inside) {
+        return;
+      }
+      const next = spanAfter(fused, current);
+      if (next === null) {
+        video.pause();
+        const last = fused[fused.length - 1];
+        if (last && current > last.endS) {
+          video.currentTime = last.endS;
+        }
+        return;
+      }
+      video.currentTime = fused[next].startS;
+    };
+    video.addEventListener("timeupdate", follow);
+    video.addEventListener("seeked", follow);
+    return () => {
+      video.removeEventListener("timeupdate", follow);
+      video.removeEventListener("seeked", follow);
+    };
+  }, [fused]);
 
   const resizeCallbackRef = useRef(onResize);
   useEffect(() => {
@@ -233,15 +303,36 @@ export function VideoPlayer({
     video.currentTime = Math.max(0, Math.min(time, max));
   }, []);
 
+  // The transport works in fused time when a span set is given, so the seek bar
+  // measures the piece being reviewed rather than the whole source.
+  const seekTransport = useCallback(
+    (time: number) => {
+      if (!fused) {
+        seek(time);
+        return;
+      }
+      const target = fusedToReal(fused, Math.max(0, Math.min(time, fusedTotal)));
+      if (target) {
+        seek(target.realS);
+      }
+    },
+    [fused, fusedTotal, seek]
+  );
+
   const seekBy = useCallback(
     (deltaSeconds: number) => {
       const video = videoRef.current;
       if (!video) {
         return;
       }
-      seek(video.currentTime + deltaSeconds);
+      if (!fused) {
+        seek(video.currentTime + deltaSeconds);
+        return;
+      }
+      const at = realToFused(fused, video.currentTime) ?? 0;
+      seekTransport(at + deltaSeconds);
     },
-    [seek]
+    [fused, seek, seekTransport]
   );
 
   const jumpToLive = useCallback(() => {
@@ -403,6 +494,14 @@ export function VideoPlayer({
   const isFullscreen = layout ? layout.mode === "fullscreen" : state.isFullscreen;
   const showChatToggle = !!layout && isFullscreen && layout.chatAvailable;
 
+  const transportTime = fused
+    ? realToFused(fused, state.currentTime) ?? 0
+    : state.currentTime;
+  const transportDuration = fused ? fusedTotal : state.duration;
+  const transportBuffered = fused
+    ? realToFused(fused, state.buffered) ?? transportTime
+    : state.buffered;
+
   return (
     <div
       ref={containerRef}
@@ -473,10 +572,10 @@ export function VideoPlayer({
         transport={
           state.seekable ? (
             <TransportVod
-              currentTime={state.currentTime}
-              duration={state.duration}
-              buffered={state.buffered}
-              onSeek={seek}
+              currentTime={transportTime}
+              duration={transportDuration}
+              buffered={transportBuffered}
+              onSeek={seekTransport}
             />
           ) : null
         }
@@ -502,8 +601,8 @@ export function VideoPlayer({
             />
             {state.seekable ? (
               <ElapsedTime
-                currentTime={state.currentTime}
-                duration={state.duration}
+                currentTime={transportTime}
+                duration={transportDuration}
               />
             ) : (
               <TransportLive

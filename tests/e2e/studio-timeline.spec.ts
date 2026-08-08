@@ -8,17 +8,32 @@ const admin = createClient(
 );
 
 let labelledStreamId: string | null = null;
+let recurringThreadId: string | null = null;
 
 test.beforeAll(async () => {
-  const { data, error } = await admin
-    .from("stream_sections")
-    .select("stream_id")
-    .limit(1)
-    .maybeSingle();
+  // A stream whose labelling produced a subject that comes back later, so the
+  // recurring-lane assertion has something real to stand on.
+  const { data: spans, error } = await admin
+    .from("stream_thread_spans")
+    .select("thread_id, stream_id");
   if (error) {
     throw error;
   }
-  labelledStreamId = data?.stream_id ?? null;
+  const counts = new Map<string, { stream: string; spans: number }>();
+  for (const span of spans ?? []) {
+    const held = counts.get(span.thread_id) ?? {
+      stream: span.stream_id,
+      spans: 0,
+    };
+    held.spans += 1;
+    counts.set(span.thread_id, held);
+  }
+  const recurring = [...counts.entries()].find(([, held]) => held.spans > 1);
+  if (!recurring) {
+    return;
+  }
+  labelledStreamId = recurring[1].stream;
+  recurringThreadId = recurring[0];
 });
 
 async function signInAsOwner(page: import("@playwright/test").Page) {
@@ -81,7 +96,7 @@ test("the timeline action opens that stream's timeline", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Streams" })).toBeVisible();
 });
 
-test("a labelled stream renders overlapping lanes with scores", async ({
+test("a recurring subject occupies one lane across the stream", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -89,12 +104,67 @@ test("a labelled stream renders overlapping lanes with scores", async ({
   await signInAsOwner(page);
 
   await page.goto(`/studio/timeline/${labelledStreamId}`);
-
-  await expect(page.getByText(/sections ·/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/^interest \d+$/).first()).toBeVisible({
     timeout: 20_000,
   });
 
-  const bars = page.locator("button[style*='left:']");
+  // Every appearance of one subject sits at the same height on the map, so the
+  // subject reads as one row rather than as unrelated bars.
+  const bars = page.locator(`button[data-thread-id="${recurringThreadId}"]`);
   await expect(bars.first()).toBeVisible();
+  const count = await bars.count();
+  expect(count).toBeGreaterThan(1);
+
+  const tops = new Set<number>();
+  for (let i = 0; i < count; i += 1) {
+    const box = await bars.nth(i).boundingBox();
+    tops.add(Math.round(box!.y));
+  }
+  expect(tops.size).toBe(1);
+});
+
+test("moments are drawn at their duration, not as points", async ({ page }) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  const moments = page.locator("button.bg-amber-500");
+  await expect(moments.first()).toBeVisible({ timeout: 20_000 });
+  const box = await moments.first().boundingBox();
+  expect(box!.width).toBeGreaterThan(2);
+});
+
+test("the stream page carries no per-tag controls", async ({ page }) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "all tags" })).toHaveCount(0);
+});
+
+test("selecting a thread plays it fused, and leaving returns to the stream", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  await page
+    .locator(`button[data-thread-id="${recurringThreadId}"]`)
+    .first()
+    .click();
+  await expect(page.getByText(/^Playing/)).toBeVisible();
+  await expect(page.getByText(/spans fused, gaps cut/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Whole stream" }).click();
+  await expect(page.getByText(/^Playing/)).toHaveCount(0);
 });

@@ -30,15 +30,15 @@ import {
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-const SAVED_GOAL_SUBS = { x: 123, y: 456, scale: 3.5 };
+const SAVED_GOAL_LIKES = { x: 123, y: 456, scale: 3.5 };
 const SAVED_COMPETITION = { x: 900, y: 111, scale: 0.75 };
-const EDITED_GOAL_SUBS = { x: 321, y: 654, scale: 1.25 };
+const EDITED_GOAL_LIKES = { x: 321, y: 654, scale: 1.25 };
 
 const SAVED: DemoLayoutConfig = mergeDemoLayout({
   ...DEFAULT_DEMO_LAYOUT,
   boxes: {
     ...DEFAULT_DEMO_LAYOUT.boxes,
-    goalSubs: SAVED_GOAL_SUBS,
+    goalLikes: SAVED_GOAL_LIKES,
     competition: SAVED_COMPETITION,
   },
 });
@@ -135,7 +135,7 @@ describe("useDemoLayout HMR store recreation", () => {
     await waitFor(() => useDemoLayoutStore.getState().hydrated);
 
     const state = useDemoLayoutStore.getState();
-    expect(state.config.boxes.goalSubs).toEqual(SAVED_GOAL_SUBS);
+    expect(state.config.boxes.goalLikes).toEqual(SAVED_GOAL_LIKES);
     expect(state.config.boxes.competition).toEqual(SAVED_COMPETITION);
 
     await flush(DEBOUNCE_WAIT_MS);
@@ -147,12 +147,12 @@ describe("useDemoLayout HMR store recreation", () => {
     await waitFor(() => useDemoLayoutStore.getState().hydrated);
 
     act(() => {
-      useDemoLayoutStore.getState().setBox("goalSubs", EDITED_GOAL_SUBS);
+      useDemoLayoutStore.getState().setBox("goalLikes", EDITED_GOAL_LIKES);
     });
     await flush(DEBOUNCE_WAIT_MS);
     expect(saveDemoLayoutMock).toHaveBeenCalledTimes(1);
     const savedConfig = saveDemoLayoutMock.mock.calls[0][0] as DemoLayoutConfig;
-    expect(savedConfig.boxes.goalSubs).toEqual(EDITED_GOAL_SUBS);
+    expect(savedConfig.boxes.goalLikes).toEqual(EDITED_GOAL_LIKES);
 
     simulateHmrStoreRecreation();
     await flush(DEBOUNCE_WAIT_MS);
@@ -162,7 +162,7 @@ describe("useDemoLayout HMR store recreation", () => {
 
     const state = useDemoLayoutStore.getState();
     expect(state.hydrated).toBe(true);
-    expect(state.config.boxes.goalSubs).toEqual(EDITED_GOAL_SUBS);
+    expect(state.config.boxes.goalLikes).toEqual(EDITED_GOAL_LIKES);
     expect(state.config.boxes.competition).toEqual(SAVED_COMPETITION);
   });
 

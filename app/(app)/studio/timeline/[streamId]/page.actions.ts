@@ -65,12 +65,13 @@ export async function getStreamTimelineAction(
     (videos ?? [])[0] ??
     null;
 
-  const [sections, moments, chapters] = await Promise.all([
+  const [threads, spans, moments, chapters] = await Promise.all([
+    supabaseAdmin.from("stream_threads").select("*").eq("stream_id", streamId),
     supabaseAdmin
-      .from("stream_sections")
+      .from("stream_thread_spans")
       .select("*")
       .eq("stream_id", streamId)
-      .order("start_s", { ascending: true }),
+      .order("ordinal", { ascending: true }),
     supabaseAdmin
       .from("stream_moments")
       .select("*")
@@ -83,12 +84,29 @@ export async function getStreamTimelineAction(
       .order("start_s", { ascending: true }),
   ]);
 
-  for (const result of [sections, moments, chapters]) {
+  for (const result of [threads, spans, moments, chapters]) {
     if (result.error) {
       console.error(result.error);
       throw new Error("Failed to load timeline");
     }
   }
+
+  const spansByThread = new Map<string, typeof spans.data>();
+  for (const span of spans.data ?? []) {
+    const held = spansByThread.get(span.thread_id) ?? [];
+    held.push(span);
+    spansByThread.set(span.thread_id, held);
+  }
+
+  // A thread with no spans cannot be placed on the map or played, so it is dropped
+  // rather than rendered as a lane with nothing on it.
+  const withSpans = (threads.data ?? [])
+    .map((thread) => ({
+      ...thread,
+      spans: spansByThread.get(thread.id) ?? [],
+    }))
+    .filter((thread) => thread.spans.length > 0)
+    .sort((a, b) => a.spans[0].start_s - b.spans[0].start_s);
 
   return {
     data: {
@@ -102,7 +120,7 @@ export async function getStreamTimelineAction(
         height: video?.height ?? null,
         poster: vodAssetUrl(video?.thumbnail_path),
       },
-      sections: sections.data ?? [],
+      threads: withSpans,
       moments: moments.data ?? [],
       chapters: chapters.data ?? [],
     },

@@ -532,6 +532,7 @@ export type StreamSettings = {
   wrapupSummaryEnabled: boolean;
   wrapupThanksEnabled: boolean;
   bridgeEnabled: boolean;
+  greetReturning: boolean;
   workerRunning: boolean;
 };
 
@@ -559,6 +560,7 @@ export type StreamSettingsInput = {
   wrapupSummaryEnabled: boolean;
   wrapupThanksEnabled: boolean;
   bridgeEnabled: boolean;
+  greetReturning: boolean;
 };
 
 export async function getStreamSettingsAction(): Promise<StreamSettings> {
@@ -620,6 +622,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
       wrapupSummaryEnabled: true,
       wrapupThanksEnabled: true,
       bridgeEnabled: true,
+      greetReturning: true,
       autoDisplayFeatured: false,
       waitingRoomChat: false,
       chatterEnrichment: true,
@@ -636,7 +639,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
   const { data: scoring } = await supabaseAdmin
     .from("chat_scoring_state")
     .select(
-      "enabled, moderation_mode, tts_mode, tts_stability, tts_similarity, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled, bridge_enabled"
+      "enabled, moderation_mode, tts_mode, tts_stability, tts_similarity, ask_mode, highlighting_enabled, auto_display_featured, useful_info_enabled, competition_status_enabled, progress_update_enabled, wrapup_mvp_enabled, wrapup_summary_enabled, wrapup_thanks_enabled, bridge_enabled, greet_returning"
     )
     .eq("stream_id", stream.id)
     .maybeSingle();
@@ -667,6 +670,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     wrapupSummaryEnabled: scoring?.wrapup_summary_enabled ?? true,
     wrapupThanksEnabled: scoring?.wrapup_thanks_enabled ?? true,
     bridgeEnabled: scoring?.bridge_enabled ?? true,
+    greetReturning: scoring?.greet_returning ?? true,
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
@@ -834,6 +838,7 @@ export async function saveStreamSettingsAction(
         wrapup_summary_enabled: input.wrapupSummaryEnabled,
         wrapup_thanks_enabled: input.wrapupThanksEnabled,
         bridge_enabled: input.bridgeEnabled,
+        greet_returning: input.greetReturning,
         highlighting_enabled: input.highlightingEnabled,
         auto_display_featured: input.autoDisplayFeatured,
         updated_at: new Date().toISOString(),

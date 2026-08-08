@@ -1,7 +1,7 @@
 import type {
   StreamChapterRow,
   StreamMomentRow,
-  StreamSectionRow,
+  ThreadWithSpans,
 } from "@/lib/timeline.types";
 
 export type TimelineVod = {
@@ -17,9 +17,11 @@ export type TimelineStreamDetail = {
   title: string;
   startedAt: string | null;
   vod: TimelineVod;
-  sections: StreamSectionRow[];
+  threads: ThreadWithSpans[];
   moments: StreamMomentRow[];
   chapters: StreamChapterRow[];
 };
 
 export type ScoreCriterion = "humour" | "interest" | "engagement";
+
+export type TimelineOrder = "score" | "time";

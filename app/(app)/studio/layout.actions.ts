@@ -82,7 +82,7 @@ export async function listOwnerStreamsAction(): Promise<
   }
 
   const labelled = new Set<string>();
-  for (const table of ["stream_sections", "stream_moments"] as const) {
+  for (const table of ["stream_threads", "stream_moments"] as const) {
     const { data, error } = await supabaseAdmin
       .from(table)
       .select("stream_id")

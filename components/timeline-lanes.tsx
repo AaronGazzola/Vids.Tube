@@ -1,21 +1,27 @@
 "use client";
 
-import { laneCount, packSectionLanes } from "@/lib/timeline-lanes";
+import {
+  laneCount,
+  packThreadLanes,
+  uncoveredStretches,
+} from "@/lib/timeline-lanes";
 import type {
   StreamChapterRow,
   StreamMomentRow,
-  StreamSectionRow,
+  ThreadWithSpans,
   TimelineScores,
 } from "@/lib/timeline.types";
 import { cn } from "@/lib/utils";
 
 export type TimelineSelection =
-  | { type: "section"; row: StreamSectionRow }
+  | { type: "thread"; row: ThreadWithSpans }
   | { type: "moment"; row: StreamMomentRow }
   | { type: "chapter"; row: StreamChapterRow };
 
-const LANE_HEIGHT_PX = 34;
-const MIN_WIDTH_PX = 720;
+const LANE_HEIGHT_PX = 30;
+const MOMENT_ROW_PX = 26;
+const MIN_WIDTH_PX = 1100;
+const TICK_INTERVAL_S = 300;
 
 function asScores(value: unknown): TimelineScores | null {
   if (typeof value !== "object" || value === null) {
@@ -42,42 +48,26 @@ function formatClock(seconds: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
 }
 
-function scoreLine(scores: TimelineScores | null): string {
-  if (!scores) {
-    return "";
-  }
-  return `humour ${scores.humour} · interest ${scores.interest} · engagement ${scores.engagement}`;
-}
-
-function entryTitle(
-  label: string,
-  startS: number,
-  endS: number | null,
-  summary: string,
-  tags: string[],
-  scores: TimelineScores | null
-): string {
-  const span =
-    endS === null || endS === startS
-      ? formatClock(startS)
-      : `${formatClock(startS)} – ${formatClock(endS)}`;
-  return [label, span, summary, tags.join(", "), scoreLine(scores)]
-    .filter((part) => part && part.length > 0)
-    .join("\n");
+function scoreOf(value: unknown, criterion: string): number {
+  return asScores(value)?.[criterion] ?? 0;
 }
 
 export function TimelineLanes({
-  sections,
+  threads,
   moments,
   chapters,
   durationS,
+  criterion,
+  selectedThreadId,
   onSelect,
   className,
 }: {
-  sections: StreamSectionRow[];
+  threads: ThreadWithSpans[];
   moments: StreamMomentRow[];
   chapters: StreamChapterRow[];
   durationS: number;
+  criterion: string;
+  selectedThreadId: string | null;
   onSelect: (selection: TimelineSelection) => void;
   className?: string;
 }) {
@@ -85,31 +75,27 @@ export function TimelineLanes({
     return null;
   }
 
-  const packed = packSectionLanes(
-    sections.map((row) => ({
-      start_s: row.start_s,
-      end_s: row.end_s,
-      label: row.label,
-      summary: row.summary,
-      tags: row.tags,
-      scores: asScores(row.scores) ?? {
-        humour: 0,
-        interest: 0,
-        engagement: 0,
-      },
-      row,
-    })),
-    durationS
+  const packed = packThreadLanes(threads, (thread) =>
+    scoreOf(thread.scores, criterion)
   );
-
   const lanes = laneCount(packed);
   const pct = (seconds: number) => (seconds / durationS) * 100;
 
+  const gaps = uncoveredStretches(
+    threads.flatMap((thread) => thread.spans),
+    durationS
+  );
+
+  const ticks: number[] = [];
+  for (let t = TICK_INTERVAL_S; t < durationS; t += TICK_INTERVAL_S) {
+    ticks.push(t);
+  }
+
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <div className="space-y-2" style={{ minWidth: `${MIN_WIDTH_PX}px` }}>
+      <div className="space-y-1" style={{ minWidth: `${MIN_WIDTH_PX}px` }}>
         {chapters.length > 0 && (
-          <div className="relative h-7 rounded-md bg-muted/40">
+          <div className="relative h-6 rounded-md bg-muted/30">
             {chapters.map((chapter, index) => {
               const next = chapters[index + 1];
               const endS = next ? next.start_s : durationS;
@@ -119,7 +105,7 @@ export function TimelineLanes({
                   type="button"
                   onClick={() => onSelect({ type: "chapter", row: chapter })}
                   title={`${chapter.title}\n${formatClock(chapter.start_s)}`}
-                  className="absolute top-0 h-7 overflow-hidden border-r border-background bg-secondary px-2 text-left text-xs leading-7 text-secondary-foreground hover:bg-secondary/70"
+                  className="absolute top-0 h-6 overflow-hidden border-r border-background px-1.5 text-left text-[11px] leading-6 text-muted-foreground hover:bg-muted/60"
                   style={{
                     left: `${pct(chapter.start_s)}%`,
                     width: `${Math.max(0.5, pct(endS - chapter.start_s))}%`,
@@ -136,67 +122,123 @@ export function TimelineLanes({
           className="relative rounded-md bg-muted/20"
           style={{ height: `${Math.max(1, lanes) * LANE_HEIGHT_PX}px` }}
         >
-          {packed.map(({ section, lane }) => {
-            const row = section.row;
-            const endS = row.end_s ?? durationS;
-            const open = row.end_s === null;
-            return (
+          {ticks.map((t) => (
+            <div
+              key={t}
+              aria-hidden
+              className="absolute inset-y-0 w-px bg-border/60"
+              style={{ left: `${pct(t)}%` }}
+            />
+          ))}
+          {packed.map(({ thread, lane }) => {
+            const selected = thread.id === selectedThreadId;
+            const score = scoreOf(thread.scores, criterion);
+            return thread.spans.map((span, index) => (
               <button
-                key={row.id}
+                key={span.id}
                 type="button"
-                onClick={() => onSelect({ type: "section", row })}
-                title={entryTitle(
-                  row.label,
-                  row.start_s,
-                  row.end_s,
-                  row.summary,
-                  row.tags,
-                  asScores(row.scores)
-                )}
+                data-thread-id={thread.id}
+                onClick={() => onSelect({ type: "thread", row: thread })}
+                title={`${thread.title}\n${thread.summary}\n${thread.tags.join(", ")}`}
                 className={cn(
-                  "absolute overflow-hidden rounded px-2 text-left text-xs leading-6 transition-colors",
-                  open
-                    ? "border border-dashed border-primary/60 bg-primary/10 text-foreground hover:bg-primary/20"
+                  "absolute flex items-center gap-1.5 overflow-hidden rounded px-1.5 text-left text-[11px] leading-none transition-colors",
+                  selected
+                    ? "bg-primary text-primary-foreground ring-2 ring-primary/60"
                     : "bg-primary/70 text-primary-foreground hover:bg-primary"
                 )}
                 style={{
-                  top: `${lane * LANE_HEIGHT_PX + 4}px`,
-                  height: `${LANE_HEIGHT_PX - 8}px`,
-                  left: `${pct(row.start_s)}%`,
-                  width: `${Math.max(0.6, pct(endS - row.start_s))}%`,
+                  top: `${lane * LANE_HEIGHT_PX + 3}px`,
+                  height: `${LANE_HEIGHT_PX - 6}px`,
+                  left: `${pct(span.start_s)}%`,
+                  width: `${Math.max(0.6, pct(span.end_s - span.start_s))}%`,
                 }}
               >
-                <span className="truncate">{row.label}</span>
+                <span className="truncate font-medium">
+                  {index === 0 ? thread.title : span.label}
+                </span>
+                <span className="shrink-0 opacity-70">{score}</span>
               </button>
-            );
+            ));
           })}
+          {/* A thread's appearances read as one row, so the stretches between them
+              are drawn as the dotted line the subject is absent for. */}
+          {packed.map(({ thread, lane }) =>
+            thread.spans.slice(0, -1).map((span, index) => {
+              const next = thread.spans[index + 1];
+              if (next.start_s <= span.end_s) {
+                return null;
+              }
+              return (
+                <div
+                  key={`${span.id}-link`}
+                  aria-hidden
+                  className="absolute border-t border-dashed border-primary/40"
+                  style={{
+                    top: `${lane * LANE_HEIGHT_PX + LANE_HEIGHT_PX / 2}px`,
+                    left: `${pct(span.end_s)}%`,
+                    width: `${pct(next.start_s - span.end_s)}%`,
+                  }}
+                />
+              );
+            })
+          )}
         </div>
 
-        <div className="relative h-8 rounded-md bg-muted/20">
+        <div
+          className="relative rounded-md bg-muted/20"
+          style={{ height: `${MOMENT_ROW_PX}px` }}
+        >
           {moments.map((row) => (
             <button
               key={row.id}
               type="button"
               onClick={() => onSelect({ type: "moment", row })}
-              title={entryTitle(
-                `${row.kind}: ${row.label}`,
-                row.start_s,
-                row.end_s,
-                row.summary,
-                row.tags,
-                asScores(row.scores)
-              )}
-              className="absolute top-1 h-6 w-2 -translate-x-1/2 rounded-full bg-amber-500 hover:bg-amber-400"
-              style={{ left: `${pct(row.start_s)}%` }}
+              title={`${row.kind}: ${row.label}\n${row.summary}`}
+              className="absolute top-1 flex h-4.5 items-center overflow-hidden rounded bg-amber-500 px-1 text-left text-[10px] leading-none text-amber-950 hover:bg-amber-400"
+              style={{
+                left: `${pct(row.start_s)}%`,
+                width: `${Math.max(0.4, pct(row.end_s - row.start_s))}%`,
+              }}
             >
-              <span className="sr-only">{row.label}</span>
+              <span className="truncate">{row.label}</span>
+              <span
+                aria-hidden
+                className="absolute inset-y-0 w-px bg-amber-950/70"
+                style={{
+                  left: `${((row.peak_s - row.start_s) / Math.max(0.001, row.end_s - row.start_s)) * 100}%`,
+                }}
+              />
             </button>
           ))}
         </div>
 
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>0:00</span>
-          <span>{formatClock(durationS)}</span>
+        {/* What no thread occupies: the parts of the stream nothing can be made of. */}
+        <div className="relative h-2 rounded-md bg-primary/20">
+          {gaps.map((gap) => (
+            <div
+              key={`${gap.start_s}-${gap.end_s}`}
+              title={`Nothing labelled ${formatClock(gap.start_s)} – ${formatClock(gap.end_s)}`}
+              className="absolute inset-y-0 bg-muted"
+              style={{
+                left: `${pct(gap.start_s)}%`,
+                width: `${Math.max(0.2, pct(gap.end_s - gap.start_s))}%`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative h-4 text-[10px] text-muted-foreground">
+          <span className="absolute left-0">0:00</span>
+          {ticks.map((t) => (
+            <span
+              key={t}
+              className="absolute -translate-x-1/2"
+              style={{ left: `${pct(t)}%` }}
+            >
+              {formatClock(t)}
+            </span>
+          ))}
+          <span className="absolute right-0">{formatClock(durationS)}</span>
         </div>
       </div>
     </div>

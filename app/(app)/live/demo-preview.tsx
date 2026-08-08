@@ -14,6 +14,7 @@ import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
+import { MemberCountStrip } from "@/components/overlay/member-count-strip";
 import { TtsCard } from "@/components/overlay/tts-card";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -44,6 +45,7 @@ import {
 } from "./demo.stores";
 import {
   DEMO_GOAL_TARGETS,
+  DEMO_MEMBER_COUNT,
   DEMO_OVERLAY_LABELS,
   type DemoBackground,
   type DemoBoxKey,
@@ -285,16 +287,20 @@ function DemoOverlayFeed() {
 // ── Goal box ───────────────────────────────────────────────────────────────
 
 const BOX_METRIC: Record<
-  Exclude<DemoBoxKey, "competition" | "highlight" | "break">,
+  Exclude<DemoBoxKey, "competition" | "highlight" | "break" | "members">,
   GoalMetric
 > = {
-  goalSubs: "subs",
   goalLikes: "likes",
   goalViewers: "viewers",
 };
 
 function GoalBox({ boxKey, data }: { boxKey: DemoBoxKey; data: MetricProgress }) {
-  if (boxKey === "competition" || boxKey === "highlight" || boxKey === "break")
+  if (
+    boxKey === "competition" ||
+    boxKey === "highlight" ||
+    boxKey === "break" ||
+    boxKey === "members"
+  )
     return null;
   return (
     <GoalBar metric={BOX_METRIC[boxKey]} data={data} height={OVERLAY_GOAL_HEIGHT} />
@@ -450,9 +456,9 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
               <DemoOverlayFeed />
             </DraggableBox>
           )}
-          {config.visible.goalSubs && (
-            <DraggableBox boxKey="goalSubs" pxScale={canvasScale * k}>
-              <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
+          {config.visible.members && (
+            <DraggableBox boxKey="members" pxScale={canvasScale * k}>
+              <MemberCountStrip count={DEMO_MEMBER_COUNT} />
             </DraggableBox>
           )}
           {config.visible.goalLikes && (

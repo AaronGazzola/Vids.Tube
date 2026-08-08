@@ -1,85 +1,112 @@
 import { describe, expect, it } from "vitest";
-import { laneCount, packSectionLanes } from "@/lib/timeline-lanes";
-import type { TimelineSection } from "@/lib/timeline.types";
+import {
+  laneCount,
+  packThreadLanes,
+  uncoveredStretches,
+  type LaneSpan,
+} from "@/lib/timeline-lanes";
 
-const scores = { humour: 10, interest: 20, engagement: 30 };
+type Thread = { title: string; score: number; spans: LaneSpan[] };
 
-function section(
-  start_s: number,
-  end_s: number | null,
-  label: string
-): TimelineSection {
-  return { start_s, end_s, label, summary: "", tags: [], scores };
+function thread(title: string, score: number, ...spans: [number, number][]): Thread {
+  return {
+    title,
+    score,
+    spans: spans.map(([start_s, end_s]) => ({ start_s, end_s })),
+  };
 }
 
-function laneOf(
-  packed: { section: TimelineSection; lane: number }[],
-  label: string
-): number {
-  return packed.find((item) => item.section.label === label)!.lane;
+const rank = (t: Thread) => t.score;
+
+function laneOf(packed: { thread: Thread; lane: number }[], title: string): number {
+  return packed.find((item) => item.thread.title === title)!.lane;
 }
 
-describe("packSectionLanes", () => {
-  it("puts two disjoint sections on the same lane", () => {
-    const packed = packSectionLanes(
-      [section(0, 100, "a"), section(200, 300, "b")],
-      600
+describe("packThreadLanes", () => {
+  it("gives every thread its own lane, so a subject reads as one row", () => {
+    const packed = packThreadLanes(
+      [thread("a", 50, [0, 100], [400, 500]), thread("b", 40, [200, 300])],
+      rank
     );
-    expect(laneOf(packed, "a")).toBe(0);
-    expect(laneOf(packed, "b")).toBe(0);
-    expect(laneCount(packed)).toBe(1);
-  });
-
-  it("puts a nested section below its container", () => {
-    const packed = packSectionLanes(
-      [section(0, 2400, "debugging"), section(600, 960, "mustaches")],
-      2400
-    );
-    expect(laneOf(packed, "debugging")).toBe(0);
-    expect(laneOf(packed, "mustaches")).toBe(1);
-  });
-
-  it("gives the longest containing section the top lane regardless of input order", () => {
-    const packed = packSectionLanes(
-      [section(0, 360, "short"), section(0, 2400, "long")],
-      2400
-    );
-    expect(laneOf(packed, "long")).toBe(0);
-    expect(laneOf(packed, "short")).toBe(1);
-  });
-
-  it("spreads three mutually overlapping sections across three lanes", () => {
-    const packed = packSectionLanes(
-      [section(0, 300, "a"), section(100, 400, "b"), section(200, 500, "c")],
-      600
-    );
-    expect(laneOf(packed, "a")).toBe(0);
-    expect(laneOf(packed, "b")).toBe(1);
-    expect(laneOf(packed, "c")).toBe(2);
-    expect(laneCount(packed)).toBe(3);
-  });
-
-  it("reuses a freed lane once a section has ended", () => {
-    const packed = packSectionLanes(
-      [section(0, 300, "a"), section(100, 400, "b"), section(350, 500, "c")],
-      600
-    );
-    expect(laneOf(packed, "c")).toBe(0);
     expect(laneCount(packed)).toBe(2);
+    expect(laneOf(packed, "a")).not.toBe(laneOf(packed, "b"));
   });
 
-  it("treats a null end as running to the end of the stream", () => {
-    const packed = packSectionLanes(
-      [section(0, null, "open"), section(100, 200, "inside")],
-      600
+  it("keeps all of a thread's spans together on its lane", () => {
+    const packed = packThreadLanes([thread("a", 50, [0, 100], [400, 500])], rank);
+    expect(packed).toHaveLength(1);
+    expect(packed[0].thread.spans).toHaveLength(2);
+  });
+
+  it("orders lanes by the chosen score, best at the top", () => {
+    const packed = packThreadLanes(
+      [thread("quiet", 10, [0, 10]), thread("loud", 90, [20, 30])],
+      rank
     );
-    expect(laneOf(packed, "open")).toBe(0);
-    expect(laneOf(packed, "inside")).toBe(1);
+    expect(laneOf(packed, "loud")).toBe(0);
+    expect(laneOf(packed, "quiet")).toBe(1);
   });
 
-  it("returns nothing for no sections", () => {
-    const packed = packSectionLanes([], 600);
-    expect(packed).toEqual([]);
-    expect(laneCount(packed)).toBe(0);
+  it("breaks a score tie by which subject came first", () => {
+    const packed = packThreadLanes(
+      [thread("later", 50, [500, 600]), thread("earlier", 50, [10, 20])],
+      rank
+    );
+    expect(laneOf(packed, "earlier")).toBe(0);
+    expect(laneOf(packed, "later")).toBe(1);
+  });
+
+  it("puts two threads open at the same instant on different lanes", () => {
+    const packed = packThreadLanes(
+      [thread("outer", 60, [0, 600]), thread("inner", 50, [100, 200])],
+      rank
+    );
+    expect(laneOf(packed, "outer")).not.toBe(laneOf(packed, "inner"));
+  });
+
+  it("counts no lanes for no threads", () => {
+    expect(laneCount(packThreadLanes([], rank))).toBe(0);
+  });
+});
+
+describe("uncoveredStretches", () => {
+  const span = (start_s: number, end_s: number) => ({ start_s, end_s });
+
+  it("reports the stretch before the first span", () => {
+    expect(uncoveredStretches([span(100, 200)], 200)).toEqual([span(0, 100)]);
+  });
+
+  it("reports the stretch after the last span", () => {
+    expect(uncoveredStretches([span(0, 100)], 200)).toEqual([span(100, 200)]);
+  });
+
+  it("reports a stretch between two spans", () => {
+    expect(uncoveredStretches([span(0, 100), span(150, 200)], 200)).toEqual([
+      span(100, 150),
+    ]);
+  });
+
+  it("reports nothing when spans touch", () => {
+    expect(uncoveredStretches([span(0, 100), span(100, 200)], 200)).toEqual([]);
+  });
+
+  it("reports nothing when spans overlap and cover everything", () => {
+    expect(uncoveredStretches([span(0, 150), span(100, 200)], 200)).toEqual([]);
+  });
+
+  it("reports the whole stream when nothing is labelled", () => {
+    expect(uncoveredStretches([], 200)).toEqual([span(0, 200)]);
+  });
+
+  it("ignores a span with no duration", () => {
+    expect(uncoveredStretches([span(50, 50)], 100)).toEqual([span(0, 100)]);
+  });
+
+  it("clamps a span that runs past the stream", () => {
+    expect(uncoveredStretches([span(0, 500)], 200)).toEqual([]);
+  });
+
+  it("reports nothing for a stream of no length", () => {
+    expect(uncoveredStretches([span(0, 100)], 0)).toEqual([]);
   });
 });

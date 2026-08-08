@@ -26,12 +26,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import {
   getFeaturedMessagesAction,
+  getMemberCountAction,
   getOverlayLayoutAction,
   getPlayableAskAction,
   getPlayableTtsAction,
   getPromotedMessagesAction,
   getStreamStandingsAction,
 } from "./page.actions";
+
+// The whole point of the strip is that the number moves when someone chats, so
+// it polls on the same 10s cadence the goals use rather than caching for longer.
+export function useMemberCount(channelSlug: string, enabled = true) {
+  return useQuery({
+    queryKey: ["overlay-member-count", channelSlug],
+    queryFn: () => getMemberCountAction(channelSlug),
+    refetchInterval: 10_000,
+    enabled,
+  });
+}
 
 // The saved layout drives the whole overlay frame. The 15s poll is the
 // fallback; live edits arrive over the layout broadcast channel within ~1s.

@@ -4,7 +4,7 @@ import { chatActivitySeries } from "../lib/timeline-activity";
 import {
   PROMPT_VERSION,
   mergeTimelinePayloads,
-  snapSectionBoundaries,
+  snapSpanBoundaries,
   validateTimelinePayload,
 } from "../lib/timeline";
 import type {
@@ -49,27 +49,32 @@ type Candidate = {
 
 async function assertTablesExist() {
   for (const table of [
-    "stream_sections",
+    "stream_threads",
+    "stream_thread_spans",
     "stream_moments",
     "stream_chapters",
   ] as const) {
     const { error } = await admin.from(table).select("id").limit(1);
     if (error) {
       throw new Error(
-        `${table} is not available (${error.message}). Run the add_stream_timeline migration first: npx supabase db push`
+        `${table} is not available (${error.message}). Run the timeline_threads migration first: npx supabase db push`
       );
     }
   }
 }
 
+// Labelled means labelled by THIS prompt. A prompt change therefore makes the whole
+// catalogue a candidate again without --force, so a relabel cannot half-apply and
+// leave two prompt versions mixed together.
 async function labelledStreamIds(): Promise<Set<string>> {
   const ids = new Set<string>();
-  for (const table of ["stream_sections", "stream_moments", "stream_chapters"] as const) {
+  for (const table of ["stream_threads", "stream_moments", "stream_chapters"] as const) {
     let from = 0;
     while (true) {
       const { data, error } = await admin
         .from(table)
         .select("stream_id")
+        .eq("prompt_version", PROMPT_VERSION)
         .range(from, from + PAGE - 1);
       if (error) {
         throw new Error(`Failed to read ${table}: ${error.message}`);
@@ -407,7 +412,7 @@ async function labelStream(
     payload = mergeTimelinePayloads([first, second], SEAM_OVERLAP_S);
   }
 
-  return snapSectionBoundaries(payload, inputs.boundaries, SNAP_TOLERANCE_S);
+  return snapSpanBoundaries(payload, inputs.boundaries, SNAP_TOLERANCE_S);
 }
 
 async function writeTimeline(streamId: string, payload: TimelinePayload) {
@@ -415,28 +420,64 @@ async function writeTimeline(streamId: string, payload: TimelinePayload) {
     return;
   }
 
-  for (const table of ["stream_sections", "stream_moments", "stream_chapters"] as const) {
+  // Moments before threads: a moment references a thread, and clearing the threads
+  // first would null those references on rows about to be deleted anyway.
+  for (const table of [
+    "stream_moments",
+    "stream_thread_spans",
+    "stream_threads",
+    "stream_chapters",
+  ] as const) {
     const { error } = await admin.from(table).delete().eq("stream_id", streamId);
     if (error) {
       throw new Error(`Failed to clear ${table}: ${error.message}`);
     }
   }
 
-  if (payload.sections.length > 0) {
-    const { error } = await admin.from("stream_sections").insert(
-      payload.sections.map((section) => ({
-        stream_id: streamId,
-        start_s: section.start_s,
-        end_s: section.end_s,
-        label: section.label,
-        summary: section.summary,
-        tags: section.tags,
-        scores: section.scores,
-        prompt_version: PROMPT_VERSION,
-      }))
-    );
+  const threadIdByTitle = new Map<string, string>();
+  if (payload.threads.length > 0) {
+    const { data, error } = await admin
+      .from("stream_threads")
+      .insert(
+        payload.threads.map((thread) => ({
+          stream_id: streamId,
+          title: thread.title,
+          summary: thread.summary,
+          tags: thread.tags,
+          scores: thread.scores,
+          prompt_version: PROMPT_VERSION,
+        }))
+      )
+      .select("id, title");
     if (error) {
-      throw new Error(`Failed to insert sections: ${error.message}`);
+      throw new Error(`Failed to insert threads: ${error.message}`);
+    }
+    for (const row of data ?? []) {
+      threadIdByTitle.set(row.title.trim().toLowerCase(), row.id);
+    }
+
+    const spans = payload.threads.flatMap((thread) => {
+      const threadId = threadIdByTitle.get(thread.title.trim().toLowerCase());
+      if (!threadId) {
+        return [];
+      }
+      return thread.spans.map((span, ordinal) => ({
+        thread_id: threadId,
+        stream_id: streamId,
+        start_s: span.start_s,
+        end_s: span.end_s,
+        label: span.label,
+        ordinal,
+        scores: span.scores,
+      }));
+    });
+    if (spans.length > 0) {
+      const { error: spanError } = await admin
+        .from("stream_thread_spans")
+        .insert(spans);
+      if (spanError) {
+        throw new Error(`Failed to insert spans: ${spanError.message}`);
+      }
     }
   }
 
@@ -444,7 +485,11 @@ async function writeTimeline(streamId: string, payload: TimelinePayload) {
     const { error } = await admin.from("stream_moments").insert(
       payload.moments.map((moment) => ({
         stream_id: streamId,
+        thread_id: moment.thread
+          ? threadIdByTitle.get(moment.thread.trim().toLowerCase()) ?? null
+          : null,
         start_s: moment.start_s,
+        peak_s: moment.peak_s,
         end_s: moment.end_s,
         kind: moment.kind,
         label: moment.label,
@@ -514,8 +559,10 @@ async function main() {
       await writeTimeline(candidate.streamId, result);
       labelled += 1;
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
+      const spans = result.threads.reduce((n, t) => n + t.spans.length, 0);
+      const recurring = result.threads.filter((t) => t.spans.length > 1).length;
       console.log(
-        `OK    ${date} ${candidate.streamId} source=${inputs.source} sections=${result.sections.length} moments=${result.moments.length} chapters=${result.chapters.length} ${elapsed}s`
+        `OK    ${date} ${candidate.streamId} source=${inputs.source} threads=${result.threads.length} (${recurring} recurring) spans=${spans} moments=${result.moments.length} chapters=${result.chapters.length} ${elapsed}s`
       );
     } catch (error) {
       failed += 1;

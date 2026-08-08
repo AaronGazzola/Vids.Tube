@@ -1,5 +1,6 @@
 import { summariseChat, type ChatRow } from "@/lib/chatter-stats";
 import type { BufferedMessage } from "../jobs/score";
+import { memberLink, siteLabel } from "./chatter-greeting";
 import type { CommandContext } from "./commands";
 
 // Imported lazily so the pure helpers (regeneration rules, clipping) stay
@@ -14,6 +15,9 @@ async function deps() {
 
 const REGEN_MESSAGE_DELTA = 20;
 const MAX_PROFILE_CHARS = 600;
+// The welcome-back greeting carries a mention and a link inside YouTube's
+// 200-character limit, so the short line has to leave room for both.
+const MAX_SHORT_CHARS = 110;
 
 export const FIRST_TIMER_REPLY =
   "you're brand new here — welcome in! Stick around, chat a bit, and I'll have a story about you next time.";
@@ -281,7 +285,8 @@ export async function gatherRecentMessages(
 }
 
 async function unclaimedClaimNudge(
-  identity: MeIdentity
+  identity: MeIdentity,
+  communitySlug: string
 ): Promise<string> {
   // Never prompt the host to claim a profile: the only one matching their
   // account would be a duplicate of their own community.
@@ -291,13 +296,19 @@ async function unclaimedClaimNudge(
   const { supabaseAdmin } = await deps();
   const { data } = await supabaseAdmin
     .from("channels")
-    .select("handle, owner_user_id")
+    .select("handle, owner_user_id, awaiting_enrichment")
     .eq("youtube_channel_id", identity.youtubeChannelId)
     .maybeSingle();
-  if (data && !data.owner_user_id) {
-    return ` · your page's already here — vids.tube/${data.handle} — sign in there to claim it`;
+  if (!data || data.owner_user_id) {
+    return "";
   }
-  return "";
+  // A handle still awaiting enrichment is about to be rewritten, so linking to
+  // it would publish an address that stops resolving.
+  if (data.awaiting_enrichment) {
+    return ` · your page's already here — ${siteLabel()} — sign in there to claim it`;
+  }
+  // The scheme is what makes YouTube render this as a link.
+  return ` · your page: ${memberLink(data.handle, communitySlug)}`;
 }
 
 function hasHistory(stats: MeStats): boolean {
@@ -334,16 +345,103 @@ function buildMePrompt(
     );
   }
   return [
-    "You write one-line chat-bot bios for live-stream viewers.",
-    `Using only these facts, write a warm, playful mini-bio about ${name} in the third person (e.g. "${name} has been part of the community since…"), under ~550 characters, plain text, no hashtags, no emojis at the start, no quotes around it.`,
-    "If their recent messages suggest what they like to talk about, weave in one playful nod to it.",
+    "You write chat-bot copy about live-stream viewers.",
+    `Using only these facts, write two things about ${name}:`,
+    `BIO: a warm, playful mini-bio in the third person (e.g. "${name} has been part of the community since…"), under ~550 characters. If their recent messages suggest what they like to talk about, weave in one playful nod to it.`,
+    `WELCOME: a single welcome-back line addressed to ${name} in the second person, under ${MAX_SHORT_CHARS} characters, referring to something they have actually said or done here. No greeting word at the start (the bot adds "welcome back" itself), no link, no mention handle.`,
+    "Both plain text, no hashtags, no emojis, no quotes around them.",
     ...lines,
-    "Reply with the bio text only.",
+    "Reply with exactly two lines, the first starting with BIO: and the second starting with WELCOME:.",
   ].join("\n");
 }
 
-export async function meHandler(ctx: CommandContext): Promise<void> {
+// Claude is asked for two labelled lines. If the labels are missing, the whole
+// reply is the bio and the caller falls back to a stats line for the greeting,
+// rather than publishing a half-parsed sentence.
+export function parseProfileResponse(raw: string): {
+  profile: string;
+  shortLine: string | null;
+} {
+  const bioMatch = raw.match(/^\s*BIO:\s*(.+?)\s*$/im);
+  const welcomeMatch = raw.match(/^\s*WELCOME:\s*(.+?)\s*$/im);
+  if (!bioMatch) {
+    return { profile: truncateProfile(raw), shortLine: null };
+  }
+  const shortRaw = welcomeMatch?.[1]?.trim() ?? "";
+  return {
+    profile: truncateProfile(bioMatch[1]),
+    shortLine: shortRaw ? clipShortLine(shortRaw) : null,
+  };
+}
+
+export function clipShortLine(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim().replace(/^["']|["']$/g, "");
+  if (clean.length <= MAX_SHORT_CHARS) return clean;
+  const slice = clean.slice(0, MAX_SHORT_CHARS - 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > MAX_SHORT_CHARS / 2 ? slice.slice(0, lastSpace) : slice;
+  return `${cut}…`;
+}
+
+// One cache, one regeneration rule, two consumers: the !me reply and the
+// welcome-back greeting. Sharing this is what stops the two describing the same
+// person differently in the same broadcast.
+export async function ensureMeProfile(
+  identity: MeIdentity,
+  streamId: string,
+  stats: MeStats
+): Promise<{ profile: string; shortLine: string | null }> {
   const { supabaseAdmin, runClaude } = await deps();
+
+  const { data: cached } = await supabaseAdmin
+    .from("me_profiles")
+    .select("profile, short_line, snapshot, generated_at")
+    .eq("profile_key", identity.key)
+    .maybeSingle();
+
+  const { data: streamRow } = await supabaseAdmin
+    .from("streams")
+    .select("started_at, created_at")
+    .eq("id", streamId)
+    .maybeSingle();
+  const streamStartedAt =
+    streamRow?.started_at ?? streamRow?.created_at ?? null;
+
+  const stale =
+    !cached?.profile ||
+    needsRegeneration(
+      cached?.snapshot as Partial<MeStats> | null,
+      stats,
+      cached?.generated_at ?? null,
+      streamStartedAt
+    );
+
+  if (!stale && cached?.profile) {
+    return { profile: cached.profile, shortLine: cached.short_line };
+  }
+
+  const recent = await gatherRecentMessages(identity);
+  const raw = await runClaude(buildMePrompt(identity, stats, recent));
+  const parsed = parseProfileResponse(raw);
+
+  const { error } = await supabaseAdmin.from("me_profiles").upsert(
+    {
+      profile_key: identity.key,
+      profile: parsed.profile,
+      short_line: parsed.shortLine,
+      snapshot: stats as unknown as Record<string, number>,
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "profile_key" }
+  );
+  if (error) {
+    console.error("me profile cache write failed:", error);
+  }
+
+  return parsed;
+}
+
+export async function meHandler(ctx: CommandContext): Promise<void> {
   const identity = await resolveMeIdentity(ctx.message, ctx.stream.channelId);
 
   if (identity.isHost && identity.communityChannelId) {
@@ -363,47 +461,7 @@ export async function meHandler(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const { data: cached } = await supabaseAdmin
-    .from("me_profiles")
-    .select("profile, snapshot, generated_at")
-    .eq("profile_key", identity.key)
-    .maybeSingle();
-
-  const { data: streamRow } = await supabaseAdmin
-    .from("streams")
-    .select("started_at, created_at")
-    .eq("id", ctx.stream.id)
-    .maybeSingle();
-  const streamStartedAt =
-    streamRow?.started_at ?? streamRow?.created_at ?? null;
-
-  let profile = cached?.profile ?? null;
-  if (
-    !profile ||
-    needsRegeneration(
-      cached?.snapshot as Partial<MeStats> | null,
-      stats,
-      cached?.generated_at ?? null,
-      streamStartedAt
-    )
-  ) {
-    const recent = await gatherRecentMessages(identity);
-    const raw = await runClaude(buildMePrompt(identity, stats, recent));
-    profile = truncateProfile(raw);
-    const { error } = await supabaseAdmin.from("me_profiles").upsert(
-      {
-        profile_key: identity.key,
-        profile,
-        snapshot: stats as unknown as Record<string, number>,
-        generated_at: new Date().toISOString(),
-      },
-      { onConflict: "profile_key" }
-    );
-    if (error) {
-      console.error("me profile cache write failed:", error);
-    }
-  }
-
-  const nudge = await unclaimedClaimNudge(identity);
+  const { profile } = await ensureMeProfile(identity, ctx.stream.id, stats);
+  const nudge = await unclaimedClaimNudge(identity, ctx.stream.channelSlug);
   ctx.reply(truncateProfile(`${mention} ${profile}`) + nudge);
 }

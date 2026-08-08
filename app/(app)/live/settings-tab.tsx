@@ -57,6 +57,7 @@ export type SettingsForm = {
   ttsSimilarity: string;
   askMode: "suggest" | "auto";
   bridgeEnabled: boolean;
+  greetReturning: boolean;
   highlightingEnabled: boolean;
   usefulInfoEnabled: boolean;
   competitionStatusEnabled: boolean;
@@ -807,6 +808,12 @@ export function SettingsTab({
           description="Post vids.tube chat messages into the YouTube live chat via Nightbot."
           checked={form.bridgeEnabled}
           onCheckedChange={(v) => set({ bridgeEnabled: v })}
+        />
+        <SwitchRow
+          label="Welcome returning chatters"
+          description="On: someone who has chatted here before gets a personal welcome back on their first message. Off: only first-time chatters are greeted."
+          checked={form.greetReturning}
+          onCheckedChange={(v) => set({ greetReturning: v })}
         />
         <SwitchRow
           label="Featured highlighting"

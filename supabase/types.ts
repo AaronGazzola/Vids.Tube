@@ -118,6 +118,33 @@ export type Database = {
           },
         ]
       }
+      badges: {
+        Row: {
+          created_at: string
+          criteria: string
+          description: string
+          icon: string | null
+          key: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          criteria: string
+          description: string
+          icon?: string | null
+          key: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: string
+          description?: string
+          icon?: string | null
+          key?: string
+          title?: string
+        }
+        Relationships: []
+      }
       banned_participants: {
         Row: {
           author_name: string | null
@@ -260,6 +287,7 @@ export type Database = {
           description: string
           handle: string
           id: string
+          is_software: boolean
           merged_into_channel_id: string | null
           name: string
           owner_user_id: string | null
@@ -276,6 +304,7 @@ export type Database = {
           description?: string
           handle: string
           id?: string
+          is_software?: boolean
           merged_into_channel_id?: string | null
           name: string
           owner_user_id?: string | null
@@ -292,6 +321,7 @@ export type Database = {
           description?: string
           handle?: string
           id?: string
+          is_software?: boolean
           merged_into_channel_id?: string | null
           name?: string
           owner_user_id?: string | null
@@ -428,6 +458,7 @@ export type Database = {
           bridge_enabled: boolean
           competition_status_enabled: boolean
           enabled: boolean
+          greet_returning: boolean
           highlighting_enabled: boolean
           last_scored_at: string | null
           locked_until: string | null
@@ -449,6 +480,7 @@ export type Database = {
           bridge_enabled?: boolean
           competition_status_enabled?: boolean
           enabled?: boolean
+          greet_returning?: boolean
           highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
@@ -470,6 +502,7 @@ export type Database = {
           bridge_enabled?: boolean
           competition_status_enabled?: boolean
           enabled?: boolean
+          greet_returning?: boolean
           highlighting_enabled?: boolean
           last_scored_at?: string | null
           locked_until?: string | null
@@ -802,21 +835,63 @@ export type Database = {
           generated_at: string
           profile: string
           profile_key: string
+          short_line: string | null
           snapshot: Json
         }
         Insert: {
           generated_at?: string
           profile: string
           profile_key: string
+          short_line?: string | null
           snapshot: Json
         }
         Update: {
           generated_at?: string
           profile?: string
           profile_key?: string
+          short_line?: string | null
           snapshot?: Json
         }
         Relationships: []
+      }
+      membership_badges: {
+        Row: {
+          awarded_at: string
+          badge_key: string
+          id: string
+          membership_id: string
+          note: string | null
+        }
+        Insert: {
+          awarded_at?: string
+          badge_key: string
+          id?: string
+          membership_id: string
+          note?: string | null
+        }
+        Update: {
+          awarded_at?: string
+          badge_key?: string
+          id?: string
+          membership_id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_badges_badge_key_fkey"
+            columns: ["badge_key"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "membership_badges_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       membership_stream_stats: {
         Row: {
@@ -1182,6 +1257,42 @@ export type Database = {
           },
         ]
       }
+      stream_greetings: {
+        Row: {
+          channel_id: string
+          greeted_at: string
+          kind: string
+          stream_id: string
+        }
+        Insert: {
+          channel_id: string
+          greeted_at?: string
+          kind: string
+          stream_id: string
+        }
+        Update: {
+          channel_id?: string
+          greeted_at?: string
+          kind?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_greetings_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stream_greetings_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stream_keys: {
         Row: {
           channel_id: string
@@ -1215,12 +1326,14 @@ export type Database = {
           id: string
           kind: string
           label: string
+          peak_s: number
           prompt_version: string
           scores: Json
           start_s: number
           stream_id: string
           summary: string
           tags: string[]
+          thread_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1228,12 +1341,14 @@ export type Database = {
           id?: string
           kind: string
           label: string
+          peak_s: number
           prompt_version: string
           scores: Json
           start_s: number
           stream_id: string
           summary: string
           tags?: string[]
+          thread_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1241,12 +1356,14 @@ export type Database = {
           id?: string
           kind?: string
           label?: string
+          peak_s?: number
           prompt_version?: string
           scores?: Json
           start_s?: number
           stream_id?: string
           summary?: string
           tags?: string[]
+          thread_id?: string | null
         }
         Relationships: [
           {
@@ -1256,48 +1373,100 @@ export type Database = {
             referencedRelation: "streams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stream_moments_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "stream_threads"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      stream_sections: {
+      stream_thread_spans: {
         Row: {
           created_at: string
-          end_s: number | null
+          end_s: number
           id: string
           label: string
-          prompt_version: string
+          ordinal: number
           scores: Json
           start_s: number
           stream_id: string
-          summary: string
-          tags: string[]
+          thread_id: string
         }
         Insert: {
           created_at?: string
-          end_s?: number | null
+          end_s: number
           id?: string
           label: string
-          prompt_version: string
+          ordinal: number
           scores: Json
           start_s: number
           stream_id: string
-          summary: string
-          tags?: string[]
+          thread_id: string
         }
         Update: {
           created_at?: string
-          end_s?: number | null
+          end_s?: number
           id?: string
           label?: string
-          prompt_version?: string
+          ordinal?: number
           scores?: Json
           start_s?: number
           stream_id?: string
-          summary?: string
-          tags?: string[]
+          thread_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "stream_sections_stream_id_fkey"
+            foreignKeyName: "stream_thread_spans_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stream_thread_spans_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "stream_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_threads: {
+        Row: {
+          created_at: string
+          id: string
+          prompt_version: string
+          scores: Json
+          stream_id: string
+          summary: string
+          tags: string[]
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt_version: string
+          scores: Json
+          stream_id: string
+          summary: string
+          tags?: string[]
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt_version?: string
+          scores?: Json
+          stream_id?: string
+          summary?: string
+          tags?: string[]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_threads_stream_id_fkey"
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "streams"
@@ -1770,6 +1939,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      community_member_count: { Args: { p_community: string }; Returns: number }
       credits_for_xp: { Args: { xp: number }; Returns: number }
       email_signup_status: { Args: { p_email: string }; Returns: string }
       end_abandoned_live_streams: { Args: never; Returns: number }
@@ -1779,6 +1949,7 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: number
       }
+      membership_rank: { Args: { p_membership: string }; Returns: number }
       merge_youtube_identity: { Args: { p_user_id: string }; Returns: Json }
       recompute_membership: {
         Args: { p_channel_id: string; p_community_channel_id: string }

@@ -18,10 +18,13 @@ export const OVERLAY_BASE_DIMS = {
   goal: { w: 160, h: 160 },
   competition: { w: 120, h: 520 },
   break: { w: 320, h: 150 },
+  // Three quarters of the 1080-wide canvas, and short: the members strip shares
+  // vertical space with the goals, the ladder and the highlight surface.
+  members: { w: 810, h: 128 },
 } as const;
 
 export type OverlayBoxKey =
-  | "goalSubs"
+  | "members"
   | "goalLikes"
   | "goalViewers"
   | "competition"
@@ -34,7 +37,7 @@ export type DemoOverlayVisibility = {
   highlight: boolean;
   tts: boolean;
   ask: boolean;
-  goalSubs: boolean;
+  members: boolean;
   goalLikes: boolean;
   goalViewers: boolean;
   competition: boolean;
@@ -91,11 +94,9 @@ export const DEMO_OVERLAY_EVENT = "snapshot";
 export const DEMO_OVERLAY_STALE_MS = 8000;
 export const DEMO_TTS_SAMPLE_SRC = "/demo/tts-sample.mp3";
 
-export const GOAL_METRIC_BOX: Record<
-  GoalMetric,
-  "goalSubs" | "goalLikes" | "goalViewers"
+export const GOAL_METRIC_BOX: Partial<
+  Record<GoalMetric, "goalLikes" | "goalViewers">
 > = {
-  subs: "goalSubs",
   likes: "goalLikes",
   viewers: "goalViewers",
 };

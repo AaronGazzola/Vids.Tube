@@ -25,7 +25,7 @@ import {
 
 const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
   highlight: OVERLAY_BASE_DIMS.highlight,
-  goalSubs: OVERLAY_BASE_DIMS.goal,
+  members: OVERLAY_BASE_DIMS.members,
   goalLikes: OVERLAY_BASE_DIMS.goal,
   goalViewers: OVERLAY_BASE_DIMS.goal,
   competition: OVERLAY_BASE_DIMS.competition,
@@ -34,7 +34,7 @@ const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
 
 const BOX_KEYS: DemoBoxKey[] = [
   "highlight",
-  "goalSubs",
+  "members",
   "goalLikes",
   "goalViewers",
   "competition",
@@ -42,10 +42,10 @@ const BOX_KEYS: DemoBoxKey[] = [
 ];
 
 const TOGGLE_KEYS: DemoOverlayKey[] = [
+  "members",
   "highlight",
   "tts",
   "ask",
-  "goalSubs",
   "goalLikes",
   "goalViewers",
   "competition",

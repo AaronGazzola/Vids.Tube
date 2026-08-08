@@ -43,6 +43,33 @@ export async function getOverlayLayoutAction(
   );
 }
 
+export async function getMemberCountAction(
+  channelSlug: string
+): Promise<number> {
+  const { data: channel, error: channelError } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", channelSlug)
+    .maybeSingle();
+  if (channelError) {
+    console.error(channelError);
+    throw new Error("Failed to fetch channel");
+  }
+  if (!channel) {
+    return 0;
+  }
+  // One definition of "member", shared with the channel page and the greeting,
+  // so the number on stream cannot disagree with the number on the page.
+  const { data, error } = await supabaseAdmin.rpc("community_member_count", {
+    p_community: channel.id,
+  });
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to count members");
+  }
+  return data ?? 0;
+}
+
 export async function getFeaturedMessagesAction(
   streamId: string
 ): Promise<FeaturedMessageWithAuthor[]> {

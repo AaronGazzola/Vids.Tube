@@ -38,6 +38,31 @@ describe("what the player paints for each source", () => {
   });
 });
 
+describe("the transport's clock", () => {
+  const SPANS = [
+    { startS: 100, endS: 160 },
+    { startS: 500, endS: 530 },
+  ];
+
+  it("measures the fused piece when a span set is given", () => {
+    const html = markup(<VideoPlayer source={MP4} spans={SPANS} />);
+    // 60 + 30 seconds of source, however far apart they sit.
+    expect(html).toContain("1:30");
+  });
+
+  it("measures the whole source when no span set is given", () => {
+    const html = markup(<VideoPlayer source={MP4} />);
+    expect(html).not.toContain("1:30");
+    expect(html).toContain("0:00");
+  });
+
+  it("starts a fused piece at zero rather than at the first span's real time", () => {
+    const html = markup(<VideoPlayer source={MP4} spans={SPANS} />);
+    expect(html).toContain("0:00");
+    expect(html).not.toContain("1:40");
+  });
+});
+
 describe("how the frame is sized", () => {
   it("never crops: the video is contained, not covered", () => {
     const html = markup(<VideoPlayer source={MP4} width={1440} height={1080} />);

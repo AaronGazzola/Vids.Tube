@@ -1,7 +1,7 @@
 import type { Counts } from "@/lib/goals";
 
 export type DemoBoxKey =
-  | "goalSubs"
+  | "members"
   | "goalLikes"
   | "goalViewers"
   | "competition"
@@ -14,7 +14,9 @@ export type DemoBox = { x: number; y: number; scale: number };
 
 // Bumped when the meaning of box coordinates changes; saved layouts from an
 // older version keep their toggles but fall back to the default boxes.
-export const DEMO_LAYOUT_VERSION = 2;
+// v3 replaced the square subscriber-goal box with the wide members strip, whose
+// coordinates mean something different, so v2 layouts must not inherit them.
+export const DEMO_LAYOUT_VERSION = 3;
 
 export type OverlayFeedSound = "chime" | "off";
 
@@ -30,7 +32,7 @@ export type DemoLayoutConfig = {
 };
 
 export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
-  "goalSubs",
+  "members",
   "goalLikes",
   "goalViewers",
   "competition",
@@ -41,7 +43,7 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
 ];
 
 export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
-  goalSubs: "Subs goal",
+  members: "Members",
   goalLikes: "Likes goal",
   goalViewers: "Viewers goal",
   competition: "Competition",
@@ -56,7 +58,9 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
 export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   version: DEMO_LAYOUT_VERSION,
   boxes: {
-    goalSubs: { x: 48, y: 64, scale: 2 },
+    // Centred across the top at scale 1: 810 wide on a 1080 canvas leaves 135
+    // either side, so the strip reads as a banner rather than a floating box.
+    members: { x: 135, y: 56, scale: 1 },
     goalLikes: { x: 48, y: 380, scale: 2 },
     goalViewers: { x: 700, y: 64, scale: 2 },
     competition: { x: 48, y: 720, scale: 2 },
@@ -64,7 +68,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     break: { x: 220, y: 860, scale: 2 },
   },
   visible: {
-    goalSubs: true,
+    members: true,
     goalLikes: true,
     goalViewers: true,
     competition: true,
@@ -77,7 +81,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   background: "slideshow",
   mobileChrome: false,
   boxOpacity: {
-    goalSubs: 1,
+    members: 1,
     goalLikes: 1,
     goalViewers: 1,
     competition: 0.6,
@@ -91,22 +95,74 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
 // over these at render time; these are only the fallback when none are set.
 export const DEMO_GOAL_TARGETS: Counts = { subs: 1000, likes: 500, viewers: 100 };
 
+// Sample figure for the layout preview, which runs on generated data rather than
+// the live community.
+export const DEMO_MEMBER_COUNT = 143;
+
 // Saved layouts from before per-overlay opacity carry a single
 // `competitionOpacity` number; it migrates into `boxOpacity.competition`.
 type LegacyDemoLayoutConfig = Partial<DemoLayoutConfig> & {
   competitionOpacity?: number;
 };
 
+export const DEMO_BOX_KEYS: DemoBoxKey[] = [
+  "members",
+  "goalLikes",
+  "goalViewers",
+  "competition",
+  "highlight",
+  "break",
+];
+
+// A version bump used to throw away every saved position, which cost the owner
+// their whole layout every time an overlay changed. Positions are hard-won and
+// are never discarded wholesale again.
+//
+// A version lists only the boxes whose coordinates genuinely changed meaning at
+// that version; every other box carries its saved position forward. A box that
+// is new, or that was never saved, takes its default.
+const RESET_AT_VERSION: Record<number, DemoBoxKey[]> = {
+  // v3 introduced the members strip and removed the subscriber goal box.
+  // Nothing that survived the change moved, so nothing is reset.
+  3: [],
+};
+
+function isBox(value: unknown): value is DemoBox {
+  if (typeof value !== "object" || value === null) return false;
+  const b = value as Partial<DemoBox>;
+  return (
+    Number.isFinite(b.x) && Number.isFinite(b.y) && Number.isFinite(b.scale)
+  );
+}
+
+function keysResetSince(savedVersion: number | undefined): Set<DemoBoxKey> {
+  const from = Number.isFinite(savedVersion)
+    ? (savedVersion as number)
+    : DEMO_LAYOUT_VERSION;
+  const reset = new Set<DemoBoxKey>();
+  for (let v = from + 1; v <= DEMO_LAYOUT_VERSION; v += 1) {
+    for (const key of RESET_AT_VERSION[v] ?? []) reset.add(key);
+  }
+  return reset;
+}
+
 export function mergeDemoLayout(
   partial: LegacyDemoLayoutConfig | null | undefined
 ): DemoLayoutConfig {
   if (!partial) return DEFAULT_DEMO_LAYOUT;
-  const boxesCurrent = partial.version === DEMO_LAYOUT_VERSION;
+
+  const reset = keysResetSince(partial.version);
+  const saved = (partial.boxes ?? {}) as Partial<Record<DemoBoxKey, unknown>>;
+  const boxes = {} as Record<DemoBoxKey, DemoBox>;
+  for (const key of DEMO_BOX_KEYS) {
+    const value = saved[key];
+    boxes[key] =
+      !reset.has(key) && isBox(value) ? value : DEFAULT_DEMO_LAYOUT.boxes[key];
+  }
+
   return {
     version: DEMO_LAYOUT_VERSION,
-    boxes: boxesCurrent
-      ? { ...DEFAULT_DEMO_LAYOUT.boxes, ...(partial.boxes ?? {}) }
-      : DEFAULT_DEMO_LAYOUT.boxes,
+    boxes,
     visible: { ...DEFAULT_DEMO_LAYOUT.visible, ...(partial.visible ?? {}) },
     goalProgressFull:
       partial.goalProgressFull ?? DEFAULT_DEMO_LAYOUT.goalProgressFull,
