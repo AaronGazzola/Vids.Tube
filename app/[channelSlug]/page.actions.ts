@@ -290,6 +290,22 @@ export async function getChannelCommunityAction(
   };
 }
 
+// Split out from the leaderboard so the total can be polled cheaply during a
+// broadcast without refetching every loaded page of members.
+export async function getCommunityMemberCountAction(
+  channelId: string
+): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_member_count", {
+    p_community: channelId,
+  });
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to count members");
+  }
+  return data ?? 0;
+}
+
 export async function getLiveChattersAction(
   streamId: string,
   communityId: string

@@ -12,6 +12,7 @@ import {
   channelHasHostedAction,
   getChannelBySlugAction,
   getChannelCommunityAction,
+  getCommunityMemberCountAction,
   getChannelMembershipsAction,
   getChannelProcessingVideosAction,
   getChannelVideosAction,
@@ -57,6 +58,21 @@ export function useChannelCommunity(
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.length : undefined,
     enabled: !!channelId && enabled,
+  });
+}
+
+// The overlay's count ticks up within seconds of a first message, so the number
+// on the channel page has to move too, or the two disagree in front of everyone.
+// Polled only while the channel is broadcasting.
+export function useCommunityMemberCount(
+  channelId: string | undefined,
+  live: boolean
+) {
+  return useQuery({
+    queryKey: ["community-member-count", channelId],
+    queryFn: () => getCommunityMemberCountAction(channelId!),
+    enabled: !!channelId,
+    refetchInterval: live ? 15_000 : false,
   });
 }
 

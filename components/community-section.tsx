@@ -3,6 +3,7 @@
 import type { CommunityMember } from "@/app/[channelSlug]/page.types";
 import {
   useChannelCommunity,
+  useCommunityMemberCount,
   useLiveChatters,
 } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
@@ -57,10 +58,14 @@ export function CommunitySection({
 }) {
   const community = useChannelCommunity(channelId);
   const { data: stream } = useLiveStream(channelId);
-  const liveStreamId = stream?.status === "live" ? stream.id : undefined;
+  const isLive = stream?.status === "live";
+  const liveStreamId = isLive ? stream.id : undefined;
   const { data: chatters } = useLiveChatters(liveStreamId, channelId);
+  const { data: polledTotal } = useCommunityMemberCount(channelId, isLive);
 
-  const total = community.data?.pages[0]?.total ?? 0;
+  // The polled figure wins while live, so the page and the overlay show the same
+  // number; the paged query supplies it otherwise.
+  const total = polledTotal ?? community.data?.pages[0]?.total ?? 0;
   const members = community.data?.pages.flatMap((p) => p.members) ?? [];
 
   return (
