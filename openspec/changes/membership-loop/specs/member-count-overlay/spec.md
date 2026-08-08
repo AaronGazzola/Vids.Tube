@@ -46,26 +46,33 @@ Overlay positions are set by hand against a live picture and are expensive to re
 
 ### Requirement: The members box shows the count and the call to action
 
-The members box SHALL sit on the same translucent black backing the other overlay surfaces use.
+The members box SHALL sit on the same translucent black backing the other overlay surfaces use, inside a white border with rounded corners, so the strip holds its edge against any picture behind it.
 
-Along its left it SHALL read "Join the chat to become a member". Down its right it SHALL stack the member total, then "Vids.tube", then "Members", so the right-hand side reads as one phrase: the number carries the name of the place with it.
+Along its left it SHALL read "Chat to become a member". Down its right it SHALL stack the member total above the label "Members".
 
-No second line of instructions SHALL appear. The earlier "See your stats at vids.tube" is removed: the left-hand call to action already says what to do, and the right-hand stack already names where.
+The count and its label SHALL be sized close together: a bare number means nothing to someone seeing it for the first time, and it is the word beneath that turns a statistic into an invitation.
+
+Nothing else SHALL appear on the strip. Neither a second line of instructions nor the site's own name belongs there: the call to action already says what to do, and the count says how many have done it.
 
 #### Scenario: The box states how to join
 
 - **WHEN** the members box renders during a broadcast
-- **THEN** its left reads "Join the chat to become a member"
+- **THEN** its left reads "Chat to become a member"
 
-#### Scenario: The right-hand side names the place
-
-- **WHEN** the members box renders
-- **THEN** the member total, "Vids.tube" and "Members" are stacked in that order down its right
-
-#### Scenario: The second instruction is gone
+#### Scenario: The right-hand side is the count and its label
 
 - **WHEN** the members box renders
-- **THEN** no "See your stats" line appears
+- **THEN** the member total sits above the label "Members", and nothing else appears beside them
+
+#### Scenario: The strip is bordered
+
+- **WHEN** the members box renders
+- **THEN** it carries a white border with rounded corners
+
+#### Scenario: Nothing extra is carried
+
+- **WHEN** the members box renders
+- **THEN** no "See your stats" line and no site name appear on it
 
 ### Requirement: The members box is a thin horizontal strip
 
