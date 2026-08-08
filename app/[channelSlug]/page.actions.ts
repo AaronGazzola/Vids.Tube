@@ -201,6 +201,36 @@ export async function getChannelMembershipsAction(
   });
 }
 
+async function badgesFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  membershipIds: string[]
+): Promise<Map<string, MembershipBadge[]>> {
+  const byMembership = new Map<string, MembershipBadge[]>();
+  if (!membershipIds.length) {
+    return byMembership;
+  }
+  const { data, error } = await supabase
+    .from("membership_badges")
+    .select("membership_id, awarded_at, badges(key, title, description)")
+    .in("membership_id", membershipIds);
+  if (error) {
+    console.error(error);
+    return byMembership;
+  }
+  for (const a of data ?? []) {
+    const badge = a.badges as unknown as {
+      key: string;
+      title: string;
+      description: string;
+    } | null;
+    if (!badge) continue;
+    const list = byMembership.get(a.membership_id) ?? [];
+    list.push({ ...badge, awardedAt: a.awarded_at });
+    byMembership.set(a.membership_id, list);
+  }
+  return byMembership;
+}
+
 export async function getChannelCommunityAction(
   channelId: string,
   page = 0
@@ -248,25 +278,10 @@ export async function getChannelCommunityAction(
   });
   const pageRows = eligible.slice(0, COMMUNITY_PAGE_SIZE);
 
-  const { data: awards } = await supabase
-    .from("membership_badges")
-    .select("membership_id, awarded_at, badges(key, title, description)")
-    .in(
-      "membership_id",
-      pageRows.length ? pageRows.map((r) => r.id) : ["00000000-0000-0000-0000-000000000000"]
-    );
-  const badgesByMembership = new Map<string, MembershipBadge[]>();
-  for (const a of awards ?? []) {
-    const badge = a.badges as unknown as {
-      key: string;
-      title: string;
-      description: string;
-    } | null;
-    if (!badge) continue;
-    const list = badgesByMembership.get(a.membership_id) ?? [];
-    list.push({ ...badge, awardedAt: a.awarded_at });
-    badgesByMembership.set(a.membership_id, list);
-  }
+  const badgesByMembership = await badgesFor(
+    supabase,
+    pageRows.map((r) => r.id)
+  );
 
   const members: CommunityMember[] = pageRows.map((r) => {
     const c = r.channels as unknown as MemberChannel;
@@ -306,68 +321,106 @@ export async function getCommunityMemberCountAction(
   return data ?? 0;
 }
 
-export async function getLiveChattersAction(
+// Standing within one broadcast, ordered by the XP earned in it and then by how
+// much was said, so someone who chatted without scoring still appears rather
+// than vanishing from the board of the stream they took part in.
+export async function getStreamLeaderboardAction(
   streamId: string,
-  communityId: string
-): Promise<CommunityMember[]> {
+  page = 0
+): Promise<{ total: number; members: CommunityMember[]; hasMore: boolean }> {
   const supabase = await createClient();
 
-  const { data: msgs, error } = await supabase
-    .from("chat_messages")
-    .select("external_author_id")
+  const { data: rows, error } = await supabase
+    .from("membership_stream_stats")
+    .select(
+      "membership_id, xp, message_count, memberships!inner(id, channel_id, level, lifetime_xp, channels!memberships_channel_id_fkey!inner(handle, name, avatar_path, remote_avatar_path, youtube_channel_id, is_software))"
+    )
     .eq("stream_id", streamId)
-    .eq("origin", "youtube")
-    .not("external_author_id", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(2000);
+    .order("xp", { ascending: false })
+    .order("message_count", { ascending: false });
   if (error) {
     console.error(error);
-    throw new Error("Failed to load chatters");
+    throw new Error("Failed to load the broadcast leaderboard");
   }
 
-  const authorIds = Array.from(
-    new Set((msgs ?? []).map((m) => m.external_author_id).filter((id): id is string => !!id))
+  type Joined = {
+    membership_id: string;
+    xp: number;
+    message_count: number;
+    memberships: {
+      id: string;
+      channel_id: string;
+      level: number;
+      lifetime_xp: number;
+      channels: {
+        handle: string;
+        name: string;
+        avatar_path: string | null;
+        remote_avatar_path: string | null;
+        youtube_channel_id: string | null;
+        is_software: boolean;
+      } | null;
+    } | null;
+  };
+
+  const eligible = (rows as unknown as Joined[]).filter((r) => {
+    const c = r.memberships?.channels;
+    return !!c && !!c.youtube_channel_id && !c.is_software;
+  });
+
+  const from = page * COMMUNITY_PAGE_SIZE;
+  const pageRows = eligible.slice(from, from + COMMUNITY_PAGE_SIZE);
+
+  const badgesByMembership = await badgesFor(
+    supabase,
+    pageRows.map((r) => r.membership_id)
   );
-  if (!authorIds.length) {
-    return [];
+
+  const members: CommunityMember[] = pageRows.map((r) => {
+    const m = r.memberships!;
+    const c = m.channels!;
+    return {
+      membershipId: m.id,
+      channelId: m.channel_id,
+      handle: c.handle,
+      name: c.name,
+      avatarPath: c.avatar_path,
+      remoteAvatarPath: c.remote_avatar_path,
+      level: m.level,
+      lifetimeXp: m.lifetime_xp,
+      streamXp: r.xp,
+      streamMessageCount: r.message_count,
+      badges: badgesByMembership.get(m.id) ?? [],
+    };
+  });
+
+  return {
+    total: eligible.length,
+    members,
+    hasMore: from + members.length < eligible.length && members.length > 0,
+  };
+}
+
+// The most recent broadcast that has finished, used for the latest-stream board.
+export async function getLatestEndedStreamAction(
+  channelId: string
+): Promise<{ id: string; title: string | null; startedAt: string | null } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("streams")
+    .select("id, title, started_at")
+    .eq("channel_id", channelId)
+    .eq("status", "ended")
+    .order("started_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load the latest broadcast");
   }
-
-  const { data: channels } = await supabase
-    .from("channels")
-    .select("id, handle, name, avatar_path, remote_avatar_path")
-    .in("youtube_channel_id", authorIds)
-    .eq("is_software", false);
-  if (!channels?.length) {
-    return [];
-  }
-
-  const { data: rows } = await supabase
-    .from("memberships")
-    .select("id, channel_id, level, lifetime_xp")
-    .eq("community_channel_id", communityId)
-    .in(
-      "channel_id",
-      channels.map((c) => c.id)
-    );
-  const membershipByChannel = new Map((rows ?? []).map((r) => [r.channel_id, r]));
-
-  return channels
-    .filter((c) => membershipByChannel.has(c.id))
-    .map((c) => {
-      const m = membershipByChannel.get(c.id)!;
-      return {
-        membershipId: m.id,
-        channelId: c.id,
-        handle: c.handle,
-        name: c.name,
-        avatarPath: c.avatar_path,
-        remoteAvatarPath: c.remote_avatar_path,
-        level: m.level,
-        lifetimeXp: m.lifetime_xp,
-        badges: [],
-      };
-    })
-    .sort((a, b) => b.lifetimeXp - a.lifetimeXp);
+  return data
+    ? { id: data.id, title: data.title, startedAt: data.started_at }
+    : null;
 }
 
 export async function channelHasHostedAction(

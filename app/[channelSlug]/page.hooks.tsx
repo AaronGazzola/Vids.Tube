@@ -16,7 +16,8 @@ import {
   getChannelMembershipsAction,
   getChannelProcessingVideosAction,
   getChannelVideosAction,
-  getLiveChattersAction,
+  getLatestEndedStreamAction,
+  getStreamLeaderboardAction,
   getUpcomingScheduledBroadcastAction,
   uploadChannelBrandingAction,
 } from "./page.actions";
@@ -76,15 +77,30 @@ export function useCommunityMemberCount(
   });
 }
 
-export function useLiveChatters(
-  streamId: string | undefined,
-  communityId: string | undefined
-) {
+export function useLatestEndedStream(channelId: string | undefined) {
   return useQuery({
-    queryKey: ["live-chatters", streamId],
-    queryFn: () => getLiveChattersAction(streamId!, communityId!),
-    enabled: !!streamId && !!communityId,
-    refetchInterval: 20_000,
+    queryKey: ["latest-ended-stream", channelId],
+    queryFn: () => getLatestEndedStreamAction(channelId!),
+    enabled: !!channelId,
+  });
+}
+
+// Standing within one broadcast. The live board polls so places move while the
+// broadcast runs; a finished broadcast cannot change, so it does not.
+export function useStreamLeaderboard(
+  streamId: string | null,
+  live: boolean,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: ["stream-leaderboard", streamId],
+    queryFn: ({ pageParam }) =>
+      getStreamLeaderboardAction(streamId!, pageParam as number),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) =>
+      last.hasMore ? pages.length : undefined,
+    enabled: !!streamId && enabled,
+    refetchInterval: live ? 20_000 : false,
   });
 }
 

@@ -130,7 +130,7 @@ test("the leaderboard expands in place rather than navigating away", async ({
   const rows = community.locator("ul > li");
   await expect(rows).toHaveCount(5);
 
-  const more = page.getByRole("button", { name: /Show more members/ });
+  const more = page.getByRole("button", { name: /Show more/ });
   await expect(more).toBeVisible();
   await more.click();
 
@@ -151,6 +151,94 @@ test("a leaderboard entry links to that member's membership", async ({
 
   await first.click();
   await expect(page.locator(`#community-${ownerSlug}`)).toHaveClass(/ring-2/);
+});
+
+test("the community section offers all-time and latest-stream, and no live tab when off air", async ({
+  page,
+}) => {
+  await page.goto(`/${ownerSlug}`);
+
+  const community = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Community" }) });
+
+  const allTime = community.getByRole("tab", { name: "All time" });
+  await expect(allTime).toHaveAttribute("aria-selected", "true");
+  await expect(community.getByRole("tab", { name: "Latest stream" })).toBeVisible();
+  await expect(community.getByRole("tab", { name: "Now live" })).toHaveCount(0);
+});
+
+test("the latest-stream tab shows that broadcast's standing", async ({ page }) => {
+  await page.goto(`/${ownerSlug}`);
+
+  const community = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Community" }) });
+
+  await community.getByRole("tab", { name: "Latest stream" }).click();
+  await expect(
+    community.getByRole("tab", { name: "Latest stream" })
+  ).toHaveAttribute("aria-selected", "true");
+
+  // A per-broadcast board reports what was earned in it, not a lifetime level.
+  await expect(community.getByText(/\d+ XP · \d+ msg/).first()).toBeVisible();
+  await expect(community.getByText(/took part/)).toBeVisible();
+});
+
+test("going live opens on a distinguished live tab, and ending restores all-time", async ({
+  page,
+}) => {
+  const { data: owner } = await admin
+    .from("channels")
+    .select("id")
+    .eq("slug", ownerSlug)
+    .maybeSingle();
+  const { data: target } = await admin
+    .from("streams")
+    .select("id, status")
+    .eq("channel_id", owner!.id)
+    .eq("status", "ended")
+    .order("started_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  test.skip(!target, "no finished broadcast to borrow");
+
+  try {
+    await admin.from("streams").update({ status: "live" }).eq("id", target!.id);
+
+    await page.goto(`/${ownerSlug}`);
+    const community = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Community" }) });
+
+    const liveTab = community.getByRole("tab", { name: "Now live" });
+    await expect(liveTab).toBeVisible({ timeout: 25_000 });
+    await expect(liveTab).toHaveAttribute("aria-selected", "true");
+    // Marked as live: a red outline and a red dot, not just another tab.
+    await expect(liveTab).toHaveClass(/destructive/);
+    await expect(liveTab.locator("span").first()).toHaveClass(/rounded-full/);
+
+    // Choosing another tab must stick.
+    await community.getByRole("tab", { name: "All time" }).click();
+    await expect(
+      community.getByRole("tab", { name: "All time" })
+    ).toHaveAttribute("aria-selected", "true");
+  } finally {
+    await admin
+      .from("streams")
+      .update({ status: target!.status })
+      .eq("id", target!.id);
+  }
+
+  await page.goto(`/${ownerSlug}`);
+  const after = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Community" }) });
+  await expect(after.getByRole("tab", { name: "Now live" })).toHaveCount(0);
+  await expect(after.getByRole("tab", { name: "All time" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
 });
 
 test("a channel that has published nothing renders no videos section", async ({

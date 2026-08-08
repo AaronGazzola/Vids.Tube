@@ -41,7 +41,19 @@ export type CommunityMember = {
   remoteAvatarPath: string | null;
   level: number;
   lifetimeXp: number;
+  // Set only on a per-broadcast board, where standing is what was earned in that
+  // one broadcast rather than across the member's whole history.
+  streamXp?: number;
+  streamMessageCount?: number;
   badges: MembershipBadge[];
 };
 
 export const COMMUNITY_PAGE_SIZE = 5;
+
+export type CommunityScopeKey = "all" | "latest" | "live";
+
+export type CommunityScope = {
+  key: CommunityScopeKey;
+  label: string;
+  streamId: string | null;
+};

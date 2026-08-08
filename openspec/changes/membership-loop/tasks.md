@@ -68,6 +68,8 @@
 - [x] 9.3 Add `useChannelCommunity` and `useLiveChatters` hooks in `app/[channelSlug]/page.hooks.tsx`.
 - [x] 9.4 Add `components/community-section.tsx` rendering the member total, the current-broadcast chatter list while live, and the leaderboard, each entry linking to that member's channel page with `?c=` set to this community. Open with the first five members and expand a page at a time in place via `useInfiniteQuery`, hiding the expand control once every member is shown.
 - [x] 9.5 Render the community section in `components/channel-view.tsx` only when the channel has hosted at least one broadcast, placed below the live-or-upcoming card and above the videos.
+- [x] 9.6 Replace the separate chatting-now list with tabs on the community section: all time, latest stream, and now live. The per-broadcast boards read `membership_stream_stats`, ordered by XP earned in that broadcast then by messages sent, so someone who chatted without scoring still appears.
+- [x] 9.7 Give the now-live tab a red dot and red outline, offer it only while broadcasting, select it by default unless the reader has chosen a tab, and fall back to all time when a tab stops being available.
 
 ## 10. Web: channel page restructure
 

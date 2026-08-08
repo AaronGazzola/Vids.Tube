@@ -35,21 +35,65 @@ The leaderboard SHALL open showing its first few members, with a control that ex
 - **WHEN** every member of the community has been revealed
 - **THEN** the expand control no longer renders
 
-### Requirement: The live broadcast shows who is chatting
+### Requirement: The community section is scoped by tabs
 
-While the channel is broadcasting, the community section SHALL additionally show the members who have chatted in the current broadcast, each linking to their own channel page anchored to this community.
+The community section SHALL offer tabs selecting which standing is shown: all time, the latest finished broadcast, and the broadcast currently in progress.
 
-This is the shared route named on the overlay: a viewer who cannot or will not follow a link from chat can reach the address, find themselves in this list, and open their own page from it.
+- All time SHALL rank members by lifetime XP and SHALL always be offered.
+- Latest stream SHALL rank by what was earned in the most recently finished broadcast, and SHALL be offered only when a finished broadcast exists.
+- Now live SHALL rank by what has been earned so far in the broadcast in progress, and SHALL be offered only while the channel is broadcasting.
 
-#### Scenario: Chatters appear during the broadcast
+Each board SHALL page a few at a time in place, as the all-time board already does, and every entry SHALL link to that member's channel page anchored to this community.
 
-- **WHEN** a chatter sends their first message of a live broadcast
-- **THEN** they appear in the current-broadcast list on the host's channel page
+The separate "chatting now" list SHALL be removed: the live board shows the same people, ordered by what they have earned rather than merely listed.
 
-#### Scenario: The list is absent when not broadcasting
+#### Scenario: A finished broadcast has its own board
+
+- **WHEN** a visitor selects the latest-stream tab
+- **THEN** the members are those who took part in the most recently finished broadcast, ranked by what they earned in it
+
+#### Scenario: The live tab is absent when not broadcasting
 
 - **WHEN** the channel is not broadcasting
-- **THEN** the current-broadcast list does not render, and the member total and leaderboard still do
+- **THEN** no now-live tab is offered, and the all-time board is shown
+
+#### Scenario: The latest-stream tab is absent before any broadcast has finished
+
+- **WHEN** the channel has never finished a broadcast
+- **THEN** no latest-stream tab is offered
+
+#### Scenario: Someone who chatted without scoring still appears
+
+- **WHEN** a member sent messages in a broadcast but earned no XP in it
+- **THEN** they appear on that broadcast's board below those who scored, rather than being absent
+
+### Requirement: The live tab is distinguished and selected by default
+
+While the channel is broadcasting, the now-live tab SHALL be visually distinct from the others, carrying a red indicator dot and a red outline, and SHALL be selected by default when the section first renders.
+
+Once the reader has chosen a tab themselves, going live SHALL NOT move them off it.
+
+A tab that stops being available SHALL NOT leave the section empty; the all-time board SHALL be shown instead.
+
+#### Scenario: Going live opens on the live board
+
+- **WHEN** a visitor opens the channel page while a broadcast is in progress
+- **THEN** the now-live tab is selected and its board is shown
+
+#### Scenario: The live tab is marked as live
+
+- **WHEN** the now-live tab renders
+- **THEN** it carries a red dot and a red outline, distinguishing it from the other tabs
+
+#### Scenario: A reader's own choice is respected
+
+- **WHEN** a visitor selects the all-time tab and the channel then goes live
+- **THEN** the all-time board stays selected
+
+#### Scenario: A broadcast ending does not strand the reader
+
+- **WHEN** the broadcast ends while the now-live board is selected
+- **THEN** the all-time board is shown instead of an empty section
 
 ### Requirement: The community excludes software and account-only members
 
