@@ -50,3 +50,4 @@ next-env.d.ts
 
 # local data snapshots taken before destructive repairs
 /.snapshots/
+/*-snapshot.json
