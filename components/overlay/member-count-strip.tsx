@@ -13,10 +13,11 @@ export function MemberCountStrip({ count }: { count: number }) {
       style={{ width: STRIP_WIDTH }}
       className="overlay-surface flex items-center gap-8 rounded-2xl border border-white px-8 py-5 text-white shadow-lg"
     >
-      <div className="min-w-0 flex-1 leading-[1.12]">
-        <p className="text-[40px] font-semibold">Chat to become a member</p>
-        <p className="text-[40px] font-semibold">at Vids.Tube</p>
-      </div>
+      {/* One line, never wrapped: the strip is a glance, and a call to action
+          that breaks mid-sentence stops being one. */}
+      <p className="min-w-0 flex-1 whitespace-nowrap text-[30px] font-semibold leading-[1.15]">
+        Chat to become a member at Vids.Tube
+      </p>
 
       <div className="flex shrink-0 flex-col items-center leading-none">
         <span className="text-[46px] font-bold tabular-nums tracking-tight">

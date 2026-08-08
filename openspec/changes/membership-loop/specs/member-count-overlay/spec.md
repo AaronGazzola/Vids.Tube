@@ -50,7 +50,7 @@ The members box SHALL sit on the same translucent black backing the other overla
 
 The box SHALL NOT apply a backdrop blur. Blurring what sits behind reads as a solid panel however far the opacity control is wound down, which defeats the control rather than obeying it.
 
-Along its left it SHALL read "Chat to become a member" above "at Vids.Tube", on two lines. Down its right it SHALL stack the member total above the label "Members".
+Along its left it SHALL read "Chat to become a member at Vids.Tube", on a single line that never wraps. Down its right it SHALL stack the member total above the label "Members".
 
 The count and its label SHALL be sized close together: a bare number means nothing to someone seeing it for the first time, and it is the word beneath that turns a statistic into an invitation.
 
@@ -59,7 +59,7 @@ Nothing else SHALL appear on the strip. Neither a second line of instructions no
 #### Scenario: The box states how to join
 
 - **WHEN** the members box renders during a broadcast
-- **THEN** its left reads "Chat to become a member" on one line and "at Vids.Tube" on the line below
+- **THEN** its left reads "Chat to become a member at Vids.Tube" on one unbroken line
 
 #### Scenario: The right-hand side is the count and its label
 
