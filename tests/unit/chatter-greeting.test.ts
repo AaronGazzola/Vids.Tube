@@ -81,7 +81,25 @@ describe("returning greeting", () => {
     messageCount: 1078,
     streamsAttended: 28,
     level: 8,
+    credits: 163,
   };
+
+  it("quotes the credits the member has banked", () => {
+    const text = buildReturningGreeting({ ...base, shortLine: null });
+    expect(text).toContain("163 credits");
+  });
+
+  it("says credit, not credits, for a balance of one", () => {
+    const text = buildReturningGreeting({ ...base, shortLine: null, credits: 1 });
+    expect(text).toContain("1 credit.");
+    expect(text).not.toContain("1 credits");
+  });
+
+  it("says nothing about a balance of nothing", () => {
+    const text = buildReturningGreeting({ ...base, shortLine: null, credits: 0 });
+    expect(text).not.toContain("credit");
+    expect(text).toContain(memberLink("kuroma", COMMUNITY));
+  });
 
   it("uses the generated line when there is one", () => {
     const text = buildReturningGreeting({
@@ -153,6 +171,7 @@ describe("the 200-character limit", () => {
       messageCount: 1078,
       streamsAttended: 28,
       level: 8,
+      credits: 9999,
     });
     expect(text.length).toBeLessThanOrEqual(MAX_GREETING_CHARS);
     expect(text).toContain(memberLink("kuroma", COMMUNITY));
@@ -174,6 +193,7 @@ describe("the 200-character limit", () => {
       messageCount: 1,
       streamsAttended: 1,
       level: 0,
+      credits: 12345,
     });
     expect(text.endsWith(memberLink("kuroma", COMMUNITY))).toBe(true);
   });

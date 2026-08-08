@@ -5,6 +5,7 @@ import { BadgeChip } from "@/components/badge-chip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { channelAvatarUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { Coins } from "lucide-react";
 import Link from "next/link";
 
 function initials(name: string): string {
@@ -21,19 +22,22 @@ function Stat({
   value,
   label,
   dim,
+  icon,
 }: {
   value: number;
   label: string;
   dim?: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col">
       <span
         className={cn(
-          "text-lg font-semibold tabular-nums tracking-tight",
+          "flex items-center gap-1 text-lg font-semibold tabular-nums tracking-tight",
           dim && "text-muted-foreground"
         )}
       >
+        {icon}
         {value.toLocaleString("en-US")}
       </span>
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -92,12 +96,28 @@ export function MembershipCard({
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <Stat value={membership.level} label="level" dim={membership.level === 0} />
         <Stat
           value={membership.lifetimeXp}
           label="XP"
           dim={membership.lifetimeXp === 0}
+        />
+        <Stat
+          value={membership.credits}
+          label="credits"
+          dim={membership.credits === 0}
+          icon={
+            <Coins
+              className={cn(
+                "h-4 w-4",
+                membership.credits === 0
+                  ? "text-muted-foreground/50"
+                  : "text-amber-500"
+              )}
+              aria-hidden
+            />
+          }
         />
         <Stat value={membership.messageCount} label="messages" />
         <Stat value={membership.streamsAttended} label="broadcasts" />

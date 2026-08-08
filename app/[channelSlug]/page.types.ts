@@ -20,6 +20,7 @@ export type ChannelMembership = {
   isLive: boolean;
   level: number;
   lifetimeXp: number;
+  credits: number;
   messageCount: number;
   streamsAttended: number;
   currentStreak: number;

@@ -105,7 +105,7 @@ export async function getChannelMembershipsAction(
   const { data: rows, error } = await supabase
     .from("memberships")
     .select(
-      "id, community_channel_id, level, lifetime_xp, message_count, streams_attended, current_streak, best_streak, first_seen_at, last_seen_at"
+      "id, community_channel_id, level, lifetime_xp, credits, message_count, streams_attended, current_streak, best_streak, first_seen_at, last_seen_at"
     )
     .eq("channel_id", channelId)
     .order("lifetime_xp", { ascending: false });
@@ -182,6 +182,7 @@ export async function getChannelMembershipsAction(
       isLive: liveIds.has(r.community_channel_id),
       level: r.level,
       lifetimeXp: r.lifetime_xp,
+      credits: Number(r.credits),
       messageCount: r.message_count,
       streamsAttended: r.streams_attended,
       currentStreak: r.current_streak,

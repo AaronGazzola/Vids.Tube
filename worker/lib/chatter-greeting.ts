@@ -75,17 +75,25 @@ export function buildReturningGreeting(input: {
   messageCount: number;
   streamsAttended: number;
   level: number;
+  credits: number;
 }): string {
   const who = mention(input.displayName);
-  const tail = input.handle
+  const link = input.handle
     ? ` ${memberLink(input.handle, input.communitySlug)}`
     : ` Find yourself at ${siteLabel()}`;
+  // A returning member has something banked, so the balance is worth saying. A
+  // balance of nothing is not, and saying "0 credits" to someone coming back
+  // reads as a rebuke rather than a welcome.
+  const purse =
+    input.credits > 0
+      ? ` You're on ${input.credits.toLocaleString("en-US")} credit${input.credits === 1 ? "" : "s"}.`
+      : "";
   // When Claude's short line is missing, the member's own numbers are still
   // personal and always available, so the greeting never falls back to nothing.
   const body =
     input.shortLine ??
     `${input.messageCount.toLocaleString("en-US")} messages across ${input.streamsAttended} stream${input.streamsAttended === 1 ? "" : "s"}, level ${input.level}.`;
-  return fit(`${who} welcome back — `, body, tail);
+  return fit(`${who} welcome back — `, body, `${purse}${link}`);
 }
 
 export function buildBatchGreeting(
@@ -165,11 +173,16 @@ export async function claimGreeting(
 async function membershipNumbers(
   channelId: string,
   communityId: string
-): Promise<{ messageCount: number; streamsAttended: number; level: number }> {
+): Promise<{
+  messageCount: number;
+  streamsAttended: number;
+  level: number;
+  credits: number;
+}> {
   const { supabaseAdmin } = await deps();
   const { data } = await supabaseAdmin
     .from("memberships")
-    .select("message_count, streams_attended, level")
+    .select("message_count, streams_attended, level, credits")
     .eq("channel_id", channelId)
     .eq("community_channel_id", communityId)
     .maybeSingle();
@@ -177,6 +190,7 @@ async function membershipNumbers(
     messageCount: data?.message_count ?? 0,
     streamsAttended: data?.streams_attended ?? 0,
     level: data?.level ?? 0,
+    credits: Number(data?.credits ?? 0),
   };
 }
 

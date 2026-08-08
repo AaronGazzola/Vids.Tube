@@ -80,6 +80,12 @@
 - [x] 10.5 Render the memberships section on every channel page, below the community section where one exists.
 - [x] 10.6 Omit the videos section entirely on a channel that has published nothing, keeping it for the channel's own owner so it stays clear where uploads land.
 
+## 12. Credits
+
+- [x] 12.1 Include the membership's credit balance in `getChannelMembershipsAction` and show it on the membership card as a stat with a gold coin, dimmed when the balance is nothing.
+- [x] 12.2 Quote the balance in the returning-chatter greeting and in the `!me` reply, scoped to the community being chatted in, and say nothing when the balance is nothing.
+- [x] 12.3 Remove the three requirements describing credits UI that was never built: the `/credits` page, the account credit summary, and the navigation credits indicator.
+
 ## 11. Tests
 
 - [x] 11.1 Add vitest coverage for the greeting builders: link form carries `https://` and the `?c=` parameter, every variant stays within 200 characters, and the batch form carries no personal link.

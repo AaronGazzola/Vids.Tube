@@ -284,6 +284,51 @@ export async function gatherRecentMessages(
   return samples;
 }
 
+// Credits are earned per community, so the balance quoted is the one held in the
+// community the caller is chatting in. A balance of nothing is left unsaid.
+async function creditsLine(
+  identity: MeIdentity,
+  communityId: string | null
+): Promise<string> {
+  if (!communityId) {
+    return "";
+  }
+  const { supabaseAdmin } = await deps();
+
+  let channelId: string | null = null;
+  if (identity.youtubeChannelId) {
+    const { data } = await supabaseAdmin
+      .from("channels")
+      .select("id, merged_into_channel_id")
+      .eq("youtube_channel_id", identity.youtubeChannelId)
+      .maybeSingle();
+    channelId = data?.merged_into_channel_id ?? data?.id ?? null;
+  } else if (identity.userId) {
+    const { data } = await supabaseAdmin
+      .from("channels")
+      .select("id")
+      .eq("owner_user_id", identity.userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    channelId = data?.id ?? null;
+  }
+  if (!channelId) {
+    return "";
+  }
+
+  const { data: membership } = await supabaseAdmin
+    .from("memberships")
+    .select("credits")
+    .eq("channel_id", channelId)
+    .eq("community_channel_id", communityId)
+    .maybeSingle();
+  const credits = Number(membership?.credits ?? 0);
+  return credits > 0
+    ? ` · ${credits.toLocaleString("en-US")} credit${credits === 1 ? "" : "s"}`
+    : "";
+}
+
 async function unclaimedClaimNudge(
   identity: MeIdentity,
   communitySlug: string
@@ -462,6 +507,7 @@ export async function meHandler(ctx: CommandContext): Promise<void> {
   }
 
   const { profile } = await ensureMeProfile(identity, ctx.stream.id, stats);
+  const purse = await creditsLine(identity, ctx.stream.channelId);
   const nudge = await unclaimedClaimNudge(identity, ctx.stream.channelSlug);
-  ctx.reply(truncateProfile(`${mention} ${profile}`) + nudge);
+  ctx.reply(truncateProfile(`${mention} ${profile}`) + purse + nudge);
 }
