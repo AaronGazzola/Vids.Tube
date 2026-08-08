@@ -208,3 +208,24 @@
 - [x] 9.10 Relabel one recent broadcast, then report its background and its tags against
   the six already labelled — whether the tags now name happenings rather than topics, and
   whether any of the channel's constants survived.
+
+## 10. Reviewing the map (refinements after first use)
+
+- [x] 10.1 Remove the steady-state block from the Studio timeline page. It stays
+  recorded against the broadcast and stays worth having; it was taking the top of the
+  screen to restate what the labelling already assumes.
+- [x] 10.2 Collapse the thread and moment cards by default, showing title, span count
+  and the score currently being sorted on. Opening one selects it; only one is open at
+  a time; clicking the open one closes it and returns the player to the whole VOD.
+- [x] 10.3 Make selection what the player follows: a thread plays as its appearances
+  fused, a moment plays as its own window — the same machinery with one span — so the
+  transport always measures the piece being judged.
+- [x] 10.4 Carry the clicked span through the map's selection, so clicking a section
+  plays from that section rather than restarting the thread from its first appearance.
+- [x] 10.5 Make a section inside an open card seek within its own thread rather than
+  dropping back to the whole VOD, so the card stays open on what it is playing.
+- [x] 10.6 Draw the seams between sections on the seek bar, so a fused piece reads as
+  its parts while still scrubbing continuously across them.
+- [x] 10.7 Browser tests: cards start collapsed and only one opens; a section inside an
+  open card plays from that section; the seek bar carries one seam fewer than there are
+  sections; clicking a section on the map moves the playhead to that section.
