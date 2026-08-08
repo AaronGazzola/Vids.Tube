@@ -4,7 +4,11 @@
 
 A channel page SHALL show a memberships section listing every community that channel has chatted in, one card per membership. The section SHALL render for claimed and unclaimed channels alike, because almost every member is unclaimed.
 
-Each card SHALL show the host community's avatar and name, a live marker when that community is broadcasting, the member's standing in that community (level, rank, lifetime XP, messages, broadcasts attended, current streak, best streak), the badges awarded in that community, and a control leading to that community.
+Each card SHALL show the host community's avatar and name, a live marker when that community is broadcasting, the member's standing in that community (level, rank, lifetime XP, credits, messages, broadcasts attended, current streak, best streak), the badges awarded in that community, and a control leading to that community.
+
+Each figure SHALL carry its own coloured icon, so the row is read by glancing rather than by working through every label. A figure of nothing SHALL lose its colour along with its emphasis, so an earned figure and an empty one never look alike.
+
+The count of broadcasts SHALL be labelled "attended". Labelling it "broadcasts" on a card that sits beside a host community invites reading it as broadcasts the member ran, which is the opposite of what it counts.
 
 Every card SHALL have the same shape regardless of standing. A member who has just joined SHALL see the same card as a long-standing member, carrying zeroes, and SHALL NOT be shown any additional or substitute content in its place.
 
@@ -13,7 +17,17 @@ A channel holding no memberships SHALL NOT render the section at all.
 #### Scenario: A member sees their standing
 
 - **WHEN** a visitor opens the channel page of someone who has chatted in a community
-- **THEN** a card for that community shows the member's level, rank, XP, messages, broadcasts attended, streaks and badges, and a control leading to that community
+- **THEN** a card for that community shows the member's level, rank, XP, credits, messages, broadcasts attended, streaks and badges, and a control leading to that community
+
+#### Scenario: An empty figure is not dressed up as an earned one
+
+- **WHEN** a member has earned nothing against one of the figures
+- **THEN** that figure's icon is drawn without its colour, matching the muted figure beside it
+
+#### Scenario: Attendance is not mistaken for hosting
+
+- **WHEN** the count of broadcasts a member took part in is shown
+- **THEN** it is labelled "attended" rather than "broadcasts"
 
 #### Scenario: A new member's card matches everyone else's
 

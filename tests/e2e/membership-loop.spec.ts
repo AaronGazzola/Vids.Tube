@@ -62,8 +62,12 @@ test("an unclaimed member's page shows their memberships, not a stats stub", asy
   const card = page.locator(`#community-${ownerSlug}`);
   await expect(card).toBeVisible();
   await expect(card.getByText("level", { exact: true })).toBeVisible();
+  await expect(card.getByText("XP", { exact: true })).toBeVisible();
+  await expect(card.getByText("credits", { exact: true })).toBeVisible();
   await expect(card.getByText("messages", { exact: true })).toBeVisible();
-  await expect(card.getByText("broadcasts", { exact: true })).toBeVisible();
+  // Broadcasts the member turned up to, not ones they ran.
+  await expect(card.getByText("attended", { exact: true })).toBeVisible();
+  await expect(card.getByText("streak", { exact: true })).toBeVisible();
   await expect(card.getByText("best streak", { exact: true })).toBeVisible();
 });
 

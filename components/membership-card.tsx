@@ -5,7 +5,15 @@ import { BadgeChip } from "@/components/badge-chip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { channelAvatarUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { Coins } from "lucide-react";
+import {
+  Coins,
+  Flame,
+  MessagesSquare,
+  Radio,
+  Star,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 function initials(name: string): string {
@@ -18,26 +26,33 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
+// Each figure gets its own colour and shape so the row can be read by glancing
+// rather than by working through seven labels. A figure of nothing loses its
+// colour too: an earned thing and an empty one should not look alike.
 function Stat({
   value,
   label,
-  dim,
-  icon,
+  icon: Icon,
+  tint,
 }: {
   value: number;
   label: string;
-  dim?: boolean;
-  icon?: React.ReactNode;
+  icon: LucideIcon;
+  tint: string;
 }) {
+  const earned = value > 0;
   return (
     <div className="flex flex-col">
       <span
         className={cn(
-          "flex items-center gap-1 text-lg font-semibold tabular-nums tracking-tight",
-          dim && "text-muted-foreground"
+          "flex items-center gap-1.5 text-lg font-semibold tabular-nums tracking-tight",
+          !earned && "text-muted-foreground"
         )}
       >
-        {icon}
+        <Icon
+          className={cn("h-4 w-4 shrink-0", earned ? tint : "text-muted-foreground/40")}
+          aria-hidden
+        />
         {value.toLocaleString("en-US")}
       </span>
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -97,39 +112,48 @@ export function MembershipCard({
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-        <Stat value={membership.level} label="level" dim={membership.level === 0} />
+        <Stat
+          value={membership.level}
+          label="level"
+          icon={Star}
+          tint="text-violet-500"
+        />
         <Stat
           value={membership.lifetimeXp}
           label="XP"
-          dim={membership.lifetimeXp === 0}
+          icon={Zap}
+          tint="text-emerald-500"
         />
         <Stat
           value={membership.credits}
           label="credits"
-          dim={membership.credits === 0}
-          icon={
-            <Coins
-              className={cn(
-                "h-4 w-4",
-                membership.credits === 0
-                  ? "text-muted-foreground/50"
-                  : "text-amber-500"
-              )}
-              aria-hidden
-            />
-          }
+          icon={Coins}
+          tint="text-amber-500"
         />
-        <Stat value={membership.messageCount} label="messages" />
-        <Stat value={membership.streamsAttended} label="broadcasts" />
+        <Stat
+          value={membership.messageCount}
+          label="messages"
+          icon={MessagesSquare}
+          tint="text-sky-500"
+        />
+        {/* Broadcasts the member turned up to, not ones they ran. */}
+        <Stat
+          value={membership.streamsAttended}
+          label="attended"
+          icon={Radio}
+          tint="text-cyan-500"
+        />
         <Stat
           value={membership.currentStreak}
           label="streak"
-          dim={membership.currentStreak === 0}
+          icon={Flame}
+          tint="text-red-500"
         />
         <Stat
           value={membership.bestStreak}
           label="best streak"
-          dim={membership.bestStreak === 0}
+          icon={Flame}
+          tint="text-yellow-400"
         />
       </div>
 
