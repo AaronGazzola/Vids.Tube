@@ -46,9 +46,11 @@ Overlay positions are set by hand against a live picture and are expensive to re
 
 ### Requirement: The members box shows the count and the call to action
 
-The members box SHALL sit on the same translucent black backing the other overlay surfaces use, inside a white border with rounded corners, so the strip holds its edge against any picture behind it.
+The members box SHALL sit on the same translucent black backing the other overlay surfaces use, scaled by the opacity control, inside a one-pixel white border with rounded corners, so the strip holds its edge against any picture behind it.
 
-Along its left it SHALL read "Chat to become a member". Down its right it SHALL stack the member total above the label "Members".
+The box SHALL NOT apply a backdrop blur. Blurring what sits behind reads as a solid panel however far the opacity control is wound down, which defeats the control rather than obeying it.
+
+Along its left it SHALL read "Chat to become a member" above "at Vids.Tube", on two lines. Down its right it SHALL stack the member total above the label "Members".
 
 The count and its label SHALL be sized close together: a bare number means nothing to someone seeing it for the first time, and it is the word beneath that turns a statistic into an invitation.
 
@@ -57,7 +59,7 @@ Nothing else SHALL appear on the strip. Neither a second line of instructions no
 #### Scenario: The box states how to join
 
 - **WHEN** the members box renders during a broadcast
-- **THEN** its left reads "Chat to become a member"
+- **THEN** its left reads "Chat to become a member" on one line and "at Vids.Tube" on the line below
 
 #### Scenario: The right-hand side is the count and its label
 
@@ -67,12 +69,17 @@ Nothing else SHALL appear on the strip. Neither a second line of instructions no
 #### Scenario: The strip is bordered
 
 - **WHEN** the members box renders
-- **THEN** it carries a white border with rounded corners
+- **THEN** it carries a one-pixel white border with rounded corners
+
+#### Scenario: The broadcast shows through when the control is low
+
+- **WHEN** the opacity control for the members box is set low
+- **THEN** what is behind the strip is visible through it unblurred
 
 #### Scenario: Nothing extra is carried
 
 - **WHEN** the members box renders
-- **THEN** no "See your stats" line and no site name appear on it
+- **THEN** no "See your stats" line appears on it
 
 ### Requirement: The members box is a thin horizontal strip
 

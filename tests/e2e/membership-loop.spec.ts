@@ -322,23 +322,30 @@ test("the members strip reads as one phrase down its right-hand side", async ({
   await expect(
     page.getByText("Chat to become a member")
   ).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText("at Vids.Tube", { exact: true })).toBeVisible();
   await expect(page.getByText("Members", { exact: true })).toBeVisible();
-  // Neither the old second line nor the site name belongs on the strip: the
-  // call to action already says what to do, and the count says how many did it.
   await expect(page.getByText(/See your stats/)).toHaveCount(0);
-  await expect(page.getByText("Vids.tube", { exact: true })).toHaveCount(0);
 
-  // A white border, so the strip holds its edge against any picture behind it.
   const surface = page.locator("div.overlay-surface").filter({
     has: page.getByText("Chat to become a member"),
   });
-  const border = await surface.evaluate((el) => {
+  const style = await surface.evaluate((el) => {
     const cs = getComputedStyle(el);
-    return { color: cs.borderTopColor, width: cs.borderTopWidth, radius: cs.borderTopLeftRadius };
+    return {
+      color: cs.borderTopColor,
+      width: cs.borderTopWidth,
+      radius: cs.borderTopLeftRadius,
+      backdrop: cs.backdropFilter,
+    };
   });
-  expect(border.color).toBe("rgb(255, 255, 255)");
-  expect(parseFloat(border.width)).toBeGreaterThan(0);
-  expect(parseFloat(border.radius)).toBeGreaterThan(0);
+  // A hairline white border with rounded corners, so the strip holds its edge
+  // against any picture behind it.
+  expect(style.color).toBe("rgb(255, 255, 255)");
+  expect(parseFloat(style.width)).toBeCloseTo(1, 1);
+  expect(parseFloat(style.radius)).toBeGreaterThan(0);
+  // No blur: frosting what is behind reads as a solid panel however far the
+  // opacity control is wound down, which defeats the control.
+  expect(style.backdrop).toBe("none");
 });
 
 test("a channel that has published nothing renders no videos section", async ({
