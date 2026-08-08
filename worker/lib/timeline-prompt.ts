@@ -69,11 +69,35 @@ increasing spine over the whole stream, the way a viewer would navigate it. The 
 chapter starts at 0. Each chapter runs until the next one begins, so give only a start
 time and a title. Aim for chapters a viewer would actually use, not one per topic shift.
 
-TAGS name the SUBJECT, and they exist to find the same subject in OTHER streams. Use
-words that would still mean something on a different broadcast: the project, the
-feature, the tool, the recurring bit. Do not tag a quality — the scores already measure
-how funny or interesting something is. Do not tag an event type — a moment's "kind"
-already carries that. Prefer a handful of durable tags over many specific ones.
+BACKGROUND. Before anything else, work out this stream's steady state: the activity,
+the subject matter and the setting that persist through most of it, in a sentence.
+On one channel that is building a web application; on another it is cooking, or
+playing one particular game, or answering questions from an audience. Put it in the
+"background" field. Everything else is judged against it.
+
+TAGS mark what DEPARTS from that background. Someone scrubbing a two-hour recording
+wants to know where something worth watching happened; a tag is what makes them stop.
+
+A tag names something that HAPPENED, not something the stream was about. The steady
+state is never tagged, however central it is — if a tag could sit on most of this
+channel's broadcasts, it is not a tag. Naming the tools, the technology, the genre or
+the format is always wrong: all of that is background by definition.
+
+Things that usually qualify: a joke or an exchange that landed; an awkward,
+embarrassing or unguarded turn; a problem finally solved or a bug found; something
+achieved, completed or reached for the first time; a surprise; a mistake; an argument
+or a strong disagreement; a change of mind; an unusually candid or emotional passage;
+a digression into something with nothing to do with the background. That list is
+illustrative, not a menu — anything genuinely notable counts, and nothing qualifies
+merely because it appears there.
+
+Write the specific thing rather than its category. "golem farm finally finished"
+rather than "gaming"; "sponsor's name mispronounced twice" rather than "sponsorship";
+"gave up on the physics approach" rather than "engineering". A thread where nothing
+departed from the background gets no tags at all, and that is a normal outcome.
+
+Do not tag a quality — the scores already measure how funny or interesting something
+is. Do not tag an event type — a moment's "kind" already carries that.
 
 SCORING. Every thread, every span and every moment carries three scores, each an integer
 0-100:
@@ -131,12 +155,14 @@ ${formatActivitySeries(input.activity)}
 ## Output
 Return ONLY a JSON object, no prose, of this exact shape:
 {
+  "background": "<one sentence: what this stream was steadily doing>",
   "threads": [ { "title": "<short>", "summary": "<short>", "tags": ["..."], "scores": { "humour": 0, "interest": 0, "engagement": 0 },
                  "spans": [ { "start_s": 0, "end_s": 0, "label": "<short>", "scores": { "humour": 0, "interest": 0, "engagement": 0 } } ] } ],
   "moments":  [ { "start_s": 0, "peak_s": 0, "end_s": 0, "kind": "<kind>", "label": "<short>", "summary": "<short>", "tags": ["..."], "scores": { "humour": 0, "interest": 0, "engagement": 0 }, "thread": "<thread title or null>" } ],
   "chapters": [ { "start_s": 0, "title": "<short>" } ]
 }
-Include all three keys and no others. Every thread must hold at least one span. Every
+Include all four keys and no others. Every thread must hold at least one span. Every
 moment must have "end_s" strictly greater than "start_s", and "peak_s" between the two.
-All three score criteria are required on every thread, span and moment.`;
+All three score criteria are required on every thread, span and moment. A thread may
+have an empty "tags" array.`;
 }

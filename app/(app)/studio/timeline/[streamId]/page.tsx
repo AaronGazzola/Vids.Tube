@@ -186,6 +186,14 @@ export default function StudioTimelinePage() {
               {data.threads.reduce((n, t) => n + t.spans.length, 0)} spans ·{" "}
               {data.moments.length} moments · {data.chapters.length} chapters
             </p>
+            {/* The ground the tags are figured against, so a tag that merely
+                restates it is visibly wrong while reviewing. */}
+            {data.background && (
+              <p className="mt-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                <span className="font-medium">Mostly: </span>
+                <span className="text-muted-foreground">{data.background}</span>
+              </p>
+            )}
           </div>
 
           {playingThread && (

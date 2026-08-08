@@ -162,7 +162,44 @@
   width, and no per-tag control row is present.
 - [x] 8.7 Run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and
   `doppler run -- npm run build:local`; all clean.
-- [ ] 8.8 Relabel five more streams spread across the catalogue, then report the subject
+- [x] 8.8 Relabel five more streams spread across the catalogue, then report the subject
   vocabulary the model reached for across all six — how many distinct subjects, which
   recur across streams, and which look like one-offs — as the evidence for choosing the
   controlled list.
+
+  **Outcome: no controlled list.** Six broadcasts produced 116 distinct subjects, 14 of
+  them recurring. The 14 are the channel's constants — vibe-coding, community, nextjs,
+  llm — and a constant discriminates nothing, so a fixed list would have locked in
+  exactly the words that carry no information. Roughly half the one-offs were generic
+  technical vocabulary too, so the fault is not the tail: it is that topics are being
+  named at all. Tags are redefined in section 9 instead.
+
+## 9. Tags mark what departs from the background
+
+- [ ] 9.1 Add a `background` field to the labelling payload: before anything else the
+  pass states this stream's steady state — the activity, subject matter and setting that
+  persist through most of it. Validate it as a non-empty string.
+- [ ] 9.2 Rewrite the TAGS part of the rubric around that background. A tag names
+  something that happened and is notable *against* the steady state, never a topic the
+  stream is about. State the test explicitly: a tag that could sit on most of this
+  channel's broadcasts is not a tag, however central the thing is.
+- [ ] 9.3 Illustrate what qualifies without fixing a taxonomy — a joke that landed, an
+  awkward or embarrassing turn, a problem solved or a bug found, something achieved or
+  reached for the first time, a surprise, a mistake, an argument, a change of mind, a
+  digression into something unrelated — and say plainly that the list is illustrative
+  rather than a menu, so the instruction does not overfit to one kind of content.
+- [ ] 9.4 Require a tag to be written as the specific thing rather than its category,
+  with a worked contrast in the prompt, and forbid naming the stack, the tools or the
+  genre.
+- [ ] 9.5 Add `timeline_background text` to `public.streams` in a migration; push and
+  regenerate types.
+- [ ] 9.6 Store the background on the stream in the backfill writer, and clear it when a
+  stream is relabelled.
+- [ ] 9.7 Show the background on the Studio timeline page above the map, so the ground
+  the tags are figured against is visible while reviewing them.
+- [ ] 9.8 Bump `PROMPT_VERSION` to `timeline-3`.
+- [ ] 9.9 Unit tests: a payload with no background is rejected; a payload with one is
+  accepted and carries it through.
+- [ ] 9.10 Relabel one recent broadcast, then report its background and its tags against
+  the six already labelled — whether the tags now name happenings rather than topics, and
+  whether any of the channel's constants survived.

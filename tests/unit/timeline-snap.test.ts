@@ -10,6 +10,7 @@ function span(start_s: number, end_s: number): TimelineSpan {
 
 function payload(spans: TimelineSpan[]): TimelinePayload {
   return {
+    background: "building a web app",
     threads: [
       { title: "t", summary: "", tags: [], scores, spans },
     ],

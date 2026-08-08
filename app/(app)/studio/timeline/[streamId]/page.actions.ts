@@ -41,7 +41,7 @@ export async function getStreamTimelineAction(
 
   const { data: stream, error: streamError } = await supabaseAdmin
     .from("streams")
-    .select("id, title, started_at, channel_id")
+    .select("id, title, started_at, channel_id, timeline_background")
     .eq("id", streamId)
     .maybeSingle();
   if (streamError) {
@@ -113,6 +113,7 @@ export async function getStreamTimelineAction(
       streamId,
       title: stream.title ?? "Untitled stream",
       startedAt: stream.started_at,
+      background: stream.timeline_background,
       vod: {
         src: vodAssetUrl(video?.mp4_path),
         durationS: video?.duration_s ?? 0,

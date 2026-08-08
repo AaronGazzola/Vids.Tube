@@ -9,7 +9,7 @@ import type {
 
 export const SCORE_CRITERIA = ["humour", "interest", "engagement"] as const;
 
-export const PROMPT_VERSION = "timeline-2";
+export const PROMPT_VERSION = "timeline-3";
 
 export const CHAPTER_START_EPSILON_S = 1;
 
@@ -127,7 +127,7 @@ export function validateTimelinePayload(
     return { error: "payload must be a JSON object" };
   }
 
-  const expected = ["threads", "moments", "chapters"];
+  const expected = ["background", "threads", "moments", "chapters"];
   const keys = Object.keys(raw);
   const missing = expected.filter((key) => !keys.includes(key));
   if (missing.length > 0) {
@@ -137,7 +137,12 @@ export function validateTimelinePayload(
   if (extra.length > 0) {
     return { error: `payload has unexpected keys: ${extra.join(", ")}` };
   }
-  for (const key of expected) {
+  // Without the steady state written down, a tag cannot be judged against
+  // anything, which is the whole basis for what a tag is allowed to say.
+  if (!nonEmptyString(raw.background)) {
+    return { error: "background must be a non-empty string" };
+  }
+  for (const key of ["threads", "moments", "chapters"]) {
     if (!Array.isArray(raw[key])) {
       return { error: `payload.${key} must be an array` };
     }
@@ -289,7 +294,7 @@ export function validateTimelinePayload(
     }
   }
 
-  return { threads, moments, chapters };
+  return { background: raw.background.trim(), threads, moments, chapters };
 }
 
 function nearestBoundary(
@@ -401,5 +406,10 @@ export function mergeTimelinePayloads(
     }
   }
 
-  return { threads, moments, chapters: spine };
+  // Both halves describe the same stream, so the first non-empty reading of its
+  // steady state stands for the whole.
+  const background =
+    payloads.map((payload) => payload.background).find((value) => value) ?? "";
+
+  return { background, threads, moments, chapters: spine };
 }

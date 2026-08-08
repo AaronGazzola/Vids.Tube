@@ -39,7 +39,13 @@ function moment(peak_s: number, label: string): TimelineMoment {
 }
 
 function payload(overrides: Partial<TimelinePayload> = {}): TimelinePayload {
-  return { threads: [], moments: [], chapters: [], ...overrides };
+  return {
+    background: "building a web app",
+    threads: [],
+    moments: [],
+    chapters: [],
+    ...overrides,
+  };
 }
 
 describe("merging the halves of one stream", () => {

@@ -54,6 +54,9 @@ export type TimelineChapter = {
 };
 
 export type TimelinePayload = {
+  // The stream's steady state. Tags name departures from it, so it has to be
+  // written down before a tag can be judged.
+  background: string;
   threads: TimelineThread[];
   moments: TimelineMoment[];
   chapters: TimelineChapter[];

@@ -29,6 +29,7 @@ function moment(overrides: Record<string, unknown> = {}) {
 
 function payload(overrides: Record<string, unknown> = {}) {
   return {
+    background: "building the site's account system",
     threads: [thread("account linking")],
     moments: [moment()],
     chapters: [{ start_s: 0, title: "Intro" }],
@@ -73,6 +74,32 @@ describe("the payload's shape", () => {
 
   it("refuses a payload carrying the old sections key", () => {
     expect(failure({ ...payload(), sections: [] })).toContain("unexpected keys");
+  });
+});
+
+describe("the stream's steady state", () => {
+  it("is required, since a tag is only meaningful against it", () => {
+    const raw = payload();
+    delete (raw as Record<string, unknown>).background;
+    expect(failure(raw)).toContain("missing background");
+  });
+
+  it("refuses an empty one", () => {
+    expect(failure(payload({ background: "   " }))).toContain(
+      "background must be a non-empty string"
+    );
+  });
+
+  it("carries through to the result", () => {
+    const result = ok(payload({ background: "  playing one long game  " }));
+    expect(result.background).toBe("playing one long game");
+  });
+
+  it("lets a thread carry no tags, when nothing departed from it", () => {
+    const result = ok(
+      payload({ threads: [{ ...thread("routine work"), tags: [] }] })
+    );
+    expect(result.threads[0].tags).toEqual([]);
   });
 });
 

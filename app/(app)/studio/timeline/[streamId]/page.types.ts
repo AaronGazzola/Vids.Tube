@@ -16,6 +16,7 @@ export type TimelineStreamDetail = {
   streamId: string;
   title: string;
   startedAt: string | null;
+  background: string | null;
   vod: TimelineVod;
   threads: ThreadWithSpans[];
   moments: StreamMomentRow[];

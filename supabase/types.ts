@@ -1492,6 +1492,7 @@ export type Database = {
           started_at: string | null
           status: string
           thumbnail_path: string | null
+          timeline_background: string | null
           title: string | null
           waiting_room_chat: boolean
           wrapup_done_at: string | null
@@ -1516,6 +1517,7 @@ export type Database = {
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
+          timeline_background?: string | null
           title?: string | null
           waiting_room_chat?: boolean
           wrapup_done_at?: string | null
@@ -1540,6 +1542,7 @@ export type Database = {
           started_at?: string | null
           status?: string
           thumbnail_path?: string | null
+          timeline_background?: string | null
           title?: string | null
           waiting_room_chat?: boolean
           wrapup_done_at?: string | null

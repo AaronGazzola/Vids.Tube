@@ -434,6 +434,14 @@ async function writeTimeline(streamId: string, payload: TimelinePayload) {
     }
   }
 
+  const { error: backgroundError } = await admin
+    .from("streams")
+    .update({ timeline_background: payload.background })
+    .eq("id", streamId);
+  if (backgroundError) {
+    throw new Error(`Failed to store the background: ${backgroundError.message}`);
+  }
+
   const threadIdByTitle = new Map<string, string>();
   if (payload.threads.length > 0) {
     const { data, error } = await admin
@@ -561,9 +569,11 @@ async function main() {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
       const spans = result.threads.reduce((n, t) => n + t.spans.length, 0);
       const recurring = result.threads.filter((t) => t.spans.length > 1).length;
+      const tagged = result.threads.filter((t) => t.tags.length > 0).length;
       console.log(
-        `OK    ${date} ${candidate.streamId} source=${inputs.source} threads=${result.threads.length} (${recurring} recurring) spans=${spans} moments=${result.moments.length} chapters=${result.chapters.length} ${elapsed}s`
+        `OK    ${date} ${candidate.streamId} source=${inputs.source} threads=${result.threads.length} (${recurring} recurring, ${tagged} tagged) spans=${spans} moments=${result.moments.length} chapters=${result.chapters.length} ${elapsed}s`
       );
+      console.log(`      background: ${result.background}`);
     } catch (error) {
       failed += 1;
       console.error(
