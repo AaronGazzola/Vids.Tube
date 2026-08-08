@@ -26,8 +26,8 @@
     },
     "vercel": {
       "enabled": false,
-      "project": "<vercel-project>",
-      "method": "cli-or-github-deployments"
+      "repo": "<github-owner>/<github-repo>",
+      "method": "github-integration"
     },
     "sentry": {
       "enabled": false,

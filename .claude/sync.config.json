@@ -26,8 +26,8 @@
     },
     "vercel": {
       "enabled": true,
-      "project": "vids-tube",
-      "method": "cli-or-github-deployments"
+      "repo": "AaronGazzola/Vids.Tube",
+      "method": "github-integration"
     },
     "sentry": {
       "enabled": false,

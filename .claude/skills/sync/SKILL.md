@@ -43,6 +43,14 @@ partial data**, and do not substitute inference for a source you could not read.
 The one allowed degradation: if the Supabase **MCP** cannot see the ref but the
 **CLI** is linked, continue using the CLI and say so. If neither works, stop.
 
+**Never start an interactive login.** This skill only ever reads through
+credentials that already exist. If any command would open a browser, print a
+device code, or wait on an OAuth callback (`vercel login`, `gh auth login`,
+`doppler login`, `supabase login`), do not run it and do not let a command run
+that falls into one — check the authenticated state first, or use a path that
+cannot prompt. An unauthenticated tool is simply an unreachable source: report
+it as such and name the one-off command the user must run themselves.
+
 ## 2. Gather (run independent reads in parallel)
 
 ### Git — `git.enabled`
@@ -54,6 +62,17 @@ git status -sb
 git branch -a -vv --sort=-committerdate
 git log --oneline --date=short --format='%h %ad %d %s' -15
 ```
+
+Remotes are SSH. `git fetch`/`git pull` authenticate with the user's SSH key and
+must never prompt for a username or password; a credential prompt means the
+remote is misconfigured (an `https://` remote), so report that instead of
+answering it.
+
+The SSH key covers **all** ref state — branches, ahead/behind, commits, tags,
+file contents on any remote branch (`git show <remote-branch>:<path>`), merge
+and ancestry checks. Use plain `git` for every one of these. Do **not** reach for
+the `gh` CLI or a GitHub token for anything git can answer, and never report a
+missing `gh` login as a blocker to the git section.
 
 Capture:
 - Current branch; clean or dirty (list uncommitted/untracked paths).
@@ -139,9 +158,33 @@ config or `CLAUDE.md` names). For each:
 Run these only when enabled, and keep each to one line in the report unless it
 is red: Doppler (`doppler configs`, `doppler secrets --only-names` — names only,
 never values, and flag if the locally selected config differs from
-`doppler.config`), Vercel (latest production deploy state + commit), Sentry
-(unresolved issues from the last 48h by event count), Trigger.dev (recent run
-statuses; flag failed/stuck).
+`doppler.config`), Vercel (see below), Sentry (unresolved issues from the last
+48h by event count), Trigger.dev (recent run statuses; flag failed/stuck).
+
+**Vercel — `vercel.enabled`.** Deploys are wired through the Vercel GitHub
+integration: a push to `mainBranch` deploys to production automatically, and
+every other pushed branch gets a preview. Nothing is deployed by hand, and no
+GitHub Actions deploy workflow is involved. Read the deployment records that
+integration writes back to GitHub, via the already-authenticated `gh` CLI:
+
+```bash
+gh api repos/<owner>/<repo>/deployments --jq '.[0:5][] | "\(.created_at) \(.environment) \(.sha[0:7]) \(.id)"'
+gh api repos/<owner>/<repo>/deployments/<id>/statuses --jq '.[0].state'
+```
+
+Report the latest **production** record: state, short SHA, and whether that SHA
+is the current tip of `mainBranch`. Flag a non-`success` state, and flag a
+production SHA behind `mainBranch` (a push that never deployed). Mention the
+newest preview only when its state is not `success`.
+
+Deployment records are the one thing SSH cannot reach: they live behind the
+GitHub REST API, which needs a token. If `gh auth status` reports no login, this
+integration is simply unreadable — give it one line in the optional-integrations
+note and carry on. It is **never** a blocker, and it never affects the git,
+OpenSpec, Linear, database or roadmap sections.
+
+Do **not** invoke the `vercel` CLI. It is not logged in and `vercel ls` silently
+starts a device-login flow that blocks until it times out.
 
 ## 3. Report
 
