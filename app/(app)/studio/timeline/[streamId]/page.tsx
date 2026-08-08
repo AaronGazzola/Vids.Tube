@@ -366,7 +366,7 @@ export default function StudioTimelinePage() {
                         </button>
 
                         {open && (
-                          <div className="space-y-2 border-t p-3">
+                          <div data-testid="card-body" className="space-y-2 border-t p-3">
                             {thread.summary && (
                               <p className="text-xs text-muted-foreground">
                                 {thread.summary}
@@ -437,7 +437,7 @@ export default function StudioTimelinePage() {
                         </button>
 
                         {open && (
-                          <div className="space-y-2 border-t p-3">
+                          <div data-testid="card-body" className="space-y-2 border-t p-3">
                             {moment.summary && (
                               <p className="text-xs text-muted-foreground">
                                 {moment.summary}

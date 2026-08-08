@@ -9,6 +9,7 @@ const admin = createClient(
 
 let labelledStreamId: string | null = null;
 let recurringThreadId: string | null = null;
+let recurringSpanStarts: number[] = [];
 
 test.beforeAll(async () => {
   // A stream whose labelling produced a subject that comes back later, so the
@@ -34,6 +35,14 @@ test.beforeAll(async () => {
   }
   labelledStreamId = recurring[1].stream;
   recurringThreadId = recurring[0];
+
+
+  const { data: ownSpans } = await admin
+    .from("stream_thread_spans")
+    .select("start_s")
+    .eq("thread_id", recurringThreadId)
+    .order("ordinal", { ascending: true });
+  recurringSpanStarts = (ownSpans ?? []).map((span) => span.start_s);
 });
 
 async function signInAsOwner(page: import("@playwright/test").Page) {
@@ -167,4 +176,114 @@ test("selecting a thread plays it fused, and leaving returns to the stream", asy
 
   await page.getByRole("button", { name: "Whole stream" }).click();
   await expect(page.getByText(/^Playing/)).toHaveCount(0);
+});
+
+test("cards start collapsed and only one opens at a time", async ({ page }) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  const cards = page.locator("li > div.rounded-lg");
+  const bodies = page.getByTestId("card-body");
+  await expect(cards.first()).toBeVisible();
+
+  await expect(bodies).toHaveCount(0);
+
+  await cards.nth(0).getByRole("button").first().click();
+  await expect(bodies).toHaveCount(1);
+
+  // Opening another closes the first: still exactly one body on the page.
+  await cards.nth(1).getByRole("button").first().click();
+  await expect(bodies).toHaveCount(1);
+  await expect(page.getByText(/^Playing/)).toBeVisible();
+
+  await cards.nth(1).getByRole("button").first().click();
+  await expect(bodies).toHaveCount(0);
+  await expect(page.getByText(/^Playing/)).toHaveCount(0);
+});
+
+test("a section inside an open card plays from that section", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  test.skip(recurringSpanStarts.length < 2, "no thread with several spans");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  await page
+    .locator(`button[data-thread-id="${recurringThreadId}"]`)
+    .first()
+    .click();
+  const body = page.getByTestId("card-body");
+  await expect(body).toHaveCount(1);
+
+  // The card stays open on its own thread rather than dropping back to the VOD.
+  const sections = body.getByRole("button");
+  await expect(sections).toHaveCount(recurringSpanStarts.length);
+  await sections.nth(1).click();
+  await expect(body).toHaveCount(1);
+  await expect(page.getByText(/^Playing/)).toBeVisible();
+});
+
+test("the seek bar shows where one section hands over to the next", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  test.skip(recurringSpanStarts.length < 2, "no thread with several spans");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  const seam = page.locator('[aria-label="Seek"] > div.bg-background');
+  await expect(seam).toHaveCount(0);
+
+  await page
+    .locator(`button[data-thread-id="${recurringThreadId}"]`)
+    .first()
+    .click();
+
+  // One divider fewer than there are sections, because the last has no successor.
+  await expect(seam).toHaveCount(recurringSpanStarts.length - 1);
+});
+
+test("clicking a section on the map plays from that section", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  test.skip(!labelledStreamId, "no labelled stream in the database yet");
+  test.skip(recurringSpanStarts.length < 2, "no thread with several spans");
+  await signInAsOwner(page);
+
+  await page.goto(`/studio/timeline/${labelledStreamId}`);
+  await expect(page.getByText(/threads ·/)).toBeVisible({ timeout: 30_000 });
+
+  const video = page.locator("video");
+  const ready = await video
+    .evaluate((el: HTMLVideoElement) =>
+      new Promise<boolean>((resolve) => {
+        if (el.readyState >= 1) return resolve(true);
+        el.addEventListener("loadedmetadata", () => resolve(true), { once: true });
+        setTimeout(() => resolve(el.readyState >= 1), 25_000);
+      })
+    )
+    .catch(() => false);
+  test.skip(!ready, "the VOD did not load, so playback cannot be checked");
+
+  const bars = page.locator(`button[data-thread-id="${recurringThreadId}"]`);
+  const second = recurringSpanStarts[1];
+  await bars.nth(1).click();
+
+  await expect
+    .poll(async () => video.evaluate((el: HTMLVideoElement) => el.currentTime), {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(second - 3);
 });
