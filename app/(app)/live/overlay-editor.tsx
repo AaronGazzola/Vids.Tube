@@ -7,6 +7,7 @@ import {
   OVERLAY_BASE_DIMS,
   OVERLAY_CANVAS_H,
   OVERLAY_CANVAS_W,
+  OVERLAY_SURFACE_ALPHA,
 } from "@/lib/demo-overlay";
 import { cn } from "@/lib/utils";
 import { Copy, RefreshCw, RotateCcw, X } from "lucide-react";
@@ -30,6 +31,14 @@ const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
   goalViewers: OVERLAY_BASE_DIMS.goal,
   competition: OVERLAY_BASE_DIMS.competition,
   break: OVERLAY_BASE_DIMS.break,
+};
+
+// Ghosts fill to the same darkness the real surface does, so what the editor
+// shows over the live preview matches what OBS renders.
+const BOX_SURFACE_ALPHA: Partial<Record<DemoBoxKey, number>> = {
+  members: OVERLAY_SURFACE_ALPHA.members,
+  goalLikes: OVERLAY_SURFACE_ALPHA.goal,
+  goalViewers: OVERLAY_SURFACE_ALPHA.goal,
 };
 
 const BOX_KEYS: DemoBoxKey[] = [
@@ -64,6 +73,7 @@ function boxShown(
 
 function GhostBox({ boxKey, pxScale }: { boxKey: DemoBoxKey; pxScale: number }) {
   const box = useDemoLayoutStore((s) => s.config.boxes[boxKey]);
+  const opacity = useDemoLayoutStore((s) => s.config.boxOpacity[boxKey]);
   const setBox = useDemoLayoutStore((s) => s.setBox);
   const dims = BOX_DIMS[boxKey];
 
@@ -107,15 +117,27 @@ function GhostBox({ boxKey, pxScale }: { boxKey: DemoBoxKey; pxScale: number }) 
   return (
     <div
       onPointerDown={startDrag}
-      className="absolute cursor-move touch-none select-none rounded border-2 border-dashed border-white/70 bg-white/10"
-      style={{
-        left: box.x,
-        top: box.y,
-        width: dims.w,
-        height: dims.h,
-        transform: `scale(${box.scale})`,
-        transformOrigin: "top left",
-      }}
+      // The ghost fills with the same black backing the real surface uses, at
+      // the same saved opacity, so the slider has something to show here: this
+      // editor sits over the live HLS preview and renders no real overlay, so a
+      // fixed tint made the control look dead while OBS was in fact obeying it.
+      // Border and label stay at full strength, or a box wound down to 10% would
+      // be unreadable and near impossible to grab.
+      className="overlay-surface absolute cursor-move touch-none select-none rounded border-2 border-dashed border-white/70"
+      style={
+        {
+          left: box.x,
+          top: box.y,
+          width: dims.w,
+          height: dims.h,
+          transform: `scale(${box.scale})`,
+          transformOrigin: "top left",
+          "--overlay-bg-opacity": opacity,
+          ...(BOX_SURFACE_ALPHA[boxKey] !== undefined
+            ? { "--overlay-surface-alpha": BOX_SURFACE_ALPHA[boxKey] }
+            : {}),
+        } as React.CSSProperties
+      }
     >
       <span
         className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-white"
@@ -235,7 +257,7 @@ export function OverlayEditor({
             <span className="w-20 truncate">{DEMO_OVERLAY_LABELS[key]}</span>
             <input
               type="range"
-              min={10}
+              min={0}
               max={100}
               value={Math.round(config.boxOpacity[key] * 100)}
               onChange={(e) => setBoxOpacity(key, Number(e.target.value) / 100)}

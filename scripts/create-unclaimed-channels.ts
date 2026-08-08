@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { cacheChannelAvatar } from "../lib/channel-avatar";
 import { ensureUniqueHandle, normalizeHandleBase } from "../lib/channel-handle";
-import { uploadToR2 } from "../lib/r2";
-import { fetchChannelSnippets, upscaleGgphtAvatar } from "../lib/youtube";
+import { fetchChannelSnippets } from "../lib/youtube";
 import type { Database } from "../supabase/types";
 
 const admin = createClient<Database>(
@@ -9,24 +9,6 @@ const admin = createClient<Database>(
   process.env.SUPABASE_SECRET_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
-
-async function cacheAvatar(
-  youtubeChannelId: string,
-  avatarUrl: string | null
-): Promise<string | null> {
-  if (!avatarUrl) return null;
-  try {
-    const res = await fetch(upscaleGgphtAvatar(avatarUrl));
-    if (!res.ok) return null;
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const key = `avatars/${youtubeChannelId}.jpg`;
-    await uploadToR2(key, bytes, "image/jpeg");
-    return key;
-  } catch (e) {
-    console.error(`avatar cache failed for ${youtubeChannelId}:`, e);
-    return null;
-  }
-}
 
 async function main() {
   const { error: memErr } = await admin.from("memberships").select("id").limit(1);
@@ -135,7 +117,7 @@ async function main() {
     const name =
       snippet?.title || chatter.author_name || "YouTube chatter";
 
-    const remoteAvatarPath = await cacheAvatar(
+    const cached = await cacheChannelAvatar(
       chatter.author_channel_id,
       snippet?.avatarUrl ?? null
     );
@@ -148,7 +130,8 @@ async function main() {
         slug: handle,
         handle,
         name,
-        remote_avatar_path: remoteAvatarPath,
+        remote_avatar_path: cached?.path ?? null,
+        avatar_source_url: cached?.sourceUrl ?? null,
       })
       .select("id")
       .single();
@@ -170,7 +153,7 @@ async function main() {
     }
     created += 1;
     console.log(
-      `created @${handle} (${chatter.author_channel_id}) avatar=${remoteAvatarPath ? "yes" : "no"}`
+      `created @${handle} (${chatter.author_channel_id}) avatar=${cached ? "yes" : "no"}`
     );
   }
 

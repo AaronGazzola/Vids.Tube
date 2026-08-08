@@ -109,11 +109,9 @@ async function primeNightbotToken(): Promise<void> {
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
   await primeNightbotToken();
-  try {
-    await catchUpEndedBroadcasts();
-  } catch (e) {
-    console.error("catch-up failed:", e);
-  }
+  // Catch-up is minutes of serial post-broadcast work; awaiting it here would
+  // delay the heartbeat and leave a live stream unengaged for that whole time.
+  void catchUpEndedBroadcasts().catch((e) => console.error("catch-up failed:", e));
   for (;;) {
     try {
       await tick();

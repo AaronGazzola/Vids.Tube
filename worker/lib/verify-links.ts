@@ -1,5 +1,5 @@
-import { uploadToR2 } from "@/lib/r2";
-import { fetchChannelSnippets, upscaleGgphtAvatar } from "@/lib/youtube";
+import { cacheChannelAvatar } from "@/lib/channel-avatar";
+import { fetchChannelSnippets } from "@/lib/youtube";
 import type { BufferedMessage } from "../jobs/score";
 import { supabaseAdmin } from "../supabase";
 
@@ -10,15 +10,17 @@ const CODE_RE = /^[A-Z2-9]{6}$/;
 async function recacheAvatar(youtubeChannelId: string): Promise<void> {
   try {
     const [snippet] = await fetchChannelSnippets([youtubeChannelId]);
-    if (!snippet?.avatarUrl) return;
-    const res = await fetch(upscaleGgphtAvatar(snippet.avatarUrl));
-    if (!res.ok) return;
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const key = `avatars/${youtubeChannelId}.jpg`;
-    await uploadToR2(key, bytes, "image/jpeg");
+    const cached = await cacheChannelAvatar(
+      youtubeChannelId,
+      snippet?.avatarUrl ?? null
+    );
+    if (!cached) return;
     await supabaseAdmin
       .from("channels")
-      .update({ remote_avatar_path: key })
+      .update({
+        remote_avatar_path: cached.path,
+        avatar_source_url: cached.sourceUrl,
+      })
       .eq("youtube_channel_id", youtubeChannelId);
   } catch (e) {
     console.error(`avatar re-cache failed for ${youtubeChannelId}:`, e);

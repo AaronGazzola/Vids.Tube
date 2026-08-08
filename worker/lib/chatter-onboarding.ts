@@ -1,6 +1,6 @@
-import { cacheChannelAvatar } from "@/lib/channel-avatar";
+import { cacheChannelAvatar, type CachedAvatar } from "@/lib/channel-avatar";
 import { ensureUniqueHandle, normalizeHandleBase } from "@/lib/channel-handle";
-import { fetchChannelSnippets } from "@/lib/youtube";
+import { fetchChannelSnippets, upscaleGgphtAvatar } from "@/lib/youtube";
 import { supabaseAdmin } from "../supabase";
 
 export type EnrichmentMode = "full" | "deferred";
@@ -29,7 +29,12 @@ type ResolvedChannel = {
   handle: string;
   is_software: boolean;
   awaiting_enrichment: boolean;
+  youtube_channel_id: string | null;
+  avatar_source_url: string | null;
 };
+
+const RESOLVED_COLUMNS =
+  "id, handle, is_software, awaiting_enrichment, youtube_channel_id, avatar_source_url";
 
 async function takenHandles(): Promise<Set<string>> {
   const taken = new Set<string>();
@@ -51,7 +56,7 @@ async function resolveExisting(
 ): Promise<ResolvedChannel | null> {
   const { data, error } = await supabaseAdmin
     .from("channels")
-    .select("id, handle, is_software, awaiting_enrichment, merged_into_channel_id")
+    .select(`${RESOLVED_COLUMNS}, merged_into_channel_id`)
     .eq("youtube_channel_id", authorChannelId)
     .maybeSingle();
   if (error) {
@@ -65,7 +70,7 @@ async function resolveExisting(
   if (data.merged_into_channel_id) {
     const { data: survivor, error: survErr } = await supabaseAdmin
       .from("channels")
-      .select("id, handle, is_software, awaiting_enrichment")
+      .select(RESOLVED_COLUMNS)
       .eq("id", data.merged_into_channel_id)
       .maybeSingle();
     if (survErr) {
@@ -80,18 +85,52 @@ async function resolveExisting(
     handle: data.handle,
     is_software: data.is_software,
     awaiting_enrichment: data.awaiting_enrichment,
+    youtube_channel_id: data.youtube_channel_id,
+    avatar_source_url: data.avatar_source_url,
   };
+}
+
+// Every chat message carries the author's current avatar URL, so a chatter who
+// changed their picture is spotted for free, without spending YouTube quota.
+// The URL only changes when the picture does, so an unchanged picture costs a
+// string comparison and nothing else.
+async function refreshAvatarIfChanged(
+  channel: ResolvedChannel,
+  input: OnboardInput
+): Promise<void> {
+  if (!input.avatarUrl) return;
+  const sourceUrl = upscaleGgphtAvatar(input.avatarUrl);
+  if (channel.avatar_source_url === sourceUrl) return;
+
+  const cached = await cacheChannelAvatar(
+    channel.youtube_channel_id ?? input.authorChannelId,
+    sourceUrl
+  );
+  if (!cached) return;
+
+  const { error } = await supabaseAdmin
+    .from("channels")
+    .update({
+      remote_avatar_path: cached.path,
+      avatar_source_url: cached.sourceUrl,
+    })
+    .eq("id", channel.id);
+  if (error) {
+    console.error(`avatar refresh failed for @${channel.handle}:`, error.message);
+    return;
+  }
+  console.error(`[chat:avatar] refreshed @${channel.handle}`);
 }
 
 async function enrich(authorChannelId: string) {
   const snippets = await fetchChannelSnippets([authorChannelId]);
   const snippet = snippets.find((s) => s.channelId === authorChannelId);
   if (!snippet) return null;
-  const remoteAvatarPath = await cacheChannelAvatar(authorChannelId, snippet.avatarUrl);
+  const cached = await cacheChannelAvatar(authorChannelId, snippet.avatarUrl);
   return {
     base: snippet.customUrl || snippet.title,
     name: snippet.title,
-    remoteAvatarPath,
+    cached,
   };
 }
 
@@ -106,6 +145,7 @@ export async function ensureChatterChannel(
     // that used to do it runs later and only when the AI call succeeds.
     if (!existing.is_software) {
       await refreshMembership(existing.id, input.communityId);
+      await refreshAvatarIfChanged(existing, input);
     }
     return {
       channelId: existing.id,
@@ -118,7 +158,7 @@ export async function ensureChatterChannel(
 
   let base = input.authorName || "chatter";
   let name = input.authorName || "YouTube chatter";
-  let remoteAvatarPath: string | null = null;
+  let cachedAvatar: CachedAvatar | null = null;
   let awaitingEnrichment = true;
 
   if (input.mode === "full") {
@@ -127,7 +167,7 @@ export async function ensureChatterChannel(
       if (enriched) {
         base = enriched.base;
         name = enriched.name;
-        remoteAvatarPath = enriched.remoteAvatarPath;
+        cachedAvatar = enriched.cached;
         awaitingEnrichment = false;
       }
     } catch (e) {
@@ -149,7 +189,8 @@ export async function ensureChatterChannel(
       slug: handle,
       handle,
       name,
-      remote_avatar_path: remoteAvatarPath,
+      remote_avatar_path: cachedAvatar?.path ?? null,
+      avatar_source_url: cachedAvatar?.sourceUrl ?? null,
       avatar_path: null,
       awaiting_enrichment: awaitingEnrichment,
     })
@@ -162,6 +203,7 @@ export async function ensureChatterChannel(
       if (!raced) return null;
       if (!raced.is_software) {
         await refreshMembership(raced.id, input.communityId);
+        await refreshAvatarIfChanged(raced, input);
       }
       return {
         channelId: raced.id,

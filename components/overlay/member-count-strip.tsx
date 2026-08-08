@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { OVERLAY_SURFACE_ALPHA } from "@/lib/demo-overlay";
 
 const STRIP_WIDTH = 810;
 
@@ -12,7 +13,12 @@ const STRIP_WIDTH = 810;
 export function MemberCountStrip({ count }: { count: number }) {
   return (
     <div
-      style={{ width: STRIP_WIDTH }}
+      style={
+        {
+          width: STRIP_WIDTH,
+          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.members,
+        } as React.CSSProperties
+      }
       className="overlay-surface flex items-center gap-6 rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
     >
       {/* One line, never wrapped: the strip is a glance, and a call to action

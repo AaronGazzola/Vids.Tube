@@ -590,7 +590,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
                 <div className="flex items-center gap-1.5 pl-2">
                   <input
                     type="range"
-                    min={10}
+                    min={0}
                     max={100}
                     value={Math.round(config.boxOpacity[key] * 100)}
                     onChange={(e) =>

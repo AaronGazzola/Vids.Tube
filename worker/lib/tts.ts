@@ -5,6 +5,52 @@ import { supabaseAdmin } from "../supabase";
 const MAX_TTS_CHARS = 200;
 const ELEVENLABS_DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
 
+// The catalog a chatter picks from. Keys are what chatters type (matched
+// case-insensitively) and what is stored on the request row; the ElevenLabs id
+// is never accepted from chat, so the input is a closed enum.
+export const TTS_VOICES: Record<string, string> = {
+  old: "MKlLqCItoCkvdhrxgtLv",
+  evil: "Vs5CmVCVJwW4odQS2pVf",
+  Victoria: "qSeXEcewz7tA0Q0qk9fH",
+  Oliver: "L1aJrPa7pLJEyYlh3Ilq",
+  DJ: "mKoqwDP2laxTdq1gEgU6",
+};
+
+export function resolveVoiceName(token: string): string | null {
+  const lowered = token.toLowerCase();
+  return (
+    Object.keys(TTS_VOICES).find((name) => name.toLowerCase() === lowered) ??
+    null
+  );
+}
+
+// The leading token is stripped only when it names a known voice, so an
+// unmatched first word stays in the text and is still moderated.
+export function splitVoiceToken(args: string): {
+  voice: string | null;
+  text: string;
+} {
+  const trimmed = args.trim();
+  const [first, ...rest] = trimmed.split(/\s+/);
+  const voice = first ? resolveVoiceName(first) : null;
+  return voice
+    ? { voice, text: rest.join(" ") }
+    : { voice: null, text: trimmed };
+}
+
+// A chatter who has never picked still gets a voice of their own, so the stream
+// sounds varied with zero chatter effort. Seeded from the lowest identity key so
+// the linked YouTube and Vids.Tube identities land on the same voice.
+export function seedVoice(keys: string[]): string {
+  const names = Object.keys(TTS_VOICES);
+  const seed = [...keys].sort()[0] ?? "";
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return names[hash % names.length];
+}
+
 export type TtsVoiceSettings = { stability: number; similarity: number };
 
 export const DEFAULT_TTS_VOICE: TtsVoiceSettings = {
@@ -46,18 +92,73 @@ export async function moderateTtsText(text: string): Promise<TtsVerdict> {
   }
 }
 
-function ttsParticipantKey(ctx: CommandContext): string {
+// Chat ingest never stamps the Vids.Tube account on a YouTube message, so the
+// same person keeps two keys after linking. Both are returned; the first is the
+// one this request is filed under, the rest are read alongside it.
+async function identityKeys(ctx: CommandContext): Promise<string[]> {
   const m = ctx.message;
-  return m.origin === "vidstube"
-    ? String(m.userId)
-    : `youtube:${m.externalAuthorId}`;
+  if (m.origin === "vidstube") {
+    const key = String(m.userId);
+    if (!m.userId) {
+      return [key];
+    }
+    const { data } = await supabaseAdmin
+      .from("youtube_links")
+      .select("youtube_channel_id, verified_at")
+      .eq("user_id", m.userId)
+      .maybeSingle();
+    return data?.verified_at && data.youtube_channel_id
+      ? [key, `youtube:${data.youtube_channel_id}`]
+      : [key];
+  }
+  const key = `youtube:${m.externalAuthorId}`;
+  const { data } = await supabaseAdmin
+    .from("youtube_links")
+    .select("user_id, verified_at")
+    .eq("youtube_channel_id", String(m.externalAuthorId))
+    .maybeSingle();
+  return data?.verified_at ? [key, data.user_id] : [key];
+}
+
+async function stickyVoice(
+  channelId: string,
+  keys: string[]
+): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("tts_requests")
+    .select("voice")
+    .eq("channel_id", channelId)
+    .in("participant_key", keys)
+    .not("voice", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+  }
+  const stored = data?.voice ? resolveVoiceName(data.voice) : null;
+  return stored ?? seedVoice(keys);
+}
+
+function ttsMention(ctx: CommandContext): string {
+  return `@${(ctx.message.authorName ?? ctx.message.author).replace(/^@+/, "")}`;
+}
+
+export async function voicesHandler(ctx: CommandContext): Promise<void> {
+  const keys = await identityKeys(ctx);
+  const mine = await stickyVoice(ctx.stream.channelId, keys);
+  ctx.reply(
+    `${ttsMention(ctx)} voices: ${Object.keys(TTS_VOICES).join(", ")} — yours is ${mine}. Change it with !tts <voice> your message.`
+  );
 }
 
 export async function ttsHandler(ctx: CommandContext): Promise<void> {
-  const text = ctx.args.trim();
-  const mention = `@${(ctx.message.authorName ?? ctx.message.author).replace(/^@+/, "")}`;
+  const { voice: picked, text } = splitVoiceToken(ctx.args);
+  const mention = ttsMention(ctx);
   if (!text) {
-    ctx.reply(`${mention} usage: !tts your message (max ${MAX_TTS_CHARS} characters)`);
+    ctx.reply(
+      `${mention} usage: !tts <voice> your message (max ${MAX_TTS_CHARS} characters) — voices: ${Object.keys(TTS_VOICES).join(", ")}`
+    );
     return;
   }
   if (text.length > MAX_TTS_CHARS) {
@@ -67,6 +168,8 @@ export async function ttsHandler(ctx: CommandContext): Promise<void> {
     return;
   }
 
+  const keys = await identityKeys(ctx);
+  const voice = picked ?? (await stickyVoice(ctx.stream.channelId, keys));
   const verdict = await moderateTtsText(text);
 
   const { data: scoring } = await supabaseAdmin
@@ -81,10 +184,11 @@ export async function ttsHandler(ctx: CommandContext): Promise<void> {
     channel_id: ctx.stream.channelId,
     stream_id: ctx.stream.id,
     chat_message_id: ctx.message.chatMessageId,
-    participant_key: ttsParticipantKey(ctx),
+    participant_key: keys[0],
     origin: ctx.message.origin === "vidstube" ? "vidstube" : "youtube",
     author_name: ctx.message.authorName ?? ctx.message.author,
     text,
+    voice,
     status,
     reason: verdict.reason || null,
     approved_at: status === "approved" ? new Date().toISOString() : null,
@@ -95,9 +199,11 @@ export async function ttsHandler(ctx: CommandContext): Promise<void> {
   }
 
   if (status === "approved") {
-    ctx.reply(`${mention} queued — your message will be spoken on stream.`);
+    ctx.reply(
+      `${mention} queued in the ${voice} voice — your message will be spoken on stream.`
+    );
   } else if (status === "suggested") {
-    ctx.reply(`${mention} sent to the streamer for approval.`);
+    ctx.reply(`${mention} sent to the streamer for approval (${voice} voice).`);
   }
 }
 
@@ -106,7 +212,8 @@ type FetchLike = typeof fetch;
 export async function synthesizeTts(
   text: string,
   voice: TtsVoiceSettings = DEFAULT_TTS_VOICE,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  voiceName: string | null = null
 ): Promise<ArrayBuffer | null> {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) {
@@ -116,7 +223,10 @@ export async function synthesizeTts(
     }
     return null;
   }
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? ELEVENLABS_DEFAULT_VOICE;
+  const voiceId =
+    (voiceName ? TTS_VOICES[voiceName] : null) ??
+    process.env.ELEVENLABS_VOICE_ID ??
+    ELEVENLABS_DEFAULT_VOICE;
   const res = await fetchImpl(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {
@@ -146,7 +256,7 @@ export async function synthesizeTts(
 export async function synthesizePendingTts(streamId: string): Promise<void> {
   const { data: pending, error } = await supabaseAdmin
     .from("tts_requests")
-    .select("id, text")
+    .select("id, text, voice")
     .eq("stream_id", streamId)
     .eq("status", "approved")
     .is("audio_path", null)
@@ -169,7 +279,7 @@ export async function synthesizePendingTts(streamId: string): Promise<void> {
     similarity: scoring?.tts_similarity ?? DEFAULT_TTS_VOICE.similarity,
   };
   for (const row of pending) {
-    const audio = await synthesizeTts(row.text, voice);
+    const audio = await synthesizeTts(row.text, voice, fetch, row.voice);
     if (!audio) {
       return;
     }

@@ -1,4 +1,5 @@
 import type { GoalMetric, MetricProgress } from "@/app/layout.types";
+import { OVERLAY_SURFACE_ALPHA } from "@/lib/demo-overlay";
 
 function fmt(n: number) {
   return n.toLocaleString();
@@ -77,7 +78,7 @@ export function GoalBar({
         {
           width: d,
           height: d,
-          "--overlay-surface-alpha": 0.4,
+          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.goal,
         } as React.CSSProperties
       }
     >

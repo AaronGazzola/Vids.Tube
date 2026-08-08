@@ -103,6 +103,10 @@ export const BUILTIN_HANDLERS: Record<
     const { ttsHandler } = await import("./tts");
     await ttsHandler(ctx);
   },
+  voices: async (ctx) => {
+    const { voicesHandler } = await import("./tts");
+    await voicesHandler(ctx);
+  },
   ask: async (ctx) => {
     const { askHandler } = await import("./ask-command");
     await askHandler(ctx);

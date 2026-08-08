@@ -523,7 +523,7 @@ function ChatPanel() {
   const { scrollRef, contentRef, onScroll } = useChatAutoScroll(messages.length);
 
   return (
-    <div className="flex min-h-[250px] flex-1 flex-col rounded-lg border">
+    <div className="flex min-h-[300px] flex-1 flex-col rounded-lg border">
       <div className="shrink-0 border-b px-3 py-2 text-sm font-semibold">Live chat</div>
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto p-2">
         <div ref={contentRef}>

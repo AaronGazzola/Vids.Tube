@@ -290,9 +290,10 @@ test("the opacity control dims the overlay backing and leaves the text alone", a
     return parts.length > 3 ? parts[3] : 1;
   };
 
-  // The backing fades in proportion.
-  expect(alphaOf(result.full.bg)).toBeCloseTo(0.7, 2);
-  expect(alphaOf(result.dim.bg)).toBeCloseTo(0.14, 2);
+  // The slider maps straight onto the backing: full is solid black, and a fifth
+  // of the way up is a fifth of the way to solid.
+  expect(alphaOf(result.full.bg)).toBeCloseTo(1, 2);
+  expect(alphaOf(result.dim.bg)).toBeCloseTo(0.2, 2);
 
   // The box itself is never faded, so the text stays fully legible at any
   // setting — dimming the element used to take the words with it.

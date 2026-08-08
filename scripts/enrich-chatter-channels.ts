@@ -51,7 +51,7 @@ async function main() {
     console.log(`  ${c.handle} -> @${handle} (${snippet.title})`);
     if (!APPLY) continue;
 
-    const remoteAvatarPath = await cacheChannelAvatar(
+    const cached = await cacheChannelAvatar(
       c.youtube_channel_id!,
       snippet.avatarUrl
     );
@@ -61,7 +61,8 @@ async function main() {
         handle,
         slug: handle,
         name: snippet.title || c.name,
-        remote_avatar_path: remoteAvatarPath,
+        remote_avatar_path: cached?.path ?? null,
+        avatar_source_url: cached?.sourceUrl ?? null,
         awaiting_enrichment: false,
       })
       .eq("id", c.id);

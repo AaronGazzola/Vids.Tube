@@ -707,6 +707,7 @@ export type TtsFeedItem = {
   status: string;
   reason: string | null;
   audioPath: string | null;
+  voice: string | null;
   createdAt: string;
 };
 
@@ -720,7 +721,7 @@ export async function getTtsFeedAction(
   const { data, error } = await supabaseAdmin
     .from("tts_requests")
     .select(
-      "id, chat_message_id, author_name, origin, text, status, reason, audio_path, created_at"
+      "id, chat_message_id, author_name, origin, text, status, reason, audio_path, voice, created_at"
     )
     .eq("stream_id", streamId)
     .order("created_at", { ascending: false })
@@ -738,6 +739,7 @@ export async function getTtsFeedAction(
     status: r.status,
     reason: r.reason,
     audioPath: r.audio_path,
+    voice: r.voice,
     createdAt: r.created_at,
   }));
 }

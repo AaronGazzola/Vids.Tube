@@ -159,6 +159,43 @@ async function recomputeIsIdempotent(communityId: string) {
   check("every total is identical after a second recompute", same);
 }
 
+async function streakCountsTheRunningBroadcast(communityId: string) {
+  console.log("\nchatting in the running broadcast lifts the streak at once");
+
+  const { data: live } = await admin
+    .from("streams")
+    .select("id")
+    .eq("channel_id", communityId)
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle();
+  if (!live) {
+    console.log("  skip  no broadcast is running — rerun during a broadcast");
+    return;
+  }
+
+  const { data: present } = await admin
+    .from("membership_stream_stats")
+    .select("membership_id")
+    .eq("stream_id", live.id);
+  const ids = (present ?? []).map((r) => r.membership_id);
+  if (!ids.length) {
+    console.log("  skip  nobody has chatted in the running broadcast yet");
+    return;
+  }
+
+  const { data: rows } = await admin
+    .from("memberships")
+    .select("id, current_streak")
+    .in("id", ids);
+  const zeroed = (rows ?? []).filter((r) => r.current_streak < 1);
+  check(
+    `every one of the ${ids.length} member(s) chatting right now holds a streak of at least 1`,
+    zeroed.length === 0,
+    zeroed.length ? `${zeroed.length} still read as 0` : ""
+  );
+}
+
 async function greetingIsClaimedOnce(communityId: string) {
   console.log("\na chatter cannot be greeted twice in one broadcast");
 
@@ -327,6 +364,7 @@ async function main() {
   const memberCount = await memberCountExcludesNonPeople(owner.id);
   await mergeLeavesCountUnchanged(owner.id);
   await recomputeIsIdempotent(owner.id);
+  await streakCountsTheRunningBroadcast(owner.id);
   await greetingIsClaimedOnce(owner.id);
   await tombstoneChainIsRefused();
   await dayOneIsAwarded(owner.id, memberCount);

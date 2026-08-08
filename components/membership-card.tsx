@@ -60,6 +60,21 @@ function Stat({
   );
 }
 
+// A member with no XP holds no rank, and the slot where the rank goes said
+// "just joined" — which was a lie for anyone who had been turning up for a year
+// without ever being scored. The slot now reports when the member was first
+// seen, and keeps "just joined" for the day they actually arrived.
+function standing(rank: number | null, firstSeenAt: string | null): string {
+  if (rank !== null) return `rank ${rank}`;
+  const first = firstSeenAt ? new Date(firstSeenAt).getTime() : NaN;
+  if (!Number.isFinite(first)) return "just joined";
+  if (Date.now() - first < 24 * 60 * 60 * 1000) return "just joined";
+  return `here since ${new Date(first).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
 // One shape for every member: someone who joined a minute ago sees the same
 // fields in the same places as someone with a thousand messages, carrying zeroes
 // rather than a different, smaller card.
@@ -107,7 +122,7 @@ export function MembershipCard({
           </span>
         )}
         <span className="text-sm text-muted-foreground">
-          {membership.rank === null ? "just joined" : `rank ${membership.rank}`}
+          {standing(membership.rank, membership.firstSeenAt)}
         </span>
       </div>
 

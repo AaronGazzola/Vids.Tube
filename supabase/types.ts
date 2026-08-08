@@ -280,6 +280,7 @@ export type Database = {
       channels: {
         Row: {
           avatar_path: string | null
+          avatar_source_url: string | null
           awaiting_enrichment: boolean
           banner_path: string | null
           chatter_enrichment_mode: string
@@ -297,6 +298,7 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          avatar_source_url?: string | null
           awaiting_enrichment?: boolean
           banner_path?: string | null
           chatter_enrichment_mode?: string
@@ -314,6 +316,7 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          avatar_source_url?: string | null
           awaiting_enrichment?: boolean
           banner_path?: string | null
           chatter_enrichment_mode?: string
@@ -1611,6 +1614,7 @@ export type Database = {
           status: string
           stream_id: string
           text: string
+          voice: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -1627,6 +1631,7 @@ export type Database = {
           status: string
           stream_id: string
           text: string
+          voice?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -1643,6 +1648,7 @@ export type Database = {
           status?: string
           stream_id?: string
           text?: string
+          voice?: string | null
         }
         Relationships: [
           {

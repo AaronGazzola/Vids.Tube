@@ -539,7 +539,7 @@ function ChatMessageRow({
           <StatusPill
             tone="violet"
             icon={<Volume2 className="h-3 w-3" />}
-            label={ttsStatusLabel(tts.status)}
+            label={`${ttsStatusLabel(tts.status)}${tts.voice ? ` · ${tts.voice}` : ""}`}
           />
           {pending && (
             <>
@@ -784,7 +784,7 @@ function ChatPanel({ streamId }: { streamId: string }) {
   }
 
   return (
-    <div className="flex min-h-[250px] flex-1 flex-col rounded-lg border">
+    <div className="flex min-h-[300px] flex-1 flex-col rounded-lg border">
       <div className="shrink-0 border-b px-3 py-2 text-sm font-semibold">Live chat</div>
       <div
         ref={scrollRef}

@@ -58,12 +58,24 @@ The divisor was lowered from 100 to 25 because the original curve was set when a
 
 ### Requirement: Streaks derive from the attendance timeline
 
-Streaks SHALL be computed over community K's ended streams (including synthetic archive-era streams) ordered by `started_at`: `current_streak` is the length of the consecutive attended run ending at K's most recent ended stream, and 0 when that stream was not attended; `best_streak` is the longest attended run in the timeline. Streak values SHALL be flat counters with no multiplier semantics.
+Streaks SHALL be computed over a timeline of community K's streams ordered by `started_at`, comprising every ended stream (including synthetic archive-era streams) plus K's running stream when and only when the member has attended it: `current_streak` is the length of the consecutive attended run ending at the last stream in that timeline, and 0 when that stream was not attended; `best_streak` is the longest attended run in the timeline. Streak values SHALL be flat counters with no multiplier semantics.
+
+A running stream is admitted only once attended so that attendance counts while the stream is still live, without zeroing the streak of every member the moment a stream goes live.
 
 #### Scenario: Missing the latest stream zeroes the current streak
 
 - **WHEN** a member attended the 5 streams before K's most recent ended stream but not the most recent one
 - **THEN** `current_streak` is 0 and `best_streak` is at least 5
+
+#### Scenario: Chatting in the running stream lifts the streak immediately
+
+- **WHEN** a member attended K's most recent ended stream and then chats in K's currently running stream
+- **THEN** `current_streak` counts both, without waiting for the running stream to end
+
+#### Scenario: A live stream nobody has attended leaves streaks alone
+
+- **WHEN** K's stream goes live and a member has not chatted in it
+- **THEN** that member's `current_streak` is unchanged from its value before the stream went live
 
 ### Requirement: Credits are a balance, not a derived value
 

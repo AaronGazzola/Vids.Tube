@@ -23,6 +23,18 @@ export const OVERLAY_BASE_DIMS = {
   members: { w: 810, h: 128 },
 } as const;
 
+// Base alpha of each surface's black backing, before the owner's opacity slider
+// multiplies it. One source of truth so the layout editor's ghost fills to the
+// same darkness the real element does: when the ghost guessed, the slider looked
+// broken because the preview disagreed with OBS. Anything absent takes the 0.7
+// default in the `overlay-surface` utility.
+export const OVERLAY_SURFACE_ALPHA = {
+  // The members strip is read at a glance over live video, so its slider maps
+  // straight to the backing: 100 is solid black, 0 is gone.
+  members: 1,
+  goal: 0.4,
+} as const;
+
 export type OverlayBoxKey =
   | "members"
   | "goalLikes"

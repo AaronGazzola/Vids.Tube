@@ -145,7 +145,7 @@ export function WatchStage({
         fullscreen
           ? "relative flex h-full w-full items-center justify-center bg-black"
           : chatBounded
-            ? "grid h-stage grid-rows-[auto_minmax(0,1fr)] gap-3 lg:h-auto lg:grid-cols-[1fr_340px] lg:grid-rows-[auto] lg:gap-4"
+            ? "grid h-stage grid-rows-[auto_minmax(300px,1fr)] gap-3 lg:h-auto lg:grid-cols-[1fr_340px] lg:grid-rows-[auto] lg:gap-4"
             : "flex flex-col gap-3 lg:gap-4",
         className
       )}
