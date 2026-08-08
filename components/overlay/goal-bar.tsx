@@ -72,8 +72,14 @@ export function GoalBar({
   const arcMask = `url("data:image/svg+xml,${encodeURIComponent(arcSvg)}")`;
   return (
     <div
-      className="relative inline-flex items-center justify-center rounded-full bg-black/40 text-white"
-      style={{ width: d, height: d }}
+      className="overlay-surface relative inline-flex items-center justify-center rounded-full text-white"
+      style={
+        {
+          width: d,
+          height: d,
+          "--overlay-surface-alpha": 0.4,
+        } as React.CSSProperties
+      }
     >
       <svg className="absolute inset-0 -rotate-90" width={d} height={d}>
         <mask id={maskId}>

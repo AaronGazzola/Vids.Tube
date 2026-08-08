@@ -124,6 +124,16 @@
   height: calc(100dvh - var(--stage-top, 0px));
 }
 
+/* The black backing every overlay surface sits on. The owner's opacity slider
+   scales this and nothing else: dimming the whole box used to take the text with
+   it, which made a subtle overlay an unreadable one. Each surface may set its own
+   base alpha; the slider multiplies whatever that is. */
+@utility overlay-surface {
+  background-color: rgb(
+    0 0 0 / calc(var(--overlay-surface-alpha, 0.7) * var(--overlay-bg-opacity, 1))
+  );
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

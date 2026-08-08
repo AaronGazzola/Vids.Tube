@@ -241,6 +241,89 @@ test("going live opens on a distinguished live tab, and ending restores all-time
   );
 });
 
+test("the opacity control dims the overlay backing and leaves the text alone", async ({
+  page,
+}) => {
+  const { data: owner } = await admin
+    .from("channels")
+    .select("id")
+    .eq("slug", ownerSlug)
+    .maybeSingle();
+  const { data: layout } = await admin
+    .from("overlay_layouts")
+    .select("token")
+    .eq("channel_id", owner!.id)
+    .maybeSingle();
+  test.skip(!layout?.token, "no overlay layout to read");
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto(`/overlay/${ownerSlug}?token=${layout!.token}`);
+  await page.waitForSelector("text=Join the chat to become a member", {
+    timeout: 25_000,
+  });
+
+  // The variable is written by the positioner and read by the surface, so the
+  // check drives it directly rather than editing the owner's saved layout.
+  const result = await page.evaluate(() => {
+    const surface = document.querySelector(
+      "div.overlay-surface"
+    ) as HTMLElement;
+    const holder = surface.closest("[style*='--overlay-bg-opacity']") as HTMLElement;
+    const read = () => {
+      const cs = getComputedStyle(surface);
+      return { bg: cs.backgroundColor, opacity: cs.opacity, color: cs.color };
+    };
+    holder.style.setProperty("--overlay-bg-opacity", "1");
+    const full = read();
+    holder.style.setProperty("--overlay-bg-opacity", "0.2");
+    const dim = read();
+    return { full, dim };
+  });
+
+  const alphaOf = (rgba: string) => {
+    const m = rgba.match(/rgba?\(([^)]+)\)/);
+    const parts = m![1].split(",").map((p) => parseFloat(p));
+    return parts.length > 3 ? parts[3] : 1;
+  };
+
+  // The backing fades in proportion.
+  expect(alphaOf(result.full.bg)).toBeCloseTo(0.7, 2);
+  expect(alphaOf(result.dim.bg)).toBeCloseTo(0.14, 2);
+
+  // The box itself is never faded, so the text stays fully legible at any
+  // setting — dimming the element used to take the words with it.
+  expect(result.full.opacity).toBe("1");
+  expect(result.dim.opacity).toBe("1");
+  expect(result.dim.color).toBe("rgb(255, 255, 255)");
+});
+
+test("the members strip reads as one phrase down its right-hand side", async ({
+  page,
+}) => {
+  const { data: owner } = await admin
+    .from("channels")
+    .select("id")
+    .eq("slug", ownerSlug)
+    .maybeSingle();
+  const { data: layout } = await admin
+    .from("overlay_layouts")
+    .select("token")
+    .eq("channel_id", owner!.id)
+    .maybeSingle();
+  test.skip(!layout?.token, "no overlay layout to read");
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto(`/overlay/${ownerSlug}?token=${layout!.token}`);
+
+  await expect(
+    page.getByText("Join the chat to become a member")
+  ).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText("Vids.tube", { exact: true })).toBeVisible();
+  await expect(page.getByText("Members", { exact: true })).toBeVisible();
+  // The old second line is gone.
+  await expect(page.getByText(/See your stats/)).toHaveCount(0);
+});
+
 test("a channel that has published nothing renders no videos section", async ({
   page,
 }) => {

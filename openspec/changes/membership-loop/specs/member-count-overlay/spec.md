@@ -46,12 +46,26 @@ Overlay positions are set by hand against a live picture and are expensive to re
 
 ### Requirement: The members box shows the count and the call to action
 
-The members box SHALL display the community's member total and a call to action telling viewers that sending a message in chat makes them a member, naming the address as `vids.tube/...` without a scheme, because the overlay is read rather than clicked.
+The members box SHALL sit on the same translucent black backing the other overlay surfaces use.
+
+Along its left it SHALL read "Join the chat to become a member". Down its right it SHALL stack the member total, then "Vids.tube", then "Members", so the right-hand side reads as one phrase: the number carries the name of the place with it.
+
+No second line of instructions SHALL appear. The earlier "See your stats at vids.tube" is removed: the left-hand call to action already says what to do, and the right-hand stack already names where.
 
 #### Scenario: The box states how to join
 
 - **WHEN** the members box renders during a broadcast
-- **THEN** it shows the member total and text telling the viewer that sending a chat message makes them a member, naming `vids.tube/...`
+- **THEN** its left reads "Join the chat to become a member"
+
+#### Scenario: The right-hand side names the place
+
+- **WHEN** the members box renders
+- **THEN** the member total, "Vids.tube" and "Members" are stacked in that order down its right
+
+#### Scenario: The second instruction is gone
+
+- **WHEN** the members box renders
+- **THEN** no "See your stats" line appears
 
 ### Requirement: The members box is a thin horizontal strip
 

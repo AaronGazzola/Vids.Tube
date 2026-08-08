@@ -37,7 +37,7 @@ export function BreakCard({
   if (done) return null;
 
   return (
-    <div className="flex w-[320px] flex-col items-center gap-1 rounded-2xl border border-white/15 bg-black/70 px-8 py-6 text-white shadow-lg backdrop-blur-sm">
+    <div className="overlay-surface flex w-[320px] flex-col items-center gap-1 rounded-2xl border border-white/15 px-8 py-6 text-white shadow-lg backdrop-blur-sm">
       <span className="text-2xl font-semibold tracking-wide">Back soon</span>
       <span className="text-5xl font-bold tabular-nums">
         {formatRemaining(remaining)}

@@ -10,8 +10,13 @@ export function SpeechBubble({
 }) {
   return (
     <div
-      className="relative flex-1 self-start rounded-xl border border-white bg-black px-4 py-3 text-base leading-relaxed text-white"
-      style={{ boxShadow: "0 0 18px 3px rgba(255,255,255,0.4)" }}
+      className="overlay-surface relative flex-1 self-start rounded-xl border border-white px-4 py-3 text-base leading-relaxed text-white"
+      style={
+        {
+          "--overlay-surface-alpha": 1,
+          boxShadow: "0 0 18px 3px rgba(255,255,255,0.4)",
+        } as React.CSSProperties
+      }
     >
       {pointer === "left" ? (
         <svg

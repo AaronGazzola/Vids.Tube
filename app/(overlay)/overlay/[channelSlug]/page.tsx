@@ -78,13 +78,18 @@ function Positioned({
   return (
     <div
       className="absolute"
-      style={{
-        left: box.x,
-        top: box.y,
-        opacity,
-        transform: `scale(${box.scale})`,
-        transformOrigin: "top left",
-      }}
+      style={
+        {
+          left: box.x,
+          top: box.y,
+          // Drives the black backing of whatever sits inside, not the box as a
+          // whole: fading the element took the text with it, so a subtle overlay
+          // was also an unreadable one.
+          "--overlay-bg-opacity": opacity,
+          transform: `scale(${box.scale})`,
+          transformOrigin: "top left",
+        } as React.CSSProperties
+      }
     >
       {children}
     </div>

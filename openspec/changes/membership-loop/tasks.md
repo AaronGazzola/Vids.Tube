@@ -86,6 +86,12 @@
 - [x] 12.2 Quote the balance in the returning-chatter greeting and in the `!me` reply, scoped to the community being chatted in, and say nothing when the balance is nothing.
 - [x] 12.3 Remove the three requirements describing credits UI that was never built: the `/credits` page, the account credit summary, and the navigation credits indicator.
 
+## 13. Overlay surface and opacity
+
+- [x] 13.1 Add a shared `overlay-surface` backing whose alpha is its own base multiplied by an `--overlay-bg-opacity` variable, and move the break card, goal ring, speech bubble and members strip onto it.
+- [x] 13.2 Have the overlay positioner and the layout preview set `--overlay-bg-opacity` from the saved opacity instead of setting `opacity` on the box, so the control fades the backing and never the text.
+- [x] 13.3 Rebuild the members strip: translucent black backing, "Join the chat to become a member" along the left, and the total, "Vids.tube" and "Members" stacked down the right; remove the "See your stats" line.
+
 ## 11. Tests
 
 - [x] 11.1 Add vitest coverage for the greeting builders: link form carries `https://` and the `?c=` parameter, every variant stays within 200 characters, and the batch form carries no personal link.

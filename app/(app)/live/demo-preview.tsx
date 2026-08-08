@@ -121,7 +121,11 @@ function DraggableBox({
         transformOrigin: "top left",
       }}
     >
-      <div style={{ opacity }}>{children}</div>
+      <div
+        style={{ "--overlay-bg-opacity": opacity } as React.CSSProperties}
+      >
+        {children}
+      </div>
       <div
         onPointerDown={startResize}
         className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize rounded-full border border-white bg-black/70"
