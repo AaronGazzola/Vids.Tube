@@ -17,8 +17,8 @@ export function MemberCountStrip({ count }: { count: number }) {
     >
       {/* One line, never wrapped: the strip is a glance, and a call to action
           that breaks mid-sentence stops being one. */}
-      <p className="min-w-0 flex-1 whitespace-nowrap text-[34px] font-semibold leading-[1.15]">
-        Chat to become a Vids.Tube member
+      <p className="min-w-0 flex-1 whitespace-nowrap text-[32px] font-semibold leading-[1.15]">
+        Chat to become a member at Vids.Tube!
       </p>
 
       {/* The icon carries the meaning the word used to: a figure beside a member
