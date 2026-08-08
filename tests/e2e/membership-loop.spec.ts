@@ -325,7 +325,8 @@ test("the members strip reads as one phrase down its right-hand side", async ({
   await expect(
     page.getByText("Chat to become a Vids.Tube member", { exact: true })
   ).toBeVisible();
-  await expect(page.getByText("Members", { exact: true })).toBeVisible();
+  // The member mark beside the count says what it counts; the word is gone.
+  await expect(page.getByText("Members", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/See your stats/)).toHaveCount(0);
 
   const surface = page.locator("div.overlay-surface").filter({

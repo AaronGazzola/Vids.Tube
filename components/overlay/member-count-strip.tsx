@@ -1,3 +1,5 @@
+import { UserStar } from "lucide-react";
+
 const STRIP_WIDTH = 810;
 
 // A wide, short banner rather than a stacked card: the strip competes for
@@ -15,15 +17,17 @@ export function MemberCountStrip({ count }: { count: number }) {
     >
       {/* One line, never wrapped: the strip is a glance, and a call to action
           that breaks mid-sentence stops being one. */}
-      <p className="min-w-0 flex-1 whitespace-nowrap text-[36px] font-semibold leading-[1.15]">
+      <p className="min-w-0 flex-1 whitespace-nowrap text-[34px] font-semibold leading-[1.15]">
         Chat to become a Vids.Tube member
       </p>
 
-      <div className="flex shrink-0 flex-col items-center leading-none">
+      {/* The icon carries the meaning the word used to: a figure beside a member
+          mark needs no label to say what it counts. */}
+      <div className="flex shrink-0 items-center gap-2.5 leading-none">
+        <UserStar className="h-9 w-9 shrink-0" aria-hidden />
         <span className="text-[38px] font-bold tabular-nums tracking-tight">
           {count.toLocaleString("en-US")}
         </span>
-        <span className="mt-1.5 text-[22px] font-semibold">Members</span>
       </div>
     </div>
   );
