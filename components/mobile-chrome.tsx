@@ -13,9 +13,17 @@ import {
 // Reference geometry measured from the YouTube Android live layout at 1080px
 // video width. Every dimension below is multiplied by `scale` at render time
 // (scale = renderedVideoWidthPx / REF_WIDTH).
+//
+// Re-measured from data/Screenshot_20260717-120823(1).png by sampling the pixels
+// rather than by eye. On that 1080x2400 phone the video occupies rows 195..2114:
+// exactly 1080x1920, so the 9:16 assumption this whole model rests on holds. The
+// numbers below are that screenshot's, expressed relative to the video.
 export const MOBILE_CHROME_REF_WIDTH = 1080;
-export const CHROME_ABOVE = 96;
-export const CHROME_BELOW = 90;
+// The channel header above the video: rows 110..194, header plus its gap.
+export const CHROME_ABOVE = 85;
+// The chat input below it: rows 2115..2194, and it sits wholly below the video
+// rather than overlapping it.
+export const CHROME_BELOW = 80;
 
 const TOP_BAR = {
   height: 96,
@@ -33,10 +41,13 @@ const TOP_BAR = {
   gap: 18,
 };
 
-const CHAT = {
+export const CHAT_GEOMETRY = {
   left: 36,
   right: 170,
-  bottom: 40,
+  // The lowest chat pixel measured 78 above the video's bottom edge. Allowing
+  // for the line box below the last glyph, the block's own edge sits near 68 —
+  // not the 40 this carried before, which floated the chat a whole line too low.
+  bottom: 68,
   rowGap: 16,
   avatar: 52,
   handleSize: 32,
@@ -47,15 +58,21 @@ const CHAT = {
   noticeSize: 32,
 };
 
-const HEART = { size: 100, right: 36, bottom: 76 };
+// The heart glyph measured x 965..1025, y 2000..2055 — centred 85 in from the
+// right and 87 up from the video's bottom edge, which puts a 100px button at
+// right 35, bottom 37. It sat at bottom 76 before, a full button too high.
+export const HEART_GEOMETRY = { size: 100, right: 35, bottom: 37, glyph: 60 };
 
-const INPUT = {
+export const INPUT_GEOMETRY = {
   width: 920,
-  height: 90,
+  height: 80,
   left: 36,
   textSize: 34,
   icon: 44,
-  overlap: 0.25,
+  // The real input clears the video entirely: it runs from the row after the
+  // video's last to the row before the phone's own bar. Overlapping it a quarter
+  // over the picture put a bar across the bottom of every overlay behind it.
+  overlap: 0,
 };
 
 const SAMPLE_VIEWERS = "14";
@@ -183,32 +200,32 @@ function ChatRow({
         src={placeholderAvatar(row.handle)}
         alt=""
         className="shrink-0 rounded-full"
-        style={{ width: s(CHAT.avatar), height: s(CHAT.avatar) }}
+        style={{ width: s(CHAT_GEOMETRY.avatar), height: s(CHAT_GEOMETRY.avatar) }}
       />
       {row.badge && (
         <span
           className="flex shrink-0 items-center rounded-full bg-indigo-600 font-semibold text-white"
           style={{
-            height: s(CHAT.badgeH),
+            height: s(CHAT_GEOMETRY.badgeH),
             paddingLeft: s(12),
             paddingRight: s(12),
-            fontSize: s(CHAT.badgeText),
+            fontSize: s(CHAT_GEOMETRY.badgeText),
             gap: s(6),
             marginTop: s(6),
           }}
         >
-          <Crown style={{ width: s(CHAT.badgeIcon), height: s(CHAT.badgeIcon) }} />
+          <Crown style={{ width: s(CHAT_GEOMETRY.badgeIcon), height: s(CHAT_GEOMETRY.badgeIcon) }} />
           {row.badge}
         </span>
       )}
       <p
         className="min-w-0 leading-snug text-white"
         style={{
-          fontSize: s(CHAT.textSize),
+          fontSize: s(CHAT_GEOMETRY.textSize),
           textShadow: "0 1px 2px rgba(0,0,0,0.8)",
         }}
       >
-        <span className="font-semibold" style={{ fontSize: s(CHAT.handleSize) }}>
+        <span className="font-semibold" style={{ fontSize: s(CHAT_GEOMETRY.handleSize) }}>
           {row.handle}
         </span>{" "}
         {row.text}
@@ -224,10 +241,10 @@ export function MobileChromeOverlay({ scale }: { scale: number }) {
       <div
         className="absolute flex flex-col justify-end"
         style={{
-          left: s(CHAT.left),
-          right: s(CHAT.right),
-          bottom: s(CHAT.bottom),
-          gap: s(CHAT.rowGap),
+          left: s(CHAT_GEOMETRY.left),
+          right: s(CHAT_GEOMETRY.right),
+          bottom: s(CHAT_GEOMETRY.bottom),
+          gap: s(CHAT_GEOMETRY.rowGap),
         }}
       >
         {SAMPLE_ROWS.map((row, i) => (
@@ -236,7 +253,7 @@ export function MobileChromeOverlay({ scale }: { scale: number }) {
         <p
           className="leading-snug text-white/90"
           style={{
-            fontSize: s(CHAT.noticeSize),
+            fontSize: s(CHAT_GEOMETRY.noticeSize),
             textShadow: "0 1px 2px rgba(0,0,0,0.8)",
           }}
         >
@@ -247,16 +264,16 @@ export function MobileChromeOverlay({ scale }: { scale: number }) {
       <div
         className="absolute flex items-center justify-center rounded-full bg-red-600"
         style={{
-          width: s(HEART.size),
-          height: s(HEART.size),
-          right: s(HEART.right),
-          bottom: s(HEART.bottom),
+          width: s(HEART_GEOMETRY.size),
+          height: s(HEART_GEOMETRY.size),
+          right: s(HEART_GEOMETRY.right),
+          bottom: s(HEART_GEOMETRY.bottom),
         }}
       >
         <svg
           viewBox="0 0 24 24"
           fill="white"
-          style={{ width: s(52), height: s(52) }}
+          style={{ width: s(HEART_GEOMETRY.glyph), height: s(HEART_GEOMETRY.glyph) }}
         >
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
         </svg>
@@ -265,10 +282,10 @@ export function MobileChromeOverlay({ scale }: { scale: number }) {
       <div
         className="absolute flex items-center rounded-full"
         style={{
-          left: s(INPUT.left),
-          width: s(INPUT.width),
-          height: s(INPUT.height),
-          bottom: -s(INPUT.height * (1 - INPUT.overlap)),
+          left: s(INPUT_GEOMETRY.left),
+          width: s(INPUT_GEOMETRY.width),
+          height: s(INPUT_GEOMETRY.height),
+          bottom: -s(INPUT_GEOMETRY.height * (1 - INPUT_GEOMETRY.overlap)),
           backgroundColor: "#2a2a2a",
           paddingLeft: s(32),
           paddingRight: s(24),
@@ -276,13 +293,13 @@ export function MobileChromeOverlay({ scale }: { scale: number }) {
       >
         <span
           className="flex-1 text-neutral-400"
-          style={{ fontSize: s(INPUT.textSize) }}
+          style={{ fontSize: s(INPUT_GEOMETRY.textSize) }}
         >
           Chat...
         </span>
         <Smile
           className="text-neutral-400"
-          style={{ width: s(INPUT.icon), height: s(INPUT.icon) }}
+          style={{ width: s(INPUT_GEOMETRY.icon), height: s(INPUT_GEOMETRY.icon) }}
         />
       </div>
     </div>

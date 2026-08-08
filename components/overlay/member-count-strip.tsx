@@ -1,4 +1,4 @@
-import { UserStar } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 const STRIP_WIDTH = 810;
 
@@ -21,10 +21,12 @@ export function MemberCountStrip({ count }: { count: number }) {
         Chat to become a member at Vids.Tube!
       </p>
 
-      {/* The icon carries the meaning the word used to: a figure beside a member
-          mark needs no label to say what it counts. */}
+      {/* The mark carries the meaning a label used to: the site's own logo beside
+          a figure says what is being counted without spending a word on it.
+          Forced white in both themes — the overlay sits on a broadcast, not on a
+          page, so it must not follow the owner's light or dark preference. */}
       <div className="flex shrink-0 items-center gap-2.5 leading-none">
-        <UserStar className="h-9 w-9 shrink-0" aria-hidden />
+        <Logo className="h-auto w-10 shrink-0 text-white dark:text-white" />
         <span className="text-[38px] font-bold tabular-nums tracking-tight">
           {count.toLocaleString("en-US")}
         </span>

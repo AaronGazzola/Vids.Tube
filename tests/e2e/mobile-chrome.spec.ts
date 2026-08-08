@@ -181,10 +181,14 @@ test("demo stage mobile chrome keeps reference proportions at two sizes", async 
   const overlapLarge =
     (large!.anchorBottom - (large!.inputBottom - large!.inputH)) /
     large!.inputH;
+  // Measured from the phone screenshot: the input begins on the row after the
+  // video's last, so none of it lies over the picture. It used to be drawn a
+  // quarter of the way up the video, putting a bar across the bottom of every
+  // overlay the owner placed there.
   expect(
     overlapLarge,
-    "a quarter of the input overlaps the video bottom"
-  ).toBeCloseTo(0.25, 1);
+    "the input clears the video rather than overlapping it"
+  ).toBeCloseTo(0, 1);
 
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.waitForTimeout(500);
