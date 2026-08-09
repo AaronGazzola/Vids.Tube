@@ -44,15 +44,3 @@ the free anonymous cap, prompting the visitor to sign in.
 - **THEN** it explains that signing in (free) is required to keep watching and
   links to sign in / sign up
 
-### Requirement: Credits page
-
-The system SHALL provide a credits page at `/credits` showing the current balance,
-available credit packages, and transaction history (balance and history stubbed;
-purchase marked as coming soon).
-
-#### Scenario: Viewing credits
-
-- **WHEN** an authenticated user opens `/credits`
-- **THEN** the page shows a balance, placeholder credit packages with a
-  coming-soon purchase state, and a placeholder transaction history
-

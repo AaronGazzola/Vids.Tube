@@ -7,6 +7,8 @@ TBD - created by archiving change public-channels-and-claim-hint. Update Purpose
 
 On a signed-in user's own channel page, while their YouTube link is unverified, the system SHALL show a hint containing their code-first verify code (the same code as the live-chat banner) with a copy control and an instruction to post it in the stream's YouTube chat to claim their YouTube profile. The hint SHALL render only for the channel's own owner and SHALL disappear once the link is verified.
 
+The hint SHALL be presented unobtrusively — a quiet, dismissible strip rather than a full-width panel competing with the channel's own content — while remaining plainly visible. The present full-bordered card is a placeholder and SHALL be reworked to this treatment.
+
 #### Scenario: Owner sees the code hint
 
 - **WHEN** the signed-in owner views their own channel and their YouTube link is unverified
@@ -21,4 +23,9 @@ On a signed-in user's own channel page, while their YouTube link is unverified, 
 
 - **WHEN** a visitor who does not own the channel views it
 - **THEN** no verify-code hint renders
+
+#### Scenario: The hint does not dominate the page
+
+- **WHEN** the hint renders on a channel page carrying memberships and videos
+- **THEN** it occupies a quiet strip and the channel's own content remains the focus of the page
 
