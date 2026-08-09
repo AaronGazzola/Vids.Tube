@@ -1,10 +1,9 @@
-// Runs the post-broadcast pass by hand, for when a finished broadcast needs
-// repairing now rather than on the worker's next idle tick.
+// Runs the post-broadcast pass. This is the only thing that runs it: the live
+// worker engages broadcasts and nothing else, because repairing rewrites the
+// same membership rows a live broadcast writes.
 //
-// The worker repairs finished broadcasts on its own, but only while it has no
-// broadcast to engage, and it stops as soon as one appears. That is the right
-// default and the wrong one when a broadcast finished badly and the data is
-// needed before the next stream.
+// Run it after a broadcast ends. The Settings tab of /live shows how many
+// broadcasts are waiting.
 import { catchUpEndedBroadcasts, runPostBroadcastPass } from "../worker/lib/post-broadcast";
 
 const argv = process.argv.slice(2);

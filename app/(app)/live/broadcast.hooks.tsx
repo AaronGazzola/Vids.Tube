@@ -10,6 +10,7 @@ import {
   getStreamKeyAction,
   getStreamSettingsAction,
   getTranscriptAction,
+  getOutstandingRepairsAction,
   getWorkerStatusAction,
   goLiveAction,
   regenerateStreamKeyAction,
@@ -66,6 +67,14 @@ export function useWorkerStatus() {
     queryKey: ["worker-status"],
     queryFn: () => getWorkerStatusAction(),
     refetchInterval: 15000,
+  });
+}
+
+export function useOutstandingRepairs() {
+  return useQuery({
+    queryKey: ["outstanding-repairs"],
+    queryFn: () => getOutstandingRepairsAction(),
+    refetchInterval: 60000,
   });
 }
 

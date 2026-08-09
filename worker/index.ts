@@ -4,7 +4,7 @@ import {
   nightbotConfigured,
   nightbotTokenDaysRemaining,
 } from "./lib/nightbot-token";
-import { catchUpEndedBroadcasts, runPostBroadcastPass } from "./lib/post-broadcast";
+import { runPostBroadcastPass } from "./lib/post-broadcast";
 import { runScoringJob } from "./jobs/score";
 import { supabaseAdmin } from "./supabase";
 import { runTranscriptionJob } from "./jobs/transcribe";
@@ -20,31 +20,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// The repair sweep is long, serial and expensive, so it is allowed to run only
-// on an idle worker and only one at a time. It checks between broadcasts
-// whether one has become engageable and gives the worker back when so.
-let repairing = false;
-
-async function repairWhileIdle(): Promise<void> {
-  if (repairing) return;
-  repairing = true;
-  try {
-    await catchUpEndedBroadcasts(5, async () => !!(await resolveEligibleStream()));
-  } catch (e) {
-    console.error("repair sweep failed:", e);
-  } finally {
-    repairing = false;
-  }
-}
-
 async function tick(): Promise<void> {
   await upsertWorkerHeartbeat();
 
   const stream = await resolveEligibleStream();
-  if (!stream) {
-    await repairWhileIdle();
-    return;
-  }
+  if (!stream) return;
 
   const locked = await tryAcquireLock(stream.id, workerConfig.loop.lockLeaseMs);
   if (!locked) {
@@ -129,9 +109,9 @@ async function primeNightbotToken(): Promise<void> {
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
   await primeNightbotToken();
-  // Nothing expensive runs at startup. Repairing a finished broadcast happens
-  // on an idle tick, so starting the worker before going live costs nothing
-  // beyond the token prime.
+  // This worker only engages live broadcasts. Repairing a finished one is
+  // minutes of serial work that writes the same membership rows a live
+  // broadcast writes, so it runs as its own command (`npm run repair`).
   for (;;) {
     try {
       await tick();

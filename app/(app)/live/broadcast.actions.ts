@@ -103,6 +103,49 @@ export async function getWorkerStatusAction(): Promise<{
   return { running: isWorkerFresh(lastHeartbeatAt), lastHeartbeatAt };
 }
 
+export async function getOutstandingRepairsAction(): Promise<{
+  count: number;
+  endedAt: string | null;
+}> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { channel } = owned.data;
+
+  const { data: ended, error } = await supabaseAdmin
+    .from("streams")
+    .select("id, started_at")
+    .eq("channel_id", channel.id)
+    .eq("status", "ended")
+    .order("started_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load outstanding repairs");
+  }
+  if (!ended?.length) return { count: 0, endedAt: null };
+
+  const { data: records, error: recordsError } = await supabaseAdmin
+    .from("broadcast_completions")
+    .select("stream_id, clean");
+
+  if (recordsError) {
+    console.error(recordsError);
+    throw new Error("Failed to load outstanding repairs");
+  }
+
+  const done = new Set(
+    (records ?? []).filter((r) => r.clean).map((r) => r.stream_id)
+  );
+  const outstanding = ended.filter((s) => !done.has(s.id));
+
+  return {
+    count: outstanding.length,
+    endedAt: outstanding[0]?.started_at ?? null,
+  };
+}
+
 export async function getStreamKeyAction() {
   const owned = await getOwnedChannel();
   if ("error" in owned) {

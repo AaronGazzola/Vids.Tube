@@ -149,45 +149,41 @@ export async function runPostBroadcastPass(
   return { ran: true, clean, outcomes };
 }
 
-// A broadcast that ended while nothing was running is repaired by this sweep.
-// Absence of a record is the signal, not recency: the abandoned broadcast sweep
-// ends broadcasts hours late, so a watermark would skip them.
-//
-// The sweep is minutes of serial work per broadcast, each step a child process
-// and one of them a Claude call over the whole chat log. It therefore runs only
-// when the worker has no broadcast to engage, and stops as soon as one appears:
-// a broadcast starting must never wait behind the repair of one that finished.
-export async function catchUpEndedBroadcasts(
-  limit = 5,
-  shouldStop: () => Promise<boolean> = async () => false
-): Promise<number> {
+// A broadcast that ended without being repaired. Absence of a record is the
+// signal, not recency: the abandoned broadcast sweep ends broadcasts hours
+// late, so a watermark would skip them.
+async function outstandingBroadcasts(): Promise<string[]> {
   const { data: ended } = await supabaseAdmin
     .from("streams")
     .select("id")
     .eq("status", "ended")
     .order("started_at", { ascending: false });
-  if (!ended?.length) return 0;
+  if (!ended?.length) return [];
 
   const { data: records } = await supabaseAdmin
     .from("broadcast_completions")
     .select("stream_id, clean");
   const done = new Set((records ?? []).filter((r) => r.clean).map((r) => r.stream_id));
 
-  const outstanding = ended.filter((s) => !done.has(s.id)).slice(0, limit);
+  return ended.filter((s) => !done.has(s.id)).map((s) => s.id);
+}
+
+// Repairing is minutes of serial work per broadcast, each step a child process
+// and one of them a Claude call over the whole chat log. It also rebuilds the
+// same membership rows a live broadcast writes, so it runs as its own command
+// rather than inside the worker.
+export async function catchUpEndedBroadcasts(limit = 5): Promise<number> {
+  const outstanding = (await outstandingBroadcasts()).slice(0, limit);
   if (!outstanding.length) return 0;
 
   console.error(`[post] repairing ${outstanding.length} broadcast(s)`);
   let ran = 0;
-  for (const s of outstanding) {
-    if (await shouldStop()) {
-      console.error(`[post] a broadcast needs the worker — stopping after ${ran} repair(s)`);
-      break;
-    }
+  for (const id of outstanding) {
     try {
-      const res = await runPostBroadcastPass(s.id);
+      const res = await runPostBroadcastPass(id);
       if (res.ran) ran += 1;
     } catch (e) {
-      console.error(`[post] repair failed for ${s.id}:`, e);
+      console.error(`[post] repair failed for ${id}:`, e);
     }
   }
   return ran;

@@ -24,6 +24,7 @@ import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  useOutstandingRepairs,
   useRegenerateStreamKey,
   useStreamKey,
   useUploadBroadcastThumbnail,
@@ -586,6 +587,42 @@ function ChatCommandsSection({
   );
 }
 
+function RepairSection() {
+  const { data, isPending } = useOutstandingRepairs();
+
+  return (
+    <Section title="Post-broadcast repair">
+      {isPending ? (
+        <Skeleton className="h-4 w-56" />
+      ) : data?.count ? (
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+          <span className="text-sm">
+            {data.count} broadcast{data.count === 1 ? "" : "s"} waiting to be
+            repaired
+            {data.endedAt
+              ? `, latest ${new Date(data.endedAt).toLocaleDateString()}`
+              : ""}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+          <span className="text-sm">Nothing waiting</span>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Saving the YouTube chat log, scoring it, and rebuilding memberships and
+        credits runs separately from the worker, because it rewrites the same
+        rows a live broadcast writes. Run it after a broadcast ends:
+      </p>
+      <code className="block rounded bg-muted px-2 py-1 font-mono text-xs">
+        npm run repair
+      </code>
+    </Section>
+  );
+}
+
 export function SettingsTab({
   form,
   setForm,
@@ -917,6 +954,8 @@ export function SettingsTab({
         </p>
         <code className="block rounded bg-muted px-2 py-1 font-mono text-xs">npm run worker</code>
       </Section>
+
+      <RepairSection />
     </div>
   );
 }
