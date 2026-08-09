@@ -40,19 +40,28 @@ export function toReplayMessages(data: ChatReplay): ReplayMessage[] {
   if (data.messages.length === 0) {
     return [];
   }
-  // Anchor to live_at (the VOD start); fall back to started_at (legacy), then to
-  // the first message. Gap adjustment only applies when live_at is known.
+  // Anchor to where the recording actually begins, when that is recorded.
+  // Otherwise fall back to live_at, which assumes the file starts at go-live,
+  // then to started_at, then to the first message. The assumption is wrong for
+  // any recording that began before go-live or was later replaced, which is
+  // exactly why the recorded value takes precedence.
+  const fileMs = data.videoStartsAt
+    ? new Date(data.videoStartsAt).getTime()
+    : NaN;
   const liveMs = data.liveAt ? new Date(data.liveAt).getTime() : NaN;
   const startedMs = data.startedAt ? new Date(data.startedAt).getTime() : NaN;
-  const baseMs = Number.isFinite(liveMs)
-    ? liveMs
-    : Number.isFinite(startedMs)
-      ? startedMs
-      : new Date(data.messages[0].created_at).getTime();
+  const baseMs = Number.isFinite(fileMs)
+    ? fileMs
+    : Number.isFinite(liveMs)
+      ? liveMs
+      : Number.isFinite(startedMs)
+        ? startedMs
+        : new Date(data.messages[0].created_at).getTime();
 
-  const gaps = Number.isFinite(liveMs)
-    ? normalizeGaps(data.gaps, baseMs)
-    : [];
+  const gaps =
+    Number.isFinite(fileMs) || Number.isFinite(liveMs)
+      ? normalizeGaps(data.gaps, baseMs)
+      : [];
 
   return data.messages.map((m) => ({
     id: m.id,

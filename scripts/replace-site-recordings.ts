@@ -1,3 +1,7 @@
+import {
+  refusalMessage,
+  wouldDestroyLiveData,
+} from "@/lib/recording-swap-guard";
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "fs";
 
@@ -99,6 +103,34 @@ async function main() {
   }
 
   if (has("--delete")) {
+    // This path deletes broadcasts. It was written for broadcasts that held
+    // nothing but a file; a broadcast that ran with the worker holds the chat,
+    // the scoring and everything that followed from it.
+    for (const s of streams) {
+      const [chat, transcript, stats] = await Promise.all([
+        admin
+          .from("chat_messages")
+          .select("*", { count: "exact", head: true })
+          .eq("stream_id", s.id),
+        admin
+          .from("transcript_segments")
+          .select("*", { count: "exact", head: true })
+          .eq("stream_id", s.id),
+        admin
+          .from("membership_stream_stats")
+          .select("*", { count: "exact", head: true })
+          .eq("stream_id", s.id),
+      ]);
+      const contents = {
+        chatMessages: chat.count ?? 0,
+        transcriptSegments: transcript.count ?? 0,
+        membershipStats: stats.count ?? 0,
+      };
+      if (wouldDestroyLiveData(contents)) {
+        throw new Error(refusalMessage(s.started_at.slice(0, 10), contents));
+      }
+    }
+
     const detached = readDetached(detachedPath);
     const plan: { stream: Stream; videoId: string; replacementStream: string; replacementVideo: string }[] = [];
     for (const s of streams) {

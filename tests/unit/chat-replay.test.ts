@@ -140,3 +140,59 @@ describe("visibleReplayMessages", () => {
     expect(visibleReplayMessages(messages, 999_000)).toHaveLength(3);
   });
 });
+
+describe("anchoring on where the file actually begins", () => {
+  const base = "2026-08-08T12:18:08.000Z";
+  const live = "2026-08-08T13:03:27.000Z";
+
+  const message = (at: string) => ({
+    id: "m1",
+    user_id: null,
+    origin: "youtube",
+    author: null,
+    author_name: "someone",
+    author_avatar_url: null,
+    body: "hello",
+    created_at: at,
+  });
+
+  it("measures from the recorded file start when there is one", () => {
+    // The file begins 2,671 seconds after the encoder connected, which is 48
+    // seconds before go-live. A message sent at go-live therefore sits 48
+    // seconds into the recording, not at zero.
+    const fileStart = new Date(new Date(base).getTime() + 2671_000).toISOString();
+
+    const [replayed] = toReplayMessages({
+      startedAt: base,
+      liveAt: live,
+      videoStartsAt: fileStart,
+      gaps: [],
+      messages: [message(live)],
+    });
+
+    expect(Math.round(replayed.offsetMs / 1000)).toBe(48);
+  });
+
+  it("falls back to go-live when the file start is unknown", () => {
+    const [replayed] = toReplayMessages({
+      startedAt: base,
+      liveAt: live,
+      videoStartsAt: null,
+      gaps: [],
+      messages: [message(live)],
+    });
+
+    expect(replayed.offsetMs).toBe(0);
+  });
+
+  it("is unchanged for a recording with no file start recorded", () => {
+    const [replayed] = toReplayMessages({
+      startedAt: base,
+      liveAt: live,
+      gaps: [],
+      messages: [message(live)],
+    });
+
+    expect(replayed.offsetMs).toBe(0);
+  });
+});

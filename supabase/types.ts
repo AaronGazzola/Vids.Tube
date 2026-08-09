@@ -1686,6 +1686,7 @@ export type Database = {
           preview_paths: string[]
           published_at: string | null
           source_stream_id: string | null
+          starts_at: string | null
           status: string
           thumbnail_path: string | null
           title: string | null
@@ -1703,6 +1704,7 @@ export type Database = {
           preview_paths?: string[]
           published_at?: string | null
           source_stream_id?: string | null
+          starts_at?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null
@@ -1720,6 +1722,7 @@ export type Database = {
           preview_paths?: string[]
           published_at?: string | null
           source_stream_id?: string | null
+          starts_at?: string | null
           status?: string
           thumbnail_path?: string | null
           title?: string | null

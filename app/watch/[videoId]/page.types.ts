@@ -26,6 +26,9 @@ export type ReplayGap = {
 export type ChatReplay = {
   startedAt: string | null;
   liveAt: string | null;
+  // Where the recording's file actually begins. Null means unknown, and replay
+  // falls back to the go-live time as it always has.
+  videoStartsAt?: string | null;
   gaps: ReplayGap[];
   messages: ChatReplayRow[];
 };
