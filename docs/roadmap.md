@@ -2,11 +2,22 @@
 
 Two-track build plan for Vids.Tube (this repo) and eco3d.shop (`../eco3d.shop`,
 see its `docs/roadmap.md` for the E-track detail). Written 2026-07-26 after the
-strategy sessions that settled the platform direction. Future agents: read this
-document, then pick work from the Linear backlog (Az team, Vids.Tube project)
-filtered to the current phase — ticket titles carry phase labels like `[V1]`.
-Per CLAUDE.md governance, promote a ticket into a new OpenSpec change before
-writing any code.
+strategy sessions that settled the platform direction; phase status refreshed
+2026-08-09. Future agents: read this document, then pick work from the Linear
+backlog (Az team, Vids.Tube project) filtered to the current phase — ticket
+titles carry phase labels like `[V1]`. Per CLAUDE.md governance, promote a
+ticket into a new OpenSpec change before writing any code.
+
+## Build position (2026-08-09)
+
+V1 is code-complete and V3's economy core landed early, ahead of V2. Every
+identity, membership, credit and greeting path exists in code; none of it has
+been confirmed on a live broadcast, so the whole block is gated behind one
+streaming session and the run-sheet that drives it (AZ-222). V2 is the only
+phase still holding unbuilt foundation work (`stream_metrics`, the Activity
+redesign, the legal pages that unblock the quota application). The stream
+timeline shipped out of phase order because the shorts workflow of V5 cannot be
+designed without it.
 
 ## Platform thesis
 
@@ -96,33 +107,50 @@ only generic touchpoints like `channel_projects` grounding for `!ask`).
   on-stream confirmation folded into the AZ-157 smoke checklist next stream
   (start the worker BEFORE going live).
 
-### V1 — Identity & the bridge
-Channel/membership model + pooled-history merge; unclaimed channels for all
-archived chatters with high-res avatars (URL size-token rewrite +
-`channels.list` batch, cached to R2); claim flow (AZ-168 banner + contextual
-prompts); slim `!me`; streamer recognition dossier (private Control Room
-briefing cards from full chat history + transcripts); returning-chatter
-welcome (auto/suggest); watch experience (persistent mini-player so
-interactions never stop playback; one-tap fullscreen with YouTube parity).
+### V1 — Identity & the bridge (code-complete 2026-08-09, unverified on stream)
+Shipped: channel/membership model + pooled-history merge (AZ-169); unclaimed
+channels for every archived chatter with high-res avatars; code-first claim
+flow with the verify banner and contextual prompts; slim `!me`; the host as an
+unscored participant (AZ-212); the returning-chatter welcome and the
+first-message greeting, gated by a per-stream toggle; one player for live and
+VOD with the chat held in place (AZ-197, AZ-198); membership on every first
+message, so chatting alone makes someone a member.
 
-### V2 — Overlay consolidation & streamer intelligence
+Remaining in V1: the streamer recognition dossier (private Control Room
+briefing cards from full chat history + transcripts).
+
+Verification pending on a live broadcast: AZ-219 (onboarding, membership
+updates, earning then spending), AZ-195 (identity merge on a real link
+verification), AZ-201 (verify banner drives a real link), AZ-200 (unclaimed
+channels and avatars on profile and overlay), AZ-221 (unified player), AZ-212
+(host class), AZ-220 (bot replies chunked to 200 characters).
+
+### V2 — Overlay consolidation & streamer intelligence (part shipped)
 Single-frame overlay + Preview-tab live editor + token + sounds shipped
 2026-07-26 (AZ-175/AZ-176; old URLs cut), pending first on-stream OBS
-confirmation.
-`stream_metrics` (worker samples per origin every 60s: concurrent viewers,
-chat rate) + combined goals strip + per-platform popover charts + per-stream
-history. AZ-167 quota calibration (10s chat poll floor, 4h + padding); the
-quota-increase application (AZ-193) files early — as soon as AZ-30
-(privacy policy + terms) ships, since the audit requires it — benefiting solo
-streaming now and easing the later multi-streamer increase. Activity
-chat-centric redesign.
+confirmation. The members strip shipped 2026-08-08: live member count, rank and
+a join call to action, with its own opacity control.
 
-### V3 — Play & economy
-XP/Credits/Level ledger on memberships; streak flat bonus; `credit_cost` on
-the command registry; `!tts` as first sink; bingo end-to-end (Settings
-authoring with AI-suggested squares → Activity mini-card + approval →
-overlay mark-off animation → `!bingo`); end-of-stream podium (top 3 +
-personal-best callouts) as a wrap-up bot moment.
+Not yet built: `stream_metrics` (worker samples per origin every 60s:
+concurrent viewers, chat rate) + combined goals strip + per-platform popover
+charts + per-stream history; the Activity chat-centric redesign. AZ-167 quota
+calibration (10s chat poll floor, 4h + padding); the quota-increase application
+(AZ-193) files early — as soon as AZ-30 (privacy policy + terms) ships, since
+the audit requires it — benefiting solo streaming now and easing the later
+multi-streamer increase.
+
+### V3 — Play & economy (economy core shipped early, games remain)
+Shipped ahead of V2, because the members strip and the greeting needed real
+numbers behind them: the XP/Credits/Level ledger on memberships, the recompute
+that keeps the ledger honest, the level curve recalibrated to reward quality
+over volume, the streak flat bonus counting the broadcast currently on air,
+`credit_cost` on the command registry, and `!tts` as the first sink. The
+earn-then-spend path has never run during a live broadcast (AZ-219).
+
+Not yet built: bingo end-to-end (Settings authoring with AI-suggested squares →
+Activity mini-card + approval → overlay mark-off animation → `!bingo`);
+end-of-stream podium (top 3 + personal-best callouts) as a wrap-up bot moment;
+badge evaluation beyond the Day One award (AZ-225).
 
 ### V4 — Dragon game on stream (requires eco3d E4)
 Habitat overlay element (one habitat at a time at the bottom of the stream);
@@ -130,10 +158,20 @@ chatter interactions designed in a dedicated design session alongside the
 game; Credits-to-game valve (egg purchases, gifts); gifting flow with print
 rights; hatch/reveal ceremonies as overlay moments.
 
-### V5 — Creator toolkit & beyond
-Clips/shorts editor from VODs with reaction-driven suggestions (AZ-119/120/
-121/122); VOD subtitles (AZ-116); thumbnail generation; `!vote` with Credit
-boosts; multi-streamer prep (AZ-31, AZ-108); monetization arc (AZ-36..42).
+### V5 — Creator toolkit & beyond (foundation shipped early)
+The stream timeline shipped 2026-08-08 out of phase order (AZ-206), because the
+shorts workflow cannot be designed without the map it produces: threads are
+subjects with recurrences rather than topic blocks, so several spans about one
+subject fuse into a single piece, and a tag marks only what departs from the
+stream's steady state. Reviewing that pass and running the whole history
+through it is AZ-209.
+
+Not yet built: the Creator Studio umbrella (AZ-189) and under it the shorts
+data model and studio editor (AZ-120), the shorts render pipeline in the worker
+(AZ-121), the VOD editor (AZ-190), chapters (AZ-192) and thumbnails (AZ-191);
+VOD subtitles (AZ-116); `!vote` with Credit boosts; multi-streamer prep (AZ-31,
+AZ-108); monetization arc (AZ-36..42). VOD visibility control (public, private,
+unlisted) enters here as the prerequisite for editing a published VOD.
 
 ## The eco3d track (summary — detail in ../eco3d.shop/docs/roadmap.md)
 
@@ -157,7 +195,10 @@ export, fulfillment).
 Vids.Tube: worker scoring/moderation loop, both-origin chat capture, live
 transcription, complete pooled chat history to Aug-2025, full YouTube
 VOD/chat/transcript archive, overlay stage + editor machinery, command
-registry (cooldowns, per-stream disabling), `youtube_links` verify flow.
+registry (cooldowns, per-stream disabling), `youtube_links` verify flow,
+channel/membership model with pooled-history merge, the credit ledger, the
+automatic post-broadcast pass that turns a finished stream into complete
+community data, and the stream timeline.
 
 eco3d: rig studio (segment detection + skeleton binding + angle caps),
 genetics schema + pure engine + admin authoring UIs, STL pipeline,
