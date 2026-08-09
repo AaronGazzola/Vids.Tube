@@ -1,16 +1,23 @@
 ---
 name: sync
-description: Pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs and the database, then report in /plain format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, Linear or Supabase are unreachable. Invoke with /sync.
+description: Pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs, Supabase and the shared skills repo, then report in /simple format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, the Linear MCP or the Supabase MCP is unreachable. Invoke with /sync.
 ---
 
 # /sync — project state sync + next-steps report
 
-Gather the live state of git, Linear, OpenSpec, the roadmap docs and the
-database, cross-reference all four against the actual code, and produce one
-concise report that ends with the next steps.
+Gather the live state of git, Linear, OpenSpec, the roadmap docs, Supabase and
+the shared skills repo, cross-reference all of them against the actual code, and
+produce one short report that ends with the next steps.
 
-This skill is **read-only except for `git pull`**. It never mutates Linear,
-OpenSpec, the database, or any deployment.
+Only three writes are permitted, and no other: a fast-forward `git pull`, a
+fast-forward `git pull` inside the shared skills clone, and copying a newer
+skill file from the shared skills repo into this repo. Nothing is ever written
+to Linear, OpenSpec, Supabase, Vercel or any deployment.
+
+Every command in this skill authenticates with credentials that already exist:
+the user's SSH key for git, and already-connected MCP servers for Linear and
+Supabase. No command here can open a browser, print a device code, or wait on an
+OAuth callback. Do not add one.
 
 ## 0. Load config
 
@@ -32,24 +39,17 @@ Before gathering, confirm the three **required** sources are reachable:
 | --- | --- |
 | git | `git rev-parse --is-inside-work-tree` and `git fetch` both succeed |
 | Linear MCP | `list_teams` (or `list_projects`) returns the configured team/project |
-| Supabase | the MCP sees `supabase.projectRef` via `list_projects`, **or** the CLI is linked (`npx supabase projects list`) |
+| Supabase MCP | `list_projects` returns `supabase.projectRef` |
 
-If any required source is unreachable — MCP not authenticated, no network, repo
-not linked, `projectRef` absent from the account the MCP is authenticated to —
-**stop**. Report exactly which source failed and what it needs (authorize the
-MCP, `doppler run`, `supabase link`, etc.). **Do not produce the report from
-partial data**, and do not substitute inference for a source you could not read.
+If any required source is unreachable — an MCP server not connected, no network,
+`projectRef` absent from the account the MCP is connected to — **stop**. Report
+exactly which source failed and the one-off command or connector setup the user
+must do themselves. **Do not produce the report from partial data**, and do not
+substitute inference for a source you could not read.
 
-The one allowed degradation: if the Supabase **MCP** cannot see the ref but the
-**CLI** is linked, continue using the CLI and say so. If neither works, stop.
-
-**Never start an interactive login.** This skill only ever reads through
-credentials that already exist. If any command would open a browser, print a
-device code, or wait on an OAuth callback (`vercel login`, `gh auth login`,
-`doppler login`, `supabase login`), do not run it and do not let a command run
-that falls into one — check the authenticated state first, or use a path that
-cannot prompt. An unauthenticated tool is simply an unreachable source: report
-it as such and name the one-off command the user must run themselves.
+There is no fallback path for Supabase. The Supabase MCP must be connected. Do
+not substitute the Supabase CLI, and do not report a database section built from
+migration files alone.
 
 ## 2. Gather (run independent reads in parallel)
 
@@ -63,16 +63,9 @@ git branch -a -vv --sort=-committerdate
 git log --oneline --date=short --format='%h %ad %d %s' -15
 ```
 
-Remotes are SSH. `git fetch`/`git pull` authenticate with the user's SSH key and
-must never prompt for a username or password; a credential prompt means the
-remote is misconfigured (an `https://` remote), so report that instead of
-answering it.
-
-The SSH key covers **all** ref state — branches, ahead/behind, commits, tags,
-file contents on any remote branch (`git show <remote-branch>:<path>`), merge
-and ancestry checks. Use plain `git` for every one of these. Do **not** reach for
-the `gh` CLI or a GitHub token for anything git can answer, and never report a
-missing `gh` login as a blocker to the git section.
+Remotes are SSH and authenticate with the user's SSH key. A prompt for a
+username or password means the remote is misconfigured as `https://`; report
+that rather than answering it.
 
 Capture:
 - Current branch; clean or dirty (list uncommitted/untracked paths).
@@ -81,6 +74,78 @@ Capture:
   date and subject.
 - Branches merged into `mainBranch` (deletable) vs. unmerged with unique work.
 - Whether `mainBranch` is behind any feature branch.
+
+### Deployment — `vercel.enabled`
+
+Vercel deploys on push, through its GitHub integration: a push to `mainBranch`
+deploys to production, and a push to any other branch deploys a preview. Nothing
+is deployed by hand.
+
+Deployment state is therefore derived entirely from git, with no API call, no
+CLI and no token:
+
+- Unpushed commits on `mainBranch` are production changes that have not
+  deployed. Flag them.
+- Unpushed commits on the current feature branch have no preview yet. Flag them
+  in one line.
+
+Do not invoke the `vercel` CLI and do not invoke the `gh` CLI. Neither is needed:
+`vercel ls` starts a device-login flow, and `gh` uses its own OAuth token rather
+than the SSH key.
+
+### Shared skills repo — `skills.enabled`
+
+The skills in this repo are copies of the skills in the shared skills repo named
+by `skills.repo`. Keep the two in step.
+
+```bash
+# clone once per run, into a scratch dir, over SSH
+git clone --depth 50 <skills.repo.ssh> <scratch>/skills-repo
+```
+
+Compare every skill folder under `skills.path` (default `.claude/skills`) on
+both sides. Compare file **content ignoring line endings** — this repo stores
+CRLF and the shared repo stores LF, so a naive byte comparison reports every
+file as different:
+
+```bash
+diff -q --strip-trailing-cr <shared-file> <local-file>
+```
+
+For each file whose content genuinely differs, decide which side is newer, then
+act on that:
+
+```bash
+git status --porcelain -- <path>     # uncommitted local edit?
+git log -1 --format=%cI -- <path>    # otherwise, last-commit date
+```
+
+A local file with uncommitted changes is **always** treated as the newer side,
+whatever the commit dates say, because the local edit has not been committed yet
+and its commit date is therefore stale. Never overwrite an uncommitted local
+edit.
+
+- Shared repo newer → **copy the shared version over the local one, silently.**
+  This is a permitted write and it is **not reported**: a skill arriving from the
+  shared repo needs no decision from the user.
+- A skill present in the shared repo and missing here → copy it in, silently, for
+  the same reason.
+- Local repo newer → **do not push**, and **report it**. Name the skill and give
+  a one-line summary of what the local version changed, then ask whether the
+  local version should be pushed to the shared repo.
+- Dates equal but content differs → report as a conflict and ask; never guess.
+
+The **only** reason this section appears in the report is a local version the
+user may want pushed to the shared repo. Where every difference resolved in the
+shared repo's favour, the section is omitted entirely and no bullet mentions
+skills at all.
+
+Only skills that exist on **both** sides are compared. A skill that exists here
+and not in the shared repo is out of scope: it is not compared, not pushed, and
+not mentioned in the report at all.
+
+Never push to the shared repo without the user saying so in the current
+conversation.
 
 ### OpenSpec — `openspec.enabled`
 
@@ -128,93 +193,110 @@ finding, and so is finished code sitting under an open ticket.
 
 ### Database — `supabase.enabled`
 
-Use **both** paths where each is stronger, per `supabase.method`:
+Through the Supabase MCP only: `list_migrations` and `list_tables` for parity
+against the migration files in `supabase/migrations`, `get_advisors` for security
+and performance, `list_branches`. Use `execute_sql` for **read-only** sanity
+checks only when a spec or ticket depends on live data (a row count, a flag's
+value, whether a backfill ran), and only when the answer changes the report's
+conclusion.
 
-- CLI: `npx supabase migration list` — local vs remote migration parity.
-- MCP: `list_tables`, `list_migrations`, `get_advisors` (security + performance),
-  `list_branches`; `execute_sql` for **read-only** sanity checks when a spec or
-  ticket depends on live data (row counts, a flag's value, whether a backfill
-  ran). Only query when it changes the report's conclusion.
-
-Flag: local migrations not pushed, remote migrations missing from the repo, and
-any security/performance advisor.
+Flag: migration files not applied to the remote project, remote migrations
+missing from the repo, and any security or performance advisor.
 
 ### Roadmap docs
 
-Find them (`docs/roadmap.md`, `ROADMAP.md`, `docs/**/roadmap*`, plus any doc the
-config or `CLAUDE.md` names). For each:
+Read the paths listed in `docs.roadmap`. If the config lists none, search
+`docs/**/*roadmap*`, `ROADMAP.md`, and any doc `CLAUDE.md` names as canonical.
 
-- `git log -1 --date=short -- <file>` for last-touched date, and compare against
-  the dates of recent feature commits.
+- `git log -1 --date=short -- <file>` for last-touched date, compared against the
+  dates of recent feature commits.
 - Check whether items marked "planned"/"next" are already shipped in code, and
   whether shipped work is missing from the doc.
-- Verdict per doc: **current** or **stale**, with the specific lines that are
+- Verdict per doc: **current** or **stale**, naming the specific lines that are
   wrong.
-- Then a one-or-two-line statement of **where the project actually is** in the
-  roadmap: which phase is done, which is in flight, what the next milestone is.
+- Then one line stating where the project actually stands: which phase is done,
+  which is in flight, what the next milestone is.
 
 ### Optional integrations
 
-Run these only when enabled, and keep each to one line in the report unless it
-is red: Doppler (`doppler configs`, `doppler secrets --only-names` — names only,
-never values, and flag if the locally selected config differs from
-`doppler.config`), Vercel (see below), Sentry (unresolved issues from the last
-48h by event count), Trigger.dev (recent run statuses; flag failed/stuck).
-
-**Vercel — `vercel.enabled`.** Deploys are wired through the Vercel GitHub
-integration: a push to `mainBranch` deploys to production automatically, and
-every other pushed branch gets a preview. Nothing is deployed by hand, and no
-GitHub Actions deploy workflow is involved. Read the deployment records that
-integration writes back to GitHub, via the already-authenticated `gh` CLI:
-
-```bash
-gh api repos/<owner>/<repo>/deployments --jq '.[0:5][] | "\(.created_at) \(.environment) \(.sha[0:7]) \(.id)"'
-gh api repos/<owner>/<repo>/deployments/<id>/statuses --jq '.[0].state'
-```
-
-Report the latest **production** record: state, short SHA, and whether that SHA
-is the current tip of `mainBranch`. Flag a non-`success` state, and flag a
-production SHA behind `mainBranch` (a push that never deployed). Mention the
-newest preview only when its state is not `success`.
-
-Deployment records are the one thing SSH cannot reach: they live behind the
-GitHub REST API, which needs a token. If `gh auth status` reports no login, this
-integration is simply unreadable — give it one line in the optional-integrations
-note and carry on. It is **never** a blocker, and it never affects the git,
-OpenSpec, Linear, database or roadmap sections.
-
-Do **not** invoke the `vercel` CLI. It is not logged in and `vercel ls` silently
-starts a device-login flow that blocks until it times out.
+Run only when enabled, and give each one line in the report unless it is red:
+Doppler (`doppler configs`, `doppler secrets --only-names` — names only, never
+values; flag if the locally selected config differs from `doppler.config`),
+Sentry (unresolved issues from the last 48h by event count), Trigger.dev (recent
+run statuses; flag failed or stuck).
 
 ## 3. Report
 
-Write the whole report in **`/plain` format** — read
-`.claude/skills/plain/SKILL.md` and follow it exactly: bold one-line section
-titles, bulleted facts nested at most two deep, no prose paragraphs, no
-em-dashes, code identifiers in backticks, dates as D-Mon-YYYY. Be very concise:
-facts only, no narration of the gathering process.
+Everything gathered above is held in context so the user can ask follow-up
+questions. Almost none of it is printed. The report is a **synthesis, not an
+inventory**: the user is being told where the project stands and what to do
+next, in the fewest bullets that carry the meaning.
 
-Sections, in this order:
+Write it in **`/simple` format** — read `.claude/skills/simple/SKILL.md` and
+follow it exactly: bold one-line section titles that are not list items,
+bulleted facts only, no prose paragraphs, no numbered lists, passive voice, no
+pronouns as subjects, every tool and service named directly, no commit hashes,
+no em-dashes, dates as D-Mon-YYYY.
 
-1. **Blockers** — anything red. Omit the section entirely if nothing is red.
-2. **Branches** — current branch, dirty/clean, ahead/behind; branch with the most
-   recent changes; the branch that should be worked on next.
-3. **OpenSpec** — one item per active change: status bucket, tasks done/total,
-   next action. Call out changes that need only verification to archive.
-4. **Linear** — the three groups from above. Call out tickets that need only a
-   test to close, with the test.
-5. **Database** — migration parity, advisors, any live-data finding.
-6. **Roadmap** — per-doc current/stale verdict, and where the project stands.
-7. **Overview** — the synthesis, in two labelled groups:
-   - Code and branches.
-   - Tickets, specs and roadmap alignment (where they agree and where they drift).
-8. **Summary** — very short. Two or three bullets of state, then a bulleted
-   **Next steps** list, ordered, one line each, each naming a concrete ticket,
-   spec or branch and the action (build / test / verify / archive / reconcile).
+### What the report is for
 
-Prioritize next steps in this order: unblock anything red; verify-and-archive
-work that is already code-complete; finish an in-progress spec; reconcile a
-stale spec or roadmap; only then start new work from a promoted backlog item.
+The user reads this to answer one question: *what do I need to know to keep
+going?* Every bullet earns its place by changing what the user does next. A
+bullet that merely proves the gathering happened is deleted.
+
+- **Synthesize, do not enumerate.** State the conclusion drawn from a source,
+  not the rows read from the source.
+  - Rejected: six bullets, one per advisory.
+  - Accepted: "Six database warnings are open, none high risk."
+- **Green gets one reassuring bullet, never a list.** Where an area is aligned
+  and needs no action, say so in one line and move on.
+  - Accepted: "Database migrations are aligned between the repository and Supabase."
+- **Dead work is one bullet, as a group.** Abandoned branches, superseded
+  approaches and cancelled tickets are named as a count and a shared cause, never
+  itemised. Where dead work needs a decision, that decision is the bullet.
+- **Name a thing only where the user must act on that thing.** A ticket
+  identifier, spec name or branch name appears when the user will open it. It
+  does not appear as evidence.
+- **No inventories of healthy things.** Branches with no work in progress,
+  passing checks, and integrations that are fine are all silent.
+
+### Length
+
+- The whole report fits on one screen.
+- At most 4 bullets under any section title, and at most one level of nesting.
+- Nesting is used only where a next step needs its condition stated.
+- Where a section would exceed 4 bullets, the bullets are being enumerated
+  instead of synthesized: collapse them.
+
+### Sections
+
+Use only these, in this order. Omit any section with nothing to say.
+
+- **Where things stand** — the position, in at most 4 bullets.
+  - Which branch is checked out, whether that branch holds the latest work, and
+    whether anything is undeployed.
+  - Whether the roadmap, the active spec and the tickets agree on the current
+    direction, said as one judgement rather than three verdicts.
+  - How far through the current phase the work is.
+  - Anything abandoned, as a single grouped bullet.
+- **Needs attention** — at most 4 loose ends, each one the user must decide or
+  clean up. State what is wrong and what closes it, in one line each.
+  - A skill whose local version is newer than the shared repo's belongs here, as
+    the one question it raises: push the local version, or not.
+- **Continue here** — at most 4 next actions, in priority order, each beginning
+  with the spec, ticket or branch and then the verb.
+  - Nest a condition only where an action cannot start without it.
+- **Next batch** — at most 3 tickets recommended for the block of work after the
+  current one, one line each saying why the ticket is ready. Include only when
+  the current work is near enough to done that the question is live.
+
+Close with a single line offering the detail held in context, naming the areas
+where detail exists. That line is not a section and carries no bullet.
+
+Priority order within **Continue here**: unblock anything red first; then verify
+and archive work that is already code-complete; then finish the in-progress spec;
+then reconcile a stale document or ticket; and only then start new work promoted
+from a backlog item.
 
 ## Installing into a new project
 
@@ -223,5 +305,5 @@ stale spec or roadmap; only then start new work from a promoted backlog item.
    identifiers, enabling only the integrations that project uses.
 3. Keep `.claude/sync.config.json` in the project repo; updating the skill later
    never touches it.
-4. `/sync` reads `.claude/skills/plain/SKILL.md` for its output format — install
-   the `plain` skill alongside it.
+4. `/sync` reads `.claude/skills/simple/SKILL.md` for its output format — install
+   the `simple` skill alongside it.

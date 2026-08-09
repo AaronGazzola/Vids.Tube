@@ -1,12 +1,20 @@
 {
   "project": "Vids.Tube",
   "mainBranch": "main",
+  "docs": {
+    "roadmap": ["docs/roadmap.md"]
+  },
   "integrations": {
     "git": {
       "enabled": true
     },
     "openspec": {
       "enabled": true
+    },
+    "skills": {
+      "enabled": true,
+      "repo": "git@github.com:AaronGazzola/AI-Resources.git",
+      "path": ".claude/skills"
     },
     "linear": {
       "enabled": true,
@@ -16,18 +24,15 @@
     },
     "supabase": {
       "enabled": true,
-      "projectRef": "cqblezzhywdjerslhgho",
-      "method": "mcp"
+      "projectRef": "cqblezzhywdjerslhgho"
+    },
+    "vercel": {
+      "enabled": true
     },
     "doppler": {
       "enabled": true,
       "project": "vids-tube",
-      "config": "dev_personal"
-    },
-    "vercel": {
-      "enabled": true,
-      "repo": "AaronGazzola/Vids.Tube",
-      "method": "github-integration"
+      "config": "prd"
     },
     "sentry": {
       "enabled": false,

@@ -33,6 +33,13 @@ The reader must be able to act on a bullet without ever having opened the codeba
 
 - Describe every item by its behaviour, its fault, or its effect.
 - Name a thing by the name it carries in the product, not by its file, function, route, or table.
+- Name every tool, service, product and integration directly, by its own proper name.
+  - Write "Linear", "Supabase", "Doppler", "Vercel", "OpenSpec", "the Supabase CLI".
+  - A descriptive stand-in is a defect, because the reader cannot act on a description.
+    - Rejected: "the ticket tracker", "the database connector", "the secrets tool", "the spec tool".
+  - Where a proper name alone is unclear, add the role in the same bullet.
+    - Accepted: "Linear, where the backlog is held".
+  - This rule outranks the ban on naming code: a tool's name is a proper name, not an identifier.
 - Use the project's own domain vocabulary: host channel, community, membership, broadcast, VOD.
   - Explain an unfamiliar domain term once, in a nested bullet.
   - Never substitute a vaguer word in order to avoid explaining a term.
