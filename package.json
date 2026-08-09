@@ -12,6 +12,7 @@
     "seed": "doppler run -- tsx supabase/seed.ts",
     "rls-check": "doppler run -- tsx supabase/rls-check.ts",
     "vod-ux-check": "doppler run -- tsx supabase/vod-ux-check.ts",
+    "visibility-check": "doppler run -- tsx supabase/visibility-check.ts",
     "recording-hook-check": "doppler run -- tsx supabase/recording-hook-check.ts",
     "db:types": "npx supabase gen types typescript --linked > supabase/types.ts",
     "email:dev": "react-email dev --dir emails",

@@ -3,6 +3,7 @@
 import type { OwnerStream } from "@/app/(app)/studio/layout.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { VideoVisibilityControl } from "@/components/video-visibility-control";
 import { cn } from "@/lib/utils";
 import { Film } from "lucide-react";
 import Link from "next/link";
@@ -76,6 +77,13 @@ export function StudioStreamRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {stream.videoId && stream.visibility && (
+          <VideoVisibilityControl
+            videoId={stream.videoId}
+            visibility={stream.visibility}
+            className="hidden sm:inline-flex"
+          />
+        )}
         {!stream.hasTimeline && (
           <Badge variant="outline" className="hidden sm:inline-flex">
             Not labelled

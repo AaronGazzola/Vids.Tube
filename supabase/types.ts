@@ -1689,6 +1689,7 @@ export type Database = {
           status: string
           thumbnail_path: string | null
           title: string | null
+          visibility: string
           width: number | null
         }
         Insert: {
@@ -1705,6 +1706,7 @@ export type Database = {
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          visibility?: string
           width?: number | null
         }
         Update: {
@@ -1721,6 +1723,7 @@ export type Database = {
           status?: string
           thumbnail_path?: string | null
           title?: string | null
+          visibility?: string
           width?: number | null
         }
         Relationships: [

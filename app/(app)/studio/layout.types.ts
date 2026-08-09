@@ -1,3 +1,5 @@
+export type VideoVisibility = "public" | "unlisted" | "private";
+
 export type OwnerStream = {
   id: string;
   title: string;
@@ -7,6 +9,7 @@ export type OwnerStream = {
   videoId: string | null;
   hasVod: boolean;
   hasTimeline: boolean;
+  visibility: VideoVisibility | null;
 };
 
 export type StudioTool = {

@@ -1,10 +1,15 @@
 "use server";
 
-import type { OwnerStream } from "@/app/(app)/studio/layout.types";
+import type {
+  OwnerStream,
+  VideoVisibility,
+} from "@/app/(app)/studio/layout.types";
 import type { ActionResult } from "@/app/layout.types";
 import { vodAssetUrl } from "@/lib/storage";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
+
+const VISIBILITIES: VideoVisibility[] = ["public", "unlisted", "private"];
 
 async function getOwnedChannelId(): Promise<ActionResult<string>> {
   const supabase = await createClient();
@@ -62,7 +67,7 @@ export async function listOwnerStreamsAction(): Promise<
 
   const { data: videos, error: videoError } = await supabaseAdmin
     .from("videos")
-    .select("id, source_stream_id, duration_s, status, mp4_path, thumbnail_path")
+    .select("id, source_stream_id, duration_s, status, mp4_path, thumbnail_path, visibility")
     .in("source_stream_id", streamIds);
 
   if (videoError) {
@@ -111,8 +116,50 @@ export async function listOwnerStreamsAction(): Promise<
       videoId: video?.id ?? null,
       hasVod,
       hasTimeline: labelled.has(stream.id),
+      visibility: (video?.visibility as OwnerStream["visibility"]) ?? null,
     };
   });
 
   return { data: rows };
+}
+
+export async function setVideoVisibilityAction(
+  videoId: string,
+  visibility: VideoVisibility
+): Promise<ActionResult<VideoVisibility>> {
+  if (!VISIBILITIES.includes(visibility)) {
+    return { error: "That is not a visibility setting." };
+  }
+
+  const owned = await getOwnedChannelId();
+  if ("error" in owned) return owned;
+
+  // No update policy exists on recordings, so this action holds the only write
+  // path. Ownership is therefore checked here rather than by the database, and
+  // the check is against the recording's own channel rather than the caller's.
+  const { data: video, error: readError } = await supabaseAdmin
+    .from("videos")
+    .select("id, channel_id")
+    .eq("id", videoId)
+    .maybeSingle();
+
+  if (readError) {
+    console.error(readError);
+    throw new Error("Failed to load the recording");
+  }
+  if (!video || video.channel_id !== owned.data) {
+    return { error: "That recording is not yours." };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("videos")
+    .update({ visibility })
+    .eq("id", videoId);
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to change the recording's visibility");
+  }
+
+  return { data: visibility };
 }

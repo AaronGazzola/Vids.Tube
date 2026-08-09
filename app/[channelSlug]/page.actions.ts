@@ -444,19 +444,44 @@ export async function getChannelVideosAction(
 ): Promise<Video[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // The read policy lets an unlisted recording through, so that it can be
+  // reached by its own address. Keeping it out of listings is this query's job.
+  // The owner sees their own withheld recordings here, labelled, so a withheld
+  // recording is never mistaken for a missing one.
+  const query = supabase
     .from("videos")
     .select("*")
     .eq("channel_id", channelId)
     .eq("status", "ready")
     .order("published_at", { ascending: false });
 
+  const { data, error } = user
+    ? await query
+    : await query.eq("visibility", "public");
+
   if (error) {
     console.error(error);
     throw new Error("Failed to fetch channel videos");
   }
 
-  return data ?? [];
+  if (!user) return data ?? [];
+
+  // A signed-in visitor who is not the owner reads only public rows here; the
+  // policy already withheld private ones, and unlisted ones are filtered now.
+  const { data: owned } = await supabase
+    .from("channels")
+    .select("id")
+    .eq("id", channelId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+
+  return (data ?? []).filter(
+    (v) => v.visibility === "public" || !!owned
+  );
 }
 
 export async function getChannelProcessingVideosAction(

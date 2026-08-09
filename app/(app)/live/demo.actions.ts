@@ -148,11 +148,16 @@ export async function getDemoFramesAction(): Promise<string[]> {
   if ("error" in owned) {
     return [];
   }
+  // Public only, and this is the one reader where that matters most: these
+  // frames are drawn as the overlay backdrop on a live broadcast. A recording
+  // withheld because of what is visible in it must not have its stills put back
+  // on screen.
   const { data, error } = await supabaseAdmin
     .from("videos")
     .select("preview_paths, thumbnail_path, published_at, width, height")
     .eq("channel_id", owned.data)
     .eq("status", "ready")
+    .eq("visibility", "public")
     .order("published_at", { ascending: false })
     .limit(20);
   if (error) {

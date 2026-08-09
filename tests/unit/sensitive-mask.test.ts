@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error plain JavaScript, kept that way so the hook starts in tens of
-// milliseconds rather than hundreds
+// Plain JavaScript, kept that way so the hook starts in tens of milliseconds
+// rather than hundreds.
 import { maskNotice, maskSensitive } from "../../.claude/hooks/sensitive-mask.mjs";
 
 const OWNER = "aaron@example.invalid";
