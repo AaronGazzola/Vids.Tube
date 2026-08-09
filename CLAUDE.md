@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+# Sensitive data (read first)
+
+**Development sessions are streamed and recorded. Anything written into a session is published.**
+
+A `PostToolUse` hook masks sensitive values in tool results before they reach the session, so a value returned by a shell command, a Supabase query or a file read never enters the transcript. That covers what tools return. It does not cover what you write.
+
+**Never write a sensitive value into a reply, a commit message, a ticket, a spec or a file without asking first.** This applies to a value learned earlier in the conversation, to one you inferred, and to one supplied by the user. Ask, and wait for an answer.
+
+Sensitive means: email addresses, JSON Web Tokens, bearer tokens and API keys, secrets of any kind, account and auth identifiers, phone numbers, postal addresses, and any raw row from `auth.users`.
+
+- When a value must be referred to, describe it instead: "the owner's address", not the address.
+- When querying production, select a masked expression rather than the raw column, so the value is never fetched in the first place.
+- Reading a value in full is deliberate and single-use: run that one command with `VIDSTUBE_REVEAL=1`. Never export it for a session.
+- The masking rules live in `.claude/hooks/sensitive-mask.mjs` and are covered by `tests/unit/sensitive-mask.test.ts`. A category that leaks is a missing pattern plus a missing test case, and both are fixed together.
+- The same safeguard exists in `../eco3d.shop`; the rule file is byte-identical in both repositories, so drift is a single comparison.
+
 ### Core Technologies
 
 - **Next.js 15** with App Router
