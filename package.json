@@ -23,6 +23,7 @@
     "email:check": "tsx supabase/resend-check.ts",
     "worker": "doppler run -- tsx worker/index.ts",
     "worker:doctor": "doppler run -- tsx worker/doctor.ts",
+    "repair": "doppler run -- tsx scripts/repair-broadcasts.ts",
     "smoke:bot": "doppler run -- tsx scripts/smoke-bot.ts",
     "dryrun": "doppler run -- tsx scripts/dryrun-stream.ts",
     "transcribe:vods": "doppler run -- tsx scripts/transcribe-vods.ts",

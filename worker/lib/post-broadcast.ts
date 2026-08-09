@@ -149,10 +149,18 @@ export async function runPostBroadcastPass(
   return { ran: true, clean, outcomes };
 }
 
-// A broadcast that ended while nothing was running is caught up the next time a
-// worker starts. Absence of a record is the signal, not recency: the abandoned
-// broadcast sweep ends broadcasts hours late, so a watermark would skip them.
-export async function catchUpEndedBroadcasts(limit = 5): Promise<number> {
+// A broadcast that ended while nothing was running is repaired by this sweep.
+// Absence of a record is the signal, not recency: the abandoned broadcast sweep
+// ends broadcasts hours late, so a watermark would skip them.
+//
+// The sweep is minutes of serial work per broadcast, each step a child process
+// and one of them a Claude call over the whole chat log. It therefore runs only
+// when the worker has no broadcast to engage, and stops as soon as one appears:
+// a broadcast starting must never wait behind the repair of one that finished.
+export async function catchUpEndedBroadcasts(
+  limit = 5,
+  shouldStop: () => Promise<boolean> = async () => false
+): Promise<number> {
   const { data: ended } = await supabaseAdmin
     .from("streams")
     .select("id")
@@ -168,14 +176,18 @@ export async function catchUpEndedBroadcasts(limit = 5): Promise<number> {
   const outstanding = ended.filter((s) => !done.has(s.id)).slice(0, limit);
   if (!outstanding.length) return 0;
 
-  console.error(`[post] catching up ${outstanding.length} broadcast(s)`);
+  console.error(`[post] repairing ${outstanding.length} broadcast(s)`);
   let ran = 0;
   for (const s of outstanding) {
+    if (await shouldStop()) {
+      console.error(`[post] a broadcast needs the worker — stopping after ${ran} repair(s)`);
+      break;
+    }
     try {
       const res = await runPostBroadcastPass(s.id);
       if (res.ran) ran += 1;
     } catch (e) {
-      console.error(`[post] catch-up failed for ${s.id}:`, e);
+      console.error(`[post] repair failed for ${s.id}:`, e);
     }
   }
   return ran;

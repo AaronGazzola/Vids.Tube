@@ -20,11 +20,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// The repair sweep is long, serial and expensive, so it is allowed to run only
+// on an idle worker and only one at a time. It checks between broadcasts
+// whether one has become engageable and gives the worker back when so.
+let repairing = false;
+
+async function repairWhileIdle(): Promise<void> {
+  if (repairing) return;
+  repairing = true;
+  try {
+    await catchUpEndedBroadcasts(5, async () => !!(await resolveEligibleStream()));
+  } catch (e) {
+    console.error("repair sweep failed:", e);
+  } finally {
+    repairing = false;
+  }
+}
+
 async function tick(): Promise<void> {
   await upsertWorkerHeartbeat();
 
   const stream = await resolveEligibleStream();
-  if (!stream) return;
+  if (!stream) {
+    await repairWhileIdle();
+    return;
+  }
 
   const locked = await tryAcquireLock(stream.id, workerConfig.loop.lockLeaseMs);
   if (!locked) {
@@ -109,9 +129,9 @@ async function primeNightbotToken(): Promise<void> {
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
   await primeNightbotToken();
-  // Catch-up is minutes of serial post-broadcast work; awaiting it here would
-  // delay the heartbeat and leave a live stream unengaged for that whole time.
-  void catchUpEndedBroadcasts().catch((e) => console.error("catch-up failed:", e));
+  // Nothing expensive runs at startup. Repairing a finished broadcast happens
+  // on an idle tick, so starting the worker before going live costs nothing
+  // beyond the token prime.
   for (;;) {
     try {
       await tick();
