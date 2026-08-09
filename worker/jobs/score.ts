@@ -29,7 +29,12 @@ import {
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
 import { processCommands } from "../lib/commands";
-import { consumeSelfEcho, enqueueNightbotBridge } from "../lib/replies";
+import {
+  consumeSelfEcho,
+  enqueueNightbotBridge,
+  isRecentSend,
+  noteRecentSend,
+} from "../lib/replies";
 import { runProactiveMoments, runWrapupIfRequested } from "../lib/moments";
 import { synthesizePendingTts } from "../lib/tts";
 import { processLinkVerifications } from "../lib/verify-links";
@@ -651,11 +656,24 @@ export async function runScoringJob(
       console.error(`[chat:yt] host recognised as ${hostChannelId}`);
     }
     const onboarded = new Set<string>();
+    // A worker that restarted mid-broadcast has no memory of what it already
+    // sent, so the echoes still in flight would each be stored a second time.
+    // Seeding from what the broadcast already holds closes that window.
+    const { data: priorBotMessages } = await supabaseAdmin
+      .from("chat_messages")
+      .select("body, created_at")
+      .eq("stream_id", stream.id)
+      .eq("origin", "bot")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    for (const prior of priorBotMessages ?? []) {
+      noteRecentSend(prior.body, new Date(prior.created_at).getTime());
+    }
     for await (const m of pollYoutubeChat(liveChatId)) {
       if (stopped) {
         return;
       }
-      if (m.isBot && consumeSelfEcho(m.text)) {
+      if (m.isBot && (consumeSelfEcho(m.text) || isRecentSend(m.text))) {
         continue;
       }
       const extMsgId = m.id || `${m.authorChannelId}:${m.publishedAt}`;

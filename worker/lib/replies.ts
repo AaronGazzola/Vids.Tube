@@ -106,6 +106,41 @@ export function consumeSelfEcho(text: string): boolean {
   return true;
 }
 
+// The memory above is consumed on the first match and lives only as long as the
+// process, so an echo outlives it whenever the send queue lags behind the poller
+// or the worker restarts mid-broadcast. Both happened on 8-Aug-2026 and put the
+// reply in chat twice. This second memory is never consumed, is bounded by time
+// rather than by matching, and is seeded from what the broadcast already stored,
+// so a restart does not reopen the hole.
+const ECHO_WINDOW_MS = 15 * 60 * 1000;
+const recentSends: { key: string; at: number }[] = [];
+
+function pruneRecentSends(now: number): void {
+  for (let i = recentSends.length - 1; i >= 0; i -= 1) {
+    if (now - recentSends[i].at > ECHO_WINDOW_MS) {
+      recentSends.splice(i, 1);
+    }
+  }
+}
+
+export function noteRecentSend(text: string, at: number = Date.now()): void {
+  const key = echoKey(text);
+  if (!key) return;
+  recentSends.push({ key, at });
+  pruneRecentSends(at);
+}
+
+export function isRecentSend(text: string, now: number = Date.now()): boolean {
+  pruneRecentSends(now);
+  const key = echoKey(text);
+  if (!key) return false;
+  return recentSends.some((e) => e.key === key);
+}
+
+export function resetRecentSends(): void {
+  recentSends.length = 0;
+}
+
 const queue: string[] = [];
 const bridgeQueue: string[] = [];
 let bridgeDropped = 0;
@@ -186,6 +221,7 @@ export function enqueueNightbotSend(
   }
   for (const chunk of chunkForYoutube(text)) {
     rememberSent(chunk);
+    noteRecentSend(chunk);
     queue.push(chunk);
   }
   void drainQueue(sender, wait, tokenFn, refreshFn);
@@ -203,6 +239,7 @@ export function enqueueNightbotBridge(
   }
   const outgoing = truncateForYoutube(text);
   rememberSent(outgoing);
+  noteRecentSend(outgoing);
   bridgeQueue.push(outgoing);
   while (bridgeQueue.length > BRIDGE_MAX_QUEUE) {
     bridgeQueue.shift();

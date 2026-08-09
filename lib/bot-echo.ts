@@ -8,11 +8,15 @@
 // the message came back cut.
 export const ECHO_PREFIX_CHARS = 80;
 
+// Whitespace is removed rather than collapsed. Collapsing assumes the transport
+// replaces a newline with a space; it deletes it instead, so a reply written
+// across two lines returned as one word-joined line and never matched its own
+// key. Removing whitespace on both sides is agnostic to what the transport does
+// with it.
 export function normaliseForEcho(text: string): string {
   return text
     .replace(/[​-‍﻿⁠]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
+    .replace(/\s+/g, "")
     .toLowerCase();
 }
 
