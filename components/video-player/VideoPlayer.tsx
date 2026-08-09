@@ -31,6 +31,7 @@ import {
   type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import { Controls } from "./controls";
+import { PlaybackStats } from "./playback-stats";
 import { PLAYBACK_SPEEDS, SettingsMenu, type PlaybackSpeed } from "./settings-menu";
 import { TransportLive } from "./transport-live";
 import { ElapsedTime, TransportVod } from "./transport-vod";
@@ -51,6 +52,10 @@ export type VideoPlayerProps = {
   onDimensions?: (width: number, height: number) => void;
   onResize?: (width: number) => void;
   seekRequest?: SeekRequest | null;
+  // Overlays a live playback-health readout. Owner-facing only: it is how an
+  // intermittent stall is told apart from a slow download.
+  diagnostics?: boolean;
+  onCloseDiagnostics?: () => void;
   // An ordered set of spans within the source. Given one, only those spans play, in
   // order, and the transport measures the fused piece rather than the whole source.
   spans?: FusedSpan[] | null;
@@ -86,6 +91,8 @@ export function VideoPlayer({
   onResize,
   seekRequest,
   spans,
+  diagnostics,
+  onCloseDiagnostics,
   children,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -118,14 +125,17 @@ export function VideoPlayer({
       ? width / height
       : DEFAULT_RATIO;
 
-  // A live source arrives muted so autoplay is allowed at all.
+  // A live source arrives muted so autoplay is allowed at all. Starting playback
+  // is left to the autoplay attribute rather than a play() call: hls.js attaches
+  // its MediaSource after a dynamic import resolves, so any play() from here runs
+  // against a source-less element, and the attach that follows re-runs the load
+  // algorithm and puts the element back to paused.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !live) {
       return;
     }
     video.muted = true;
-    void video.play().catch(() => {});
   }, [live, source.src]);
 
   // Held stable against its own contents, so a caller passing a fresh array each
@@ -534,7 +544,8 @@ export function VideoPlayer({
       style={{ aspectRatio: ratio }}
       className={cn(
         "group/player relative isolate mx-auto w-full overflow-hidden rounded-lg bg-black outline-none focus-visible:ring-2 focus-visible:ring-primary",
-        vertical && "max-w-[min(420px,calc(80vh*9/16))]",
+        vertical &&
+          "max-w-[min(420px,calc(80vh*9/16),var(--stage-portrait-cap,100vw))]",
         isFullscreen && "max-h-full",
         containerClassName,
         className
@@ -544,6 +555,8 @@ export function VideoPlayer({
         ref={videoRef}
         poster={source.kind === "mp4" ? source.poster : undefined}
         playsInline
+        autoPlay={live}
+        muted={live}
         preload="metadata"
         onClick={handleVideoClick}
         onLoadedMetadata={handleLoadedMetadata}
@@ -569,6 +582,15 @@ export function VideoPlayer({
             {live ? "Waiting for the stream to resume." : "Try reloading the page."}
           </p>
         </div>
+      )}
+
+      {diagnostics && (
+        <PlaybackStats
+          videoRef={videoRef}
+          hlsRef={media.hlsRef}
+          lastErrorRef={media.lastErrorRef}
+          onClose={onCloseDiagnostics}
+        />
       )}
 
       {live && state.muted && (

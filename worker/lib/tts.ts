@@ -1,5 +1,5 @@
 import { runClaude } from "./claude";
-import type { CommandContext } from "./commands";
+import { commandParticipantKey, type CommandContext } from "./commands";
 import { supabaseAdmin } from "../supabase";
 
 const MAX_TTS_CHARS = 200;
@@ -92,32 +92,32 @@ export async function moderateTtsText(text: string): Promise<TtsVerdict> {
   }
 }
 
-// Chat ingest never stamps the Vids.Tube account on a YouTube message, so the
-// same person keeps two keys after linking. Both are returned; the first is the
-// one this request is filed under, the rest are read alongside it.
+// One person can hold two keys: a Vids.Tube account and a YouTube channel. Both
+// are returned; the first is the one this request is filed under, the rest are
+// read alongside it. The account key is filed under whenever the message carries
+// an account, which is what keeps the host's voice sticky across both chats.
 async function identityKeys(ctx: CommandContext): Promise<string[]> {
   const m = ctx.message;
-  if (m.origin === "vidstube") {
-    const key = String(m.userId);
-    if (!m.userId) {
-      return [key];
-    }
+  const key = commandParticipantKey(m);
+  if (!m.userId) {
     const { data } = await supabaseAdmin
       .from("youtube_links")
-      .select("youtube_channel_id, verified_at")
-      .eq("user_id", m.userId)
+      .select("user_id, verified_at")
+      .eq("youtube_channel_id", String(m.externalAuthorId))
       .maybeSingle();
-    return data?.verified_at && data.youtube_channel_id
-      ? [key, `youtube:${data.youtube_channel_id}`]
-      : [key];
+    return data?.verified_at ? [key, data.user_id] : [key];
   }
-  const key = `youtube:${m.externalAuthorId}`;
+  if (m.externalAuthorId) {
+    return [key, `youtube:${m.externalAuthorId}`];
+  }
   const { data } = await supabaseAdmin
     .from("youtube_links")
-    .select("user_id, verified_at")
-    .eq("youtube_channel_id", String(m.externalAuthorId))
+    .select("youtube_channel_id, verified_at")
+    .eq("user_id", m.userId)
     .maybeSingle();
-  return data?.verified_at ? [key, data.user_id] : [key];
+  return data?.verified_at && data.youtube_channel_id
+    ? [key, `youtube:${data.youtube_channel_id}`]
+    : [key];
 }
 
 async function stickyVoice(

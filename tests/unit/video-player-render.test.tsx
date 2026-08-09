@@ -36,6 +36,45 @@ describe("what the player paints for each source", () => {
     expect(markup(<VideoPlayer source={LIVE} />)).toContain("Tap to unmute");
     expect(markup(<VideoPlayer source={MP4} />)).not.toContain("Tap to unmute");
   });
+
+  // hls.js attaches its MediaSource after a dynamic import resolves, so a play()
+  // call from an effect runs before there is anything to play and the attach that
+  // follows returns the element to paused. Only the attribute survives that order.
+  it("asks the element itself to start a live source, not an effect", () => {
+    const html = markup(<VideoPlayer source={LIVE} />).toLowerCase();
+    expect(html).toContain("autoplay=");
+    expect(html).toContain("muted=");
+  });
+
+  it("leaves a file source to the viewer", () => {
+    const html = markup(<VideoPlayer source={MP4} />).toLowerCase();
+    expect(html).not.toContain("autoplay=");
+  });
+});
+
+describe("the playback health readout", () => {
+  it("stays off until asked for", () => {
+    expect(markup(<VideoPlayer source={LIVE} />)).not.toContain(
+      "Playback health"
+    );
+  });
+
+  it("reports buffer, headroom and stalls when asked for", () => {
+    const html = markup(<VideoPlayer source={LIVE} diagnostics />);
+    expect(html).toContain("Playback health");
+    expect(html).toContain("Buffer ahead");
+    expect(html).toContain("Headroom");
+    expect(html).toContain("Stalls");
+  });
+
+  // The whole point of the panel: the two candidate causes of a flashing spinner
+  // must be distinguishable, so both the download rate and what the stream needs
+  // are shown rather than a single verdict the reader cannot check.
+  it("shows the download rate against what the stream needs", () => {
+    const html = markup(<VideoPlayer source={LIVE} diagnostics />);
+    expect(html).toContain("Download");
+    expect(html).toContain("Stream needs");
+  });
 });
 
 describe("the transport's clock", () => {
@@ -88,6 +127,14 @@ describe("how the frame is sized", () => {
 
   it("keeps a portrait video bounded to the viewport height", () => {
     const html = markup(<VideoPlayer source={MP4} width={1080} height={1920} />);
-    expect(html).toContain("max-w-[min(420px,calc(80vh*9/16))]");
+    expect(html).toContain("max-w-[min(420px,calc(80vh*9/16)");
+  });
+
+  // Below the large breakpoint the stage's height is already fixed by the time a
+  // stream reports it is portrait, so the cap has to defer to what the stage
+  // says is left over, or the video pushes the chat out of the stage's box.
+  it("defers to the stage's own cap for a portrait video", () => {
+    const html = markup(<VideoPlayer source={MP4} width={1080} height={1920} />);
+    expect(html).toContain("var(--stage-portrait-cap,100vw)");
   });
 });

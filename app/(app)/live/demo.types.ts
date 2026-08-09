@@ -6,7 +6,8 @@ export type DemoBoxKey =
   | "goalViewers"
   | "competition"
   | "highlight"
-  | "break";
+  | "break"
+  | "game";
 export type DemoOverlayKey = DemoBoxKey | "tts" | "ask";
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
@@ -40,6 +41,7 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
   "tts",
   "ask",
   "break",
+  "game",
 ];
 
 export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
@@ -51,6 +53,7 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
   tts: "TTS card",
   ask: "!ask exchange",
   break: "Break timer",
+  game: "Game",
 };
 
 // Box coordinates live on the 1080x1920 vertical stream canvas, so a saved
@@ -66,6 +69,9 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     competition: { x: 48, y: 720, scale: 2 },
     highlight: { x: 120, y: 1260, scale: 2 },
     break: { x: 220, y: 860, scale: 2 },
+    // Right of the ladder and below the viewers goal, at scale 1: the band of
+    // the canvas no other surface claims by default.
+    game: { x: 480, y: 600, scale: 1 },
   },
   visible: {
     members: true,
@@ -76,6 +82,9 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     tts: true,
     ask: true,
     break: false,
+    // Off by default: an existing channel's overlay must not gain a window on
+    // deploy, and the window shows nothing at all unless a game is configured.
+    game: false,
   },
   goalProgressFull: false,
   background: "slideshow",
@@ -87,6 +96,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     competition: 0.6,
     highlight: 1,
     break: 1,
+    game: 1,
   },
   feedSound: "chime",
 };
@@ -112,6 +122,7 @@ export const DEMO_BOX_KEYS: DemoBoxKey[] = [
   "competition",
   "highlight",
   "break",
+  "game",
 ];
 
 // A version bump used to throw away every saved position, which cost the owner

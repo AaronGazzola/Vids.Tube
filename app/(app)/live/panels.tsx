@@ -6,7 +6,9 @@ import type {
   FeaturedMessageWithAuthor,
   ViewerScoreWithAuthor,
 } from "@/app/layout.types";
+import { usePostChatMessage } from "@/app/layout.hooks";
 import { ChatAuthor } from "@/components/chat-author";
+import { ChatComposer } from "@/components/chat-composer";
 import { ChatText } from "@/components/chat-text";
 import { OriginBadge } from "@/components/origin-badge";
 import {
@@ -366,18 +368,20 @@ function MessageMenu({
   );
 }
 
-type CardTone = "amber" | "violet" | "sky";
+type CardTone = "amber" | "violet" | "sky" | "gray";
 
 const CARD_TONE: Record<CardTone, string> = {
   amber: "border-amber-400/50 bg-amber-400/10",
   violet: "border-violet-400/50 bg-violet-400/10",
   sky: "border-sky-400/50 bg-sky-400/10",
+  gray: "border-muted-foreground/30 bg-muted/40",
 };
 
 const PILL_TONE: Record<CardTone, string> = {
   amber: "bg-amber-400/15 text-amber-700 dark:text-amber-300",
   violet: "bg-violet-400/15 text-violet-700 dark:text-violet-300",
   sky: "bg-sky-400/15 text-sky-700 dark:text-sky-300",
+  gray: "bg-muted-foreground/15 text-muted-foreground",
 };
 
 function StatusPill({
@@ -412,6 +416,8 @@ function ttsStatusLabel(status: string): string {
       return "TTS · played";
     case "dismissed":
       return "TTS · dismissed";
+    case "cooldown":
+      return "TTS · not applied · cooldown";
     default:
       return `TTS · ${status}`;
   }
@@ -515,12 +521,14 @@ function ChatMessageRow({
   // Dismiss show only while it's still pending.
   if (tts) {
     const pending = tts.status === "suggested";
+    const tone: CardTone = tts.status === "cooldown" ? "gray" : "violet";
     return (
       <li
         className={cn(
           "rounded-md border p-2",
-          CARD_TONE.violet,
-          tts.status === "dismissed" && "opacity-70"
+          CARD_TONE[tone],
+          (tts.status === "dismissed" || tts.status === "cooldown") &&
+            "opacity-70"
         )}
       >
         <div className="flex items-start gap-2">
@@ -537,7 +545,7 @@ function ChatMessageRow({
         </div>
         <div className="mt-1 flex items-center gap-2">
           <StatusPill
-            tone="violet"
+            tone={tone}
             icon={<Volume2 className="h-3 w-3" />}
             label={`${ttsStatusLabel(tts.status)}${tts.voice ? ` · ${tts.voice}` : ""}`}
           />
@@ -757,11 +765,12 @@ function ChatMessageRow({
 }
 
 function ChatPanel({ streamId }: { streamId: string }) {
-  const { data: chat, isPending } = useOwnerChat(streamId);
+  const { data: chat, isPending, refetch } = useOwnerChat(streamId);
   const { data: featured } = useReadThisQueue(streamId);
   const { data: ttsFeed } = useTtsFeed(streamId);
   const { data: askFeed } = useAskFeed(streamId);
   const { data: clipMarkers } = useClipMarkers(streamId);
+  const post = usePostChatMessage(streamId);
   const { scrollRef, contentRef, onScroll } = useChatAutoScroll(
     chat?.length ?? 0
   );
@@ -814,6 +823,12 @@ function ChatPanel({ streamId }: { streamId: string }) {
             </ul>
           )}
         </div>
+      </div>
+      <div className="shrink-0 border-t p-2">
+        <ChatComposer
+          onSend={(body) => post.mutateAsync(body).then(() => refetch())}
+          pending={post.isPending}
+        />
       </div>
     </div>
   );

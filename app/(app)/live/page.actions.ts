@@ -730,18 +730,46 @@ export async function getTtsFeedAction(
     console.error(error);
     throw new Error("Failed to load TTS requests");
   }
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    chatMessageId: r.chat_message_id,
-    authorName: r.author_name,
-    origin: r.origin,
-    text: r.text,
-    status: r.status,
-    reason: r.reason,
-    audioPath: r.audio_path,
-    voice: r.voice,
-    createdAt: r.created_at,
-  }));
+  // A !tts blocked by its cooldown never becomes a request row, so the card is
+  // built from the command event instead and marked as never applied.
+  const { data: blocked, error: blockedError } = await supabaseAdmin
+    .from("command_events")
+    .select("id, chat_message_id, origin, args, reply, created_at")
+    .eq("stream_id", streamId)
+    .eq("keyword", "tts")
+    .eq("status", "cooldown")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (blockedError) {
+    console.error(blockedError);
+    throw new Error("Failed to load TTS requests");
+  }
+  return [
+    ...(data ?? []).map((r) => ({
+      id: r.id,
+      chatMessageId: r.chat_message_id,
+      authorName: r.author_name,
+      origin: r.origin,
+      text: r.text,
+      status: r.status,
+      reason: r.reason,
+      audioPath: r.audio_path,
+      voice: r.voice,
+      createdAt: r.created_at,
+    })),
+    ...(blocked ?? []).map((r) => ({
+      id: r.id,
+      chatMessageId: r.chat_message_id,
+      authorName: null,
+      origin: r.origin,
+      text: r.args ?? "",
+      status: "cooldown",
+      reason: r.reply,
+      audioPath: null,
+      voice: null,
+      createdAt: r.created_at,
+    })),
+  ];
 }
 
 export async function approveTtsAction(

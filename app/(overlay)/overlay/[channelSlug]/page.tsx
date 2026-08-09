@@ -7,6 +7,7 @@ import { OVERLAY_GOAL_METRICS } from "@/app/layout.types";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
+import { GameWindow } from "@/components/overlay/game-window";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { MemberCountStrip } from "@/components/overlay/member-count-strip";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
@@ -449,6 +450,12 @@ export default function OverlayFramePage({
             entries={competitionEntries}
             size={OVERLAY_LADDER_SIZE}
           />
+        </Positioned>
+      )}
+
+      {visible.game && (
+        <Positioned box={boxes.game} opacity={config.boxOpacity.game}>
+          <GameWindow />
         </Positioned>
       )}
 

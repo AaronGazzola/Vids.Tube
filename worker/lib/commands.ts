@@ -121,10 +121,28 @@ export const BUILTIN_HANDLERS: Record<
   },
 };
 
-function commandParticipantKey(m: BufferedMessage): string {
-  return m.origin === "vidstube"
-    ? String(m.userId)
-    : `youtube:${m.externalAuthorId}`;
+export function cooldownWaitSeconds(
+  lastExecutedIso: string,
+  cooldownS: number,
+  now: number
+): number {
+  const readyAt = new Date(lastExecutedIso).getTime() + cooldownS * 1000;
+  return Math.max(1, Math.ceil((readyAt - now) / 1000));
+}
+
+function mention(m: BufferedMessage): string {
+  return `@${(m.authorName ?? m.author).replace(/^@+/, "")}`;
+}
+
+// Same rule as the generated `viewer_scores.participant_key`: the Vids.Tube
+// account wins whenever the message carries one. Chat ingest stamps the account
+// on a YouTube message from the recognised host, so the host is one participant
+// in both chats rather than two.
+export function commandParticipantKey(m: {
+  userId: string | null;
+  externalAuthorId: string | null;
+}): string {
+  return m.userId ? String(m.userId) : `youtube:${m.externalAuthorId}`;
 }
 
 type EventStatus = "executed" | "cooldown" | "limit" | "disabled" | "unknown";
@@ -218,20 +236,30 @@ export async function processCommands(
       const sinceIso = new Date(
         Date.now() - row.cooldown_s * 1000
       ).toISOString();
-      const { count, error } = await supabaseAdmin
+      const { data: last, error } = await supabaseAdmin
         .from("command_events")
-        .select("id", { count: "exact", head: true })
+        .select("created_at")
         .eq("stream_id", stream.id)
         .eq("participant_key", pkey)
         .eq("keyword", row.keyword)
         .eq("status", "executed")
-        .gte("created_at", sinceIso);
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) {
         console.error(error);
         continue;
       }
-      if (count) {
-        await insertEvent(stream, m, row.keyword, parsed.args, "cooldown", null);
+      if (last) {
+        const wait = cooldownWaitSeconds(
+          last.created_at,
+          row.cooldown_s,
+          Date.now()
+        );
+        const text = `${mention(m)} !${row.keyword} is on cooldown — try again in ${wait}s.`;
+        await insertEvent(stream, m, row.keyword, parsed.args, "cooldown", text);
+        await deliverReply({ streamId: stream.id, origin: m.origin, text });
         continue;
       }
     }

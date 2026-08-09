@@ -22,6 +22,9 @@ const supabaseOrigin = originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const supabaseWs = supabaseOrigin.replace(/^https:/, "wss:");
 const vodBase = originOf(process.env.NEXT_PUBLIC_VOD_BASE_URL);
 const streamHost = originOf(process.env.NEXT_PUBLIC_STREAM_HOST);
+// Only the ORIGIN of the game address enters the policy; the rest of that value is a path and a hash
+// carrying the rig and its configuration, which have no business in a header.
+const gameOrigin = originOf(process.env.NEXT_PUBLIC_GAME_EMBED_URL);
 const imageCdns = ["https://picsum.photos", "https://fastly.picsum.photos"];
 const youtubeAvatarHosts = [
   "https://*.ggpht.com",
@@ -57,6 +60,9 @@ const contentSecurityPolicy = [
     vodBase
   ),
   directive("font-src", "'self'"),
+  // Never omitted: an absent frame-src inherits default-src 'self', which blocks the game window with no
+  // directive naming the cause. This says what is permitted, or says nothing is.
+  directive("frame-src", gameOrigin || "'none'"),
   directive("frame-ancestors", "'none'"),
   directive("base-uri", "'self'"),
   directive("form-action", "'self'"),

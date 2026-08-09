@@ -18,11 +18,15 @@ export function LivePlayer({
   mobileChrome,
   onPortraitChange,
   overlay,
+  diagnostics,
+  onCloseDiagnostics,
 }: {
   src: string;
   mobileChrome?: { handle: string | null; avatarUrl: string | null } | null;
   onPortraitChange?: (portrait: boolean | null) => void;
   overlay?: ReactNode;
+  diagnostics?: boolean;
+  onCloseDiagnostics?: () => void;
 }) {
   // Orientation is recorded against the source it was measured from, so a new
   // source reads as unknown again without an effect resetting it.
@@ -68,6 +72,8 @@ export function LivePlayer({
         source={{ kind: "hls", src, live: true }}
         onDimensions={handleDimensions}
         onResize={setVideoWidth}
+        diagnostics={diagnostics}
+        onCloseDiagnostics={onCloseDiagnostics}
         containerClassName={chromeActive ? "overflow-visible" : undefined}
       >
         {chromeActive && (

@@ -21,6 +21,10 @@ export const OVERLAY_BASE_DIMS = {
   // Three quarters of the 1080-wide canvas, and short: the members strip shares
   // vertical space with the goals, the ladder and the highlight surface.
   members: { w: 810, h: 128 },
+  // A landscape viewport for the game, which is a 3D scene rather than a card:
+  // wide enough for a creature that travels, short enough to leave the canvas to
+  // the surfaces that carry stream data.
+  game: { w: 480, h: 320 },
 } as const;
 
 // Base alpha of each surface's black backing, before the owner's opacity slider
@@ -41,7 +45,8 @@ export type OverlayBoxKey =
   | "goalViewers"
   | "competition"
   | "highlight"
-  | "break";
+  | "break"
+  | "game";
 
 export type OverlayBox = { x: number; y: number; scale: number };
 
@@ -54,6 +59,7 @@ export type DemoOverlayVisibility = {
   goalViewers: boolean;
   competition: boolean;
   break: boolean;
+  game: boolean;
 };
 
 export type DemoOverlayHighlight = {

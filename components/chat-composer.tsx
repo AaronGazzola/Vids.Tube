@@ -59,7 +59,7 @@ export function ChatComposer({
           <div
             ref={backdropRef}
             aria-hidden
-            className="pointer-events-none absolute inset-0 max-h-32 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent px-2.5 py-2 text-base md:text-sm"
+            className="pointer-events-none absolute inset-0 max-h-32 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent px-2.5 py-2 text-sm"
           >
             {draft.slice(0, MAX_CHAT_MESSAGE_LENGTH)}
             <span className="rounded-[2px] bg-destructive/25 text-destructive">
@@ -76,7 +76,7 @@ export function ChatComposer({
             placeholder="Send a message"
             rows={1}
             aria-invalid={overLimit}
-            className="relative max-h-32 min-h-9 resize-none bg-transparent text-transparent caret-foreground"
+            className="relative max-h-32 min-h-9 resize-none bg-transparent text-sm text-transparent caret-foreground"
           />
         </div>
         <Button type="submit" disabled={!canSend}>

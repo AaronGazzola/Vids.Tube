@@ -20,8 +20,10 @@ export function useMediaSource(
   );
   const liveSyncRef = useRef<number | null>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const lastErrorRef = useRef<string | null>(null);
 
   const { kind, src } = source;
+  const live = kind === "hls" && source.live;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -90,12 +92,25 @@ export function useMediaSource(
       instance.on(HlsCtor.Events.LEVEL_UPDATED, syncLive);
 
       instance.on(HlsCtor.Events.ERROR, (_event, data) => {
+        // Recorded whether fatal or not: a run of recovered errors is exactly what
+        // an intermittent stall looks like, and the diagnostics panel reads this.
+        lastErrorRef.current = `${data.details}${data.fatal ? " (fatal)" : ""}`;
         if (!data.fatal) {
           return;
         }
         console.error("HLS fatal error", data.type, data.details);
         if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
-          instance!.startLoad();
+          // The edge hands out a session id inside the variant URL the master
+          // redirects to, and drops the session once a reader goes quiet for long
+          // enough — a backgrounded tab is enough. Every later read of that URL is
+          // a 401, so resuming the current playlist retries a URL that can only
+          // fail. A live stream reloads the master instead, which mints a new
+          // session; a file has no session to lose and keeps its position.
+          if (live) {
+            instance!.loadSource(src);
+          } else {
+            instance!.startLoad();
+          }
         } else if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
           instance!.recoverMediaError();
         } else {
@@ -113,7 +128,7 @@ export function useMediaSource(
         hlsRef.current = null;
       }
     };
-  }, [videoRef, kind, src]);
+  }, [videoRef, kind, src, live]);
 
   const setLevel = useCallback((index: number) => {
     setPinnedLevel(index);
@@ -130,5 +145,7 @@ export function useMediaSource(
     latency,
     liveSyncPosition,
     liveSyncRef,
+    hlsRef,
+    lastErrorRef,
   };
 }

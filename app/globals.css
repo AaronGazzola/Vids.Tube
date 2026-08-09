@@ -124,6 +124,20 @@
   height: calc(100dvh - var(--stage-top, 0px));
 }
 
+/* A stream is assumed 16:9 until its first frame reports otherwise, so a
+   portrait stream trebles in height mid-load. The stage's height is already
+   fixed by then and grid rows do not shrink, so the chat spilled past the
+   bottom edge and the title below it painted over the spill. The stage
+   publishes the widest a portrait video may be and still leave the chat its
+   400px floor plus the 12px gap. Only below lg, where the two stack. */
+@media (width < 64rem) {
+  .h-stage {
+    --stage-portrait-cap: calc(
+      (100dvh - var(--stage-top, 0px) - 412px) * 9 / 16
+    );
+  }
+}
+
 /* The black backing every overlay surface sits on. The owner's opacity slider
    scales this and nothing else: dimming the whole box used to take the text with
    it, which made a subtle overlay an unreadable one. Each surface may set its own

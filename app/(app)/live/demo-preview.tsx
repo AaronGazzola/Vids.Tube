@@ -12,6 +12,7 @@ import {
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
+import { GameWindow } from "@/components/overlay/game-window";
 import { GoalBar } from "@/components/overlay/goal-bar";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { MemberCountStrip } from "@/components/overlay/member-count-strip";
@@ -290,22 +291,17 @@ function DemoOverlayFeed() {
 
 // ── Goal box ───────────────────────────────────────────────────────────────
 
-const BOX_METRIC: Record<
-  Exclude<DemoBoxKey, "competition" | "highlight" | "break" | "members">,
-  GoalMetric
-> = {
+// Named by the two goal surfaces rather than by everything they are not: an exclusion list has to be
+// extended by hand every time a surface that is not a goal is added, and the compiler only says so as a
+// missing-key error somewhere unrelated.
+type GoalBoxKey = "goalLikes" | "goalViewers";
+
+const BOX_METRIC: Record<GoalBoxKey, GoalMetric> = {
   goalLikes: "likes",
   goalViewers: "viewers",
 };
 
-function GoalBox({ boxKey, data }: { boxKey: DemoBoxKey; data: MetricProgress }) {
-  if (
-    boxKey === "competition" ||
-    boxKey === "highlight" ||
-    boxKey === "break" ||
-    boxKey === "members"
-  )
-    return null;
+function GoalBox({ boxKey, data }: { boxKey: GoalBoxKey; data: MetricProgress }) {
   return (
     <GoalBar metric={BOX_METRIC[boxKey]} data={data} height={OVERLAY_GOAL_HEIGHT} />
   );
@@ -483,6 +479,11 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           {config.visible.break && (
             <DraggableBox boxKey="break" pxScale={canvasScale * k}>
               <DemoBreak />
+            </DraggableBox>
+          )}
+          {config.visible.game && (
+            <DraggableBox boxKey="game" pxScale={canvasScale * k}>
+              <GameWindow />
             </DraggableBox>
           )}
         </div>

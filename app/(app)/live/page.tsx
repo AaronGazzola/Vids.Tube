@@ -437,6 +437,7 @@ export default function LivePage() {
   const [demo, setDemo] = useState(false);
   const [editOverlays, setEditOverlays] = useState(false);
   const [previewPortrait, setPreviewPortrait] = useState<boolean | null>(null);
+  const [playbackHealth, setPlaybackHealth] = useState(false);
   const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
   const mobileChrome = useDemoLayoutStore((s) => s.config.mobileChrome);
@@ -641,6 +642,8 @@ export default function LivePage() {
                   }
                   onPortraitChange={setPreviewPortrait}
                   overlay={disconnected ? <DisconnectedOverlay /> : null}
+                  diagnostics={playbackHealth}
+                  onCloseDiagnostics={() => setPlaybackHealth(false)}
                 />
                 {state === "preview" && (
                   <Badge variant="secondary" className="absolute left-2 top-2">
@@ -664,6 +667,13 @@ export default function LivePage() {
                         checked={mobileChrome}
                         onCheckedChange={setMobileChrome}
                         disabled={previewPortrait === false}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                      <span>Playback health</span>
+                      <Switch
+                        checked={playbackHealth}
+                        onCheckedChange={setPlaybackHealth}
                       />
                     </div>
                     <button

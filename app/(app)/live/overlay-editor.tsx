@@ -31,6 +31,7 @@ const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
   goalViewers: OVERLAY_BASE_DIMS.goal,
   competition: OVERLAY_BASE_DIMS.competition,
   break: OVERLAY_BASE_DIMS.break,
+  game: OVERLAY_BASE_DIMS.game,
 };
 
 // Ghosts fill to the same darkness the real surface does, so what the editor
@@ -48,6 +49,7 @@ const BOX_KEYS: DemoBoxKey[] = [
   "goalViewers",
   "competition",
   "break",
+  "game",
 ];
 
 const TOGGLE_KEYS: DemoOverlayKey[] = [
@@ -58,6 +60,7 @@ const TOGGLE_KEYS: DemoOverlayKey[] = [
   "goalLikes",
   "goalViewers",
   "competition",
+  "game",
   "break",
 ];
 
