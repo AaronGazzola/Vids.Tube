@@ -17,7 +17,13 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { createClient } from "@supabase/supabase-js";
 import { execFile } from "child_process";
-import { createReadStream, mkdirSync, writeFileSync, readFileSync } from "fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "fs";
 import { join } from "path";
 import { promisify } from "util";
 
@@ -47,16 +53,6 @@ function fmt(s: number): string {
   const sec = abs % 60;
   return `${sign}${h}h${String(m).padStart(2, "0")}m${String(sec).padStart(2, "0")}s`;
 }
-
-type Snapshot = {
-  takenAt: string;
-  streamId: string;
-  offsetS: number;
-  video: Record<string, unknown>;
-  transcriptSegments: { id: string; start_s: number; end_s: number }[];
-  spans: { id: string; start_s: number; end_s: number }[];
-  moments: { id: string; start_s: number; end_s: number; peak_s: number }[];
-};
 
 async function loadBroadcast(streamId: string) {
   const { data: stream, error } = await admin
@@ -253,52 +249,50 @@ async function apply(
   video: Record<string, unknown> & { id: string },
   offsetS: number
 ) {
-  const { data: segments } = await admin
-    .from("transcript_segments")
-    .select("id, start_s, end_s")
-    .eq("stream_id", streamId);
-  const { data: spans } = await admin
-    .from("stream_thread_spans")
-    .select("id, start_s, end_s")
-    .eq("stream_id", streamId);
-  const { data: moments } = await admin
-    .from("stream_moments")
-    .select("id, start_s, end_s, peak_s")
-    .eq("stream_id", streamId);
+  const newKey = `vod/owner/${youtubeId}-replacement.mp4`;
+
+  // Applying twice would shift every timing twice. The recording already
+  // pointing at the replacement is the signal, and it is checked before
+  // anything else happens.
+  if (video.mp4_path === newKey) {
+    throw new Error(
+      "this recording already points at the replacement — refusing to apply twice"
+    );
+  }
 
   mkdirSync(SNAPSHOT_DIR, { recursive: true });
-  const snapshot: Snapshot = {
+  const snapshot = {
     takenAt: new Date().toISOString(),
     streamId,
     offsetS,
     video,
-    transcriptSegments: segments ?? [],
-    spans: spans ?? [],
-    moments: moments ?? [],
   };
   const snapshotPath = join(SNAPSHOT_DIR, `swap-${streamId}.json`);
   writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
   console.log(`snapshot written to ${snapshotPath}`);
 
-  console.log("downloading the replacement...");
   const localPath = join(SNAPSHOT_DIR, `${youtubeId}.mp4`);
-  await execFileAsync(
-    process.env.YTDLP_BIN ?? "yt-dlp",
-    [
-      "-f",
-      "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
-      "--merge-output-format",
-      "mp4",
-      "-o",
-      localPath,
-      `https://www.youtube.com/watch?v=${youtubeId}`,
-    ],
-    { maxBuffer: 1024 * 1024 * 64 }
-  );
+  if (existsSync(localPath)) {
+    console.log(`reusing the copy already downloaded at ${localPath}`);
+  } else {
+    console.log("downloading the replacement...");
+    await execFileAsync(
+      process.env.YTDLP_BIN ?? "yt-dlp",
+      [
+        "-f",
+        "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
+        "--merge-output-format",
+        "mp4",
+        "-o",
+        localPath,
+        `https://www.youtube.com/watch?v=${youtubeId}`,
+      ],
+      { maxBuffer: 1024 * 1024 * 64 }
+    );
+  }
 
   // Beside the original rather than over it, so an undo has something to go
   // back to.
-  const newKey = `vod/owner/${youtubeId}-replacement.mp4`;
   console.log(`uploading to ${newKey} ...`);
   const r2 = new S3Client({
     region: "auto",
@@ -321,91 +315,70 @@ async function apply(
     partSize: 64 * 1024 * 1024,
   }).done();
 
-  for (const row of segments ?? []) {
-    await admin
-      .from("transcript_segments")
-      .update({ start_s: row.start_s - offsetS, end_s: row.end_s - offsetS })
-      .eq("id", row.id);
-  }
-  for (const row of spans ?? []) {
-    await admin
-      .from("stream_thread_spans")
-      .update({ start_s: row.start_s - offsetS, end_s: row.end_s - offsetS })
-      .eq("id", row.id);
-  }
-  for (const row of moments ?? []) {
-    await admin
-      .from("stream_moments")
-      .update({
-        start_s: row.start_s - offsetS,
-        end_s: row.end_s - offsetS,
-        peak_s: row.peak_s - offsetS,
-      })
-      .eq("id", row.id);
-  }
-
   // Where the replacement's file begins in wall-clock time. Chat replay reads
-  // this rather than assuming the file starts at go-live, which is the
-  // assumption that would have left chat about a minute out after the swap.
+  // this rather than assuming the file starts at go-live.
   const { data: streamRow } = await admin
     .from("streams")
     .select("started_at")
     .eq("id", streamId)
     .maybeSingle();
-  const fileStartsAt = streamRow?.started_at
-    ? new Date(new Date(streamRow.started_at).getTime() + offsetS * 1000)
-    : null;
+  if (!streamRow?.started_at) {
+    throw new Error(
+      "the broadcast has no start time, so where the replacement begins cannot be recorded"
+    );
+  }
+  const fileStartsAt = new Date(
+    new Date(streamRow.started_at).getTime() + offsetS * 1000
+  );
 
-  const { error } = await admin
-    .from("videos")
-    .update({
-      mp4_path: newKey,
-      duration_s: (video.duration_s as number) - offsetS,
-      starts_at: fileStartsAt ? fileStartsAt.toISOString() : null,
-      visibility: "private",
-      status: "ready",
-    })
-    .eq("id", video.id);
+  // One call, one transaction. Every shift and the recording update either all
+  // happen or none do.
+  const { data: applied, error } = await admin.rpc("apply_recording_swap", {
+    p_stream: streamId,
+    p_video: video.id,
+    p_offset: offsetS,
+    p_mp4_path: newKey,
+    p_duration_s: Math.round((video.duration_s as number) - offsetS),
+    p_starts_at: fileStartsAt.toISOString(),
+  });
   if (error) throw new Error(error.message);
 
+  const counts = applied?.[0];
   console.log("");
+  console.log(
+    `shifted ${counts?.segments_shifted ?? 0} transcript segments, ${
+      counts?.spans_shifted ?? 0
+    } spans, ${counts?.moments_shifted ?? 0} moments`
+  );
   console.log("swapped, and left private. check the three moments, then set it");
   console.log("to public from the studio.");
 }
 
 async function undo(streamId: string) {
   const path = join(SNAPSHOT_DIR, `swap-${streamId}.json`);
-  const snapshot = JSON.parse(readFileSync(path, "utf8")) as Snapshot;
+  const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
+    offsetS: number;
+    video: { id: string } & Record<string, unknown>;
+  };
+  const video = snapshot.video;
 
-  for (const row of snapshot.transcriptSegments) {
-    await admin
-      .from("transcript_segments")
-      .update({ start_s: row.start_s, end_s: row.end_s })
-      .eq("id", row.id);
-  }
-  for (const row of snapshot.spans) {
-    await admin
-      .from("stream_thread_spans")
-      .update({ start_s: row.start_s, end_s: row.end_s })
-      .eq("id", row.id);
-  }
-  for (const row of snapshot.moments) {
-    await admin
-      .from("stream_moments")
-      .update({
-        start_s: row.start_s,
-        end_s: row.end_s,
-        peak_s: row.peak_s,
-      })
-      .eq("id", row.id);
-  }
-  const video = snapshot.video as { id: string } & Record<string, unknown>;
+  // Shifting back by the same offset is exact, and unlike replaying stored rows
+  // it cannot restore only the ones that happened to be read.
+  const { error } = await admin.rpc("apply_recording_swap", {
+    p_stream: streamId,
+    p_video: video.id,
+    p_offset: -snapshot.offsetS,
+    p_mp4_path: video.mp4_path as string,
+    p_duration_s: video.duration_s as number,
+    // Null is a legitimate value here: it means the recording never recorded
+    // where its file began. The generated argument type cannot express that.
+    p_starts_at: (video.starts_at ?? null) as string,
+  });
+  if (error) throw new Error(error.message);
+
   await admin
     .from("videos")
     .update({
-      mp4_path: video.mp4_path as string,
-      duration_s: video.duration_s as number,
-      starts_at: (video.starts_at as string | null) ?? null,
       status: video.status as string,
       visibility: video.visibility as string,
     })

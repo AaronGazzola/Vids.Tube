@@ -1954,6 +1954,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_recording_swap: {
+        Args: {
+          p_duration_s: number
+          p_mp4_path: string
+          p_offset: number
+          p_starts_at: string
+          p_stream: string
+          p_video: string
+        }
+        Returns: {
+          moments_shifted: number
+          segments_shifted: number
+          spans_shifted: number
+        }[]
+      }
       community_member_count: { Args: { p_community: string }; Returns: number }
       credits_for_xp: { Args: { xp: number }; Returns: number }
       email_signup_status: { Args: { p_email: string }; Returns: string }
