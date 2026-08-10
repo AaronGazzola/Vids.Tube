@@ -33,9 +33,11 @@ has to end.
   already stored on past broadcasts keep working, because the single-rendition playlist
   is still served at its existing address.
 
-Not in this change, and deliberately: the machine has to be resized before the rungs fit,
-which is owner work and is tracked separately. The change is written so that the code and
-configuration land first and the resize is the last step before it is switched on.
+The machine does not need resizing. That was assumed when this change was opened, and the
+assumption was checked before it was acted on: both rungs together cost 0.50 of a core and
+run at 2.1x real time against a real recording of the 9-Aug-2026 broadcast, on the machine
+as it stands. The ladder still ships behind a switch and its load is watched through the
+first broadcast that runs it, because the cost depends on what is being streamed.
 
 ## Capabilities
 
@@ -55,9 +57,9 @@ configuration land first and the resize is the last step before it is switched o
 ## Impact
 
 - **Streaming machine**: MediaMTX gains two rung paths; the on-ready and on-not-ready
-  scripts gain the transcoder's lifecycle; nginx gains the master playlist. The machine
-  must move from 2 vCPU to 8 vCPU before the rungs can run, which changes the per-machine
-  viewer ceiling and the cost curve being worked out in AZ-35.
+  scripts gain the transcoder's lifecycle; nginx gains the master playlist. No resize, on
+  the measurement above. The per-machine viewer ceiling being worked out in AZ-35 still
+  changes, because viewers stop all pulling 5.0 Mbps.
 - **App**: the route that records a stream's playback address when the encoder connects
   now records the master playlist.
 - **Runbook**: `docs/runbooks/live-streaming-vm.md` is the deployment contract for the

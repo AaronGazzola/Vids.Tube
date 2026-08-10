@@ -11,16 +11,22 @@ one stream key, and publishing to it would create a real broadcast row and go li
 copy runs the same MediaMTX version with the same HLS settings, so what is proven
 transfers.
 
-**The machine resize and the on-stream confirmation are AZ-250**, because neither can be
-finished in code.
+**The on-stream confirmation is AZ-250**, because it cannot be finished in code. The
+machine is not resized: both rungs measured 0.50 of a core at 2.1x real time against a
+real recording, on the machine as it stands.
 
 ## 1. Know the source before matching it
 
-- [ ] 1.1 Add `scripts/measure-source-cadence.ts` taking an HLS address, reading the
-      playlist's advertised target duration and probing one segment with `ffprobe` for its
-      keyframe positions, and printing the measured keyframe interval. Design records that
-      2 s is inferred from one measurement rather than known.
-- [ ] 1.2 Have the script fail loudly, naming both numbers, when the keyframe interval is
+- [x] 1.1 Measured, and the assumption it replaced was wrong. The publisher sends
+      1080x1920 at 30 fps and 5.00 Mbps with a keyframe every **1.000 s**, read from the
+      keyframe positions in a real recording. The design had inferred 2 s from the
+      advertised target duration; building on that would have left half the segment
+      boundaries unaligned.
+- [ ] 1.2 Add `scripts/measure-source-cadence.ts` taking an HLS address, reading the
+      playlist's advertised target duration and probing keyframe positions with `ffprobe`,
+      and printing the measured keyframe interval, so the cadence is re-read rather than
+      carried as a constant the encoder can silently change.
+- [ ] 1.3 Have the script fail loudly, naming both numbers, when the keyframe interval is
       not a whole multiple of the segment duration, since that is the condition under which
       segments cannot align across renditions.
 
@@ -32,7 +38,7 @@ finished in code.
       split and scaled twice, per the design.
 - [ ] 2.2 In that script, copy audio rather than re-encoding it, so every rendition carries
       byte-identical audio.
-- [ ] 2.3 In that script, fix the keyframe interval to the value measured in 1.1 and disable
+- [ ] 2.3 In that script, fix the keyframe interval to the measured 1.000 s and disable
       scene-cut keyframes, so no rendition gains a keyframe the others lack.
 - [ ] 2.4 Encode 720x1280 at about 2.5 Mbps and 540x960 at about 1.2 Mbps with a bounded
       rate, so a complex scene cannot push a rendition above the bandwidth its master
@@ -51,8 +57,8 @@ finished in code.
       recording and no on-ready or on-not-ready hooks, so publishing into a rendition path
       cannot start a second heartbeat, a second recording, or a loop.
 - [ ] 3.4 Add a single switch to the runbook configuration that leaves the ladder off, so
-      the change lands without altering what viewers receive until AZ-250 resizes the
-      machine.
+      the change lands without altering what viewers receive until it is deliberately
+      turned on and watched.
 
 ## 4. Admitting the transcoder's publish
 
@@ -117,6 +123,10 @@ finished in code.
 ## 8. Land it
 
 - [ ] 8.1 Update `docs/runbooks/live-streaming-vm.md` so the overview diagram, the
-      `mediamtx.yml` block, the nginx block and the machine sizing all describe the ladder,
-      since the runbook is the deployment contract for the machine.
-- [ ] 8.2 Run `openspec validate --strict` and archive.
+      `mediamtx.yml` block and the nginx block all describe the ladder, since the runbook is
+      the deployment contract for the machine.
+- [ ] 8.2 Correct the runbook's stated sizing. It reads "CPX21/CPX22 is ample for
+      remux-only", which now implies a resize is needed for a ladder. Record the measured
+      cost instead, so the next reader is not told to buy a bigger machine on an assumption
+      that was tested and found wrong.
+- [ ] 8.3 Run `openspec validate --strict` and archive.

@@ -12,6 +12,21 @@ Measured on the machine, 10-Aug-2026:
 - Every action is authenticated against the app (`authMethod: http`), including publish.
 - `authHTTPExclude` and `runOnInit` are both supported by this build.
 
+Measured against a real recording of the 9-Aug-2026 broadcast, held on the machine:
+
+- The publisher sends 1080x1920 at 30 fps and 5.00 Mbps, matching what was measured at the
+  live edge during the stalling.
+- **The publisher's keyframe interval is 1.000 s**, not the 2 s inferred from the
+  advertised target duration. The rungs are built against the measured value.
+- **Both rungs together cost 0.50 of a core and run at 2.1x real time.** Sixty seconds of
+  that broadcast transcoded to both rungs in 28.4 s wall, consuming 30.0 core-seconds.
+  A single 720x1280 rung costs 0.35 of a core at 2.6x real time.
+
+That last figure overturned the assumption this design was started on. The estimate was
+roughly two cores, which is the whole machine; the measurement is a quarter of that. The
+machine is not the constraint, and the resize this change was originally written around is
+not a prerequisite.
+
 The player needs no work. It already lists whatever renditions the manifest advertises,
 already allows pinning one, and already reports its own health through the Playback
 health readout. The whole change lives on the machine, plus one line in the app.
@@ -77,11 +92,15 @@ instants. The transcoder therefore fixes its keyframe interval to the source's, 
 disables scene-cut keyframes, which would otherwise insert extra keyframes at moments
 that differ per rung.
 
-The source's cadence is measured on the machine rather than assumed. The advertised
-target duration of 2 against a 1 s segment duration implies a 2 s publisher keyframe
-interval, but that is inference from one measurement and the encoder's setting can
-change. The cadence is read from the live stream and the rung configuration is derived
-from it.
+The cadence was measured rather than assumed, and the assumption was wrong. The
+advertised target duration of 2 against a 1 s segment duration implied a 2 s publisher
+keyframe interval; reading the keyframe positions out of a real recording shows 1.000 s.
+Building the rungs on the inference would have given every rung a keyframe every second
+segment, so half of the segment boundaries could not have aligned.
+
+Because the encoder's setting can change without warning, the transcoder still reads the
+cadence rather than carrying 1 s as a constant, and refuses to start when the cadence is
+not a whole multiple of the segment duration.
 
 ### The master playlist is a static file served by nginx
 
@@ -105,11 +124,19 @@ publishing into them cannot start a second heartbeat, a second recording, or a l
 
 ## Risks / Trade-offs
 
-- **The machine cannot run the rungs at its current size.** Two software encodes plus a
-  decode is roughly two cores, which is the entire machine, leaving nothing for MediaMTX
-  and nginx serving viewers. → The resize to 8 vCPU is a prerequisite, not an
-  optimisation, and it is the last step before the ladder is switched on. Until then the
-  code and configuration are in place and the ladder stays off.
+- **The encode cost is content-dependent, and the measurement is of one kind of content.**
+  0.50 of a core was measured against a coding broadcast, which is largely static text and
+  cheap to encode. A high-motion scene costs more, and the margin is 2.1x rather than
+  unlimited. → The ladder ships behind a switch, the machine's load is watched through the
+  first broadcast that runs it, and the fallback is dropping to the single 720x1280 rung at
+  0.35 of a core. Resizing is the last resort rather than the opening move.
+- **Sustained encoding on a shared-vCPU plan can be throttled or stolen from.** → At half a
+  core average the machine is nowhere near pegged, which is what makes a shared plan
+  defensible here. If the load measured on a real broadcast approaches a full core
+  sustained, the plan family becomes the question rather than the core count.
+- **Viewers cost CPU too, and the measurement was taken on an idle machine.** nginx serving
+  a live audience runs alongside the transcoder. → The connection cap already bounds this,
+  and the same first-broadcast load reading covers it.
 - **A dead transcoder leaves the master advertising renditions that 404.** → The top rung
   is listed and is served directly by MediaMTX, so it survives any transcoder failure,
   and a player that cannot load a variant drops it and keeps playing. The failure mode is
@@ -130,16 +157,19 @@ publishing into them cannot start a second heartbeat, a second recording, or a l
 
 1. Land the app change and the machine configuration with the ladder off. Nothing changes
    for viewers: the top rung is still served at its existing address.
-2. Resize the machine to 8 vCPU.
-3. Switch the ladder on and verify against a real publish.
-4. Rollback is stopping the transcoder and serving the single-rendition address again.
+2. Switch the ladder on, on the machine as it is. No resize.
+3. Verify against a real publish, watching the machine's load for the whole broadcast.
+4. Only if that load says so, drop to the single rung, and only then consider a larger
+   machine.
+5. Rollback is stopping the transcoder and serving the single-rendition address again.
    Addresses stored on past broadcasts are unaffected either way, because the
    single-rendition playlist keeps its address throughout.
 
 ## Open Questions
 
-- The publisher's keyframe interval is measured during implementation rather than
-  assumed, so the rung keyframe setting is not fixed by this document.
 - Whether hls.js follows MediaMTX's session redirect for a variant playlist listed in a
   master is asserted by the verification rather than assumed; if it does not, the master
   lists the session-scoped addresses instead.
+- What the encode costs on high-motion content. The measurement covers a coding broadcast,
+  which is what this channel streams, so it is representative of today rather than of every
+  broadcast this platform might carry.
