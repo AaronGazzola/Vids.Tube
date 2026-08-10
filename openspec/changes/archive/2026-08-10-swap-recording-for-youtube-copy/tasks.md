@@ -46,8 +46,8 @@
 - [x] 6.0 Unplanned and required: chat replay anchored on go-live and assumed the file began there. That is already wrong for this broadcast by about 45 minutes, and the swap would have added another 48 seconds. Recordings now carry `starts_at`, the wall-clock instant their file begins, and replay prefers it over go-live. Null preserves today's behaviour for every existing recording. Covered by three cases in the chat replay tests.
 
 - [x] 6.1 Run the dry run against the 8-Aug-2026 broadcast and record the measured offset and confidence in AZ-239.
-- [ ] 6.2 Apply the swap, leaving the recording private.
-- [ ] 6.3 Confirm afterwards that the chat message count, transcript count, membership stats and credit entries are unchanged.
+- [x] 6.2 Applied 10-Aug-2026, at an offset of 2,671 seconds. The first attempt half-applied and was restored from its snapshot; the cause was a non-transactional loop and is fixed. 1,222 transcript segments shifted, no spans or moments on this broadcast.
+- [x] 6.3 Confirmed against production. Unchanged: 103 chat messages, 1,222 transcript segments, 3 membership records, 1 credit entry. Changed as intended: the transcript now runs 1,097s to 7,247s, the recording is 7,264s and points at the replacement, and its file start is recorded as 13:02:39. Both files are served by the CDN, so an undo has something to return to.
 
 Looking at the three moments and deciding to publish are the owner's, not code,
 so they live in AZ-239 with the measurement and the three timestamps rather than
