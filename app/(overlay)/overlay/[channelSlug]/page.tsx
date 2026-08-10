@@ -3,7 +3,7 @@
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
 import type { GoalMetric } from "@/app/layout.types";
-import { OVERLAY_GOAL_METRICS } from "@/app/layout.types";
+import { GOAL_METRICS } from "@/app/layout.types";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { BreakCard } from "@/components/overlay/break-card";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
@@ -20,6 +20,7 @@ import {
   OVERLAY_CANVAS_W,
   OVERLAY_FEED_WIDTH,
   OVERLAY_GOAL_HEIGHT,
+  OVERLAY_LADDER_MAX,
   OVERLAY_LADDER_SIZE,
   type DemoOverlaySnapshot,
   type OverlayBox,
@@ -381,11 +382,11 @@ export default function OverlayFramePage({
   };
 
   const competitionEntries = demo
-    ? demo.competition.slice(0, 18)
+    ? demo.competition.slice(0, OVERLAY_LADDER_MAX)
     : (scores ?? [])
         .filter((s) => s.total_score > 0)
         .sort((a, b) => b.total_score - a.total_score)
-        .slice(0, 18)
+        .slice(0, OVERLAY_LADDER_MAX)
         .map((s) => ({
           key: s.participant_key,
           author: s.author,
@@ -421,13 +422,15 @@ export default function OverlayFramePage({
 
       {visible.members && (
         <Positioned box={boxes.members} opacity={config.boxOpacity.members}>
-          <MemberCountStrip count={memberCount ?? 0} />
+          <MemberCountStrip
+            count={memberCount ?? 0}
+            messages={config.messages}
+          />
         </Positioned>
       )}
 
-      {OVERLAY_GOAL_METRICS.map((m) => {
+      {GOAL_METRICS.map((m) => {
         const boxKey = GOAL_METRIC_BOX[m];
-        if (!boxKey) return null;
         const data = visible[boxKey] ? goalMetric(m) : null;
         if (!data) return null;
         return (

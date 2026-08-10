@@ -10,9 +10,9 @@ describe("overlay layout version 3", () => {
     expect(DEMO_LAYOUT_VERSION).toBe(3);
   });
 
-  it("offers a members box and no subscriber goal box", () => {
+  it("offers a members box alongside the subscriber goal box", () => {
     expect(DEFAULT_DEMO_LAYOUT.boxes).toHaveProperty("members");
-    expect(DEFAULT_DEMO_LAYOUT.boxes).not.toHaveProperty("goalSubs");
+    expect(DEFAULT_DEMO_LAYOUT.boxes).toHaveProperty("goalSubs");
     expect(DEFAULT_DEMO_LAYOUT.visible).toHaveProperty("members");
   });
 
@@ -72,9 +72,9 @@ describe("a layout saved before the change keeps every position it had", () => {
     expect(merged.boxes.members).toEqual(DEFAULT_DEMO_LAYOUT.boxes.members);
   });
 
-  it("drops the box that no longer exists", () => {
+  it("keeps the subscriber goal box the owner had placed", () => {
     const merged = mergeDemoLayout(saved);
-    expect(merged.boxes).not.toHaveProperty("goalSubs");
+    expect(merged.boxes.goalSubs).toEqual({ x: 900, y: 1500, scale: 4 });
   });
 
   it("keeps the toggles and the opacities the owner had chosen", () => {
@@ -88,6 +88,113 @@ describe("a layout saved before the change keeps every position it had", () => {
 
   it("reports itself as the current version afterwards", () => {
     expect(mergeDemoLayout(saved).version).toBe(DEMO_LAYOUT_VERSION);
+  });
+});
+
+// Messages are stored in the same value as hand-set positions, which are
+// expensive to redo. Adding a message must never cost the owner their layout.
+describe("messages ride alongside the layout without disturbing it", () => {
+  const PLACED = {
+    goalLikes: { x: 11, y: 22, scale: 1.5 },
+    members: { x: 200, y: 300, scale: 1.25 },
+    competition: { x: 55, y: 66, scale: 0.8 },
+  };
+
+  const saved = {
+    version: DEMO_LAYOUT_VERSION,
+    boxes: { ...DEFAULT_DEMO_LAYOUT.boxes, ...PLACED },
+    visible: { ...DEFAULT_DEMO_LAYOUT.visible, goalLikes: false, break: true },
+    boxOpacity: { ...DEFAULT_DEMO_LAYOUT.boxOpacity, members: 0.42 },
+  } as unknown as Parameters<typeof mergeDemoLayout>[0];
+
+  const FIRST = { text: "first thing", align: "left" as const };
+  const SECOND = { text: "second thing", align: "center" as const };
+  const DEFAULT_MESSAGES = [
+    { text: "Chat to become a member at Vids.Tube!", align: "left" },
+  ];
+
+  const withMessages = {
+    ...saved,
+    messages: [FIRST, SECOND],
+  } as unknown as Parameters<typeof mergeDemoLayout>[0];
+
+  it("keeps every position and scale once messages are added", () => {
+    const merged = mergeDemoLayout(withMessages);
+    expect(merged.boxes.goalLikes).toEqual(PLACED.goalLikes);
+    expect(merged.boxes.members).toEqual(PLACED.members);
+    expect(merged.boxes.competition).toEqual(PLACED.competition);
+  });
+
+  it("keeps every toggle and opacity once messages are added", () => {
+    const merged = mergeDemoLayout(withMessages);
+    expect(merged.visible.goalLikes).toBe(false);
+    expect(merged.visible.break).toBe(true);
+    expect(merged.boxOpacity.members).toBe(0.42);
+  });
+
+  it("changes nothing but the messages", () => {
+    expect(mergeDemoLayout(withMessages)).toEqual({
+      ...mergeDemoLayout(saved),
+      messages: [FIRST, SECOND],
+    });
+  });
+
+  it("keeps the messages in the order the streamer set", () => {
+    expect(mergeDemoLayout(withMessages).messages).toEqual([FIRST, SECOND]);
+  });
+
+  it("keeps the alignment the streamer chose for each message", () => {
+    const merged = mergeDemoLayout(withMessages);
+    expect(merged.messages[0].align).toBe("left");
+    expect(merged.messages[1].align).toBe("center");
+  });
+
+  it("gives a layout saved before messages existed the old sentence", () => {
+    expect(mergeDemoLayout(saved).messages).toEqual(DEFAULT_MESSAGES);
+  });
+
+  it("falls back to the old sentence when the list is empty", () => {
+    const merged = mergeDemoLayout({
+      ...saved,
+      messages: [],
+    } as unknown as Parameters<typeof mergeDemoLayout>[0]);
+    expect(merged.messages).toEqual(DEFAULT_MESSAGES);
+  });
+
+  it("drops entries that are not text rather than rendering a blank", () => {
+    const merged = mergeDemoLayout({
+      ...saved,
+      messages: [FIRST, { text: "  " }, 7, null, { align: "center" }],
+    } as unknown as Parameters<typeof mergeDemoLayout>[0]);
+    expect(merged.messages).toEqual([FIRST]);
+  });
+
+  // Alignment arrived after the messages did, so a message stored as a bare
+  // string is read as the left-aligned line it was.
+  it("reads a message saved as plain text as a left-aligned message", () => {
+    const merged = mergeDemoLayout({
+      ...saved,
+      messages: ["written before alignment existed"],
+    } as unknown as Parameters<typeof mergeDemoLayout>[0]);
+    expect(merged.messages).toEqual([
+      { text: "written before alignment existed", align: "left" },
+    ]);
+  });
+
+  it("reads an unknown alignment as the left it can actually draw", () => {
+    const merged = mergeDemoLayout({
+      ...saved,
+      messages: [{ text: "sideways", align: "diagonal" }],
+    } as unknown as Parameters<typeof mergeDemoLayout>[0]);
+    expect(merged.messages[0].align).toBe("left");
+  });
+
+  it("falls back rather than crashing when the list is nonsense", () => {
+    const merged = mergeDemoLayout({
+      ...saved,
+      messages: "not a list",
+    } as unknown as Parameters<typeof mergeDemoLayout>[0]);
+    expect(merged.messages).toEqual(DEFAULT_MESSAGES);
   });
 });
 

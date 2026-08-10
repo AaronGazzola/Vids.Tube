@@ -27,6 +27,7 @@ import {
 const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
   highlight: OVERLAY_BASE_DIMS.highlight,
   members: OVERLAY_BASE_DIMS.members,
+  goalSubs: OVERLAY_BASE_DIMS.goal,
   goalLikes: OVERLAY_BASE_DIMS.goal,
   goalViewers: OVERLAY_BASE_DIMS.goal,
   competition: OVERLAY_BASE_DIMS.competition,
@@ -38,6 +39,7 @@ const BOX_DIMS: Record<DemoBoxKey, { w: number; h: number }> = {
 // shows over the live preview matches what OBS renders.
 const BOX_SURFACE_ALPHA: Partial<Record<DemoBoxKey, number>> = {
   members: OVERLAY_SURFACE_ALPHA.members,
+  goalSubs: OVERLAY_SURFACE_ALPHA.goal,
   goalLikes: OVERLAY_SURFACE_ALPHA.goal,
   goalViewers: OVERLAY_SURFACE_ALPHA.goal,
 };
@@ -45,6 +47,7 @@ const BOX_SURFACE_ALPHA: Partial<Record<DemoBoxKey, number>> = {
 const BOX_KEYS: DemoBoxKey[] = [
   "highlight",
   "members",
+  "goalSubs",
   "goalLikes",
   "goalViewers",
   "competition",
@@ -57,6 +60,7 @@ const TOGGLE_KEYS: DemoOverlayKey[] = [
   "highlight",
   "tts",
   "ask",
+  "goalSubs",
   "goalLikes",
   "goalViewers",
   "competition",

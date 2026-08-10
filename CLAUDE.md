@@ -30,7 +30,8 @@ Sensitive means: email addresses, JSON Web Tokens, bearer tokens and API keys, s
 
 # General rules:
 
-- Format all responses in accordance with the `/simple` skill unless otherwise specified
+- Format all responses in accordance with the `/simple` skill unless otherwise specified.
+- All responses should be extremely concise, specific and focused on what the user needs to know
 - Any skills from the "AI Resources" repository (public; owned by AaronGazzola) should match any changes made to the local version. 
 - Don't include any comments in any files.
 - Don't use `console.log` in any app code unless requested, delete all logs after the related development is completed

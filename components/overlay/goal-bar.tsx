@@ -147,21 +147,6 @@ export function GoalBar({
           {fmt(data.current)}
         </span>
       </div>
-      {metric === "subs" && (
-        <svg
-          className="absolute -right-3.5 top-0 h-4.5 w-4.5"
-          style={{ animation: "arrow-nudge 4s ease-in-out infinite" }}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M7 7h10v10" />
-          <path d="M7 17 17 7" />
-        </svg>
-      )}
     </div>
   );
 }

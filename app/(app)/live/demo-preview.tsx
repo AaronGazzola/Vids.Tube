@@ -23,6 +23,7 @@ import {
   OVERLAY_CANVAS_W,
   OVERLAY_FEED_WIDTH,
   OVERLAY_GOAL_HEIGHT,
+  OVERLAY_LADDER_MAX,
   OVERLAY_LADDER_SIZE,
 } from "@/lib/demo-overlay";
 import { channelAssetUrl } from "@/lib/storage";
@@ -151,7 +152,7 @@ function CompetitionField() {
     .map((v) => ({ key: v.key, author: authorOf(v), score: scores[v.key]?.total ?? 0 }))
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 18);
+    .slice(0, OVERLAY_LADDER_MAX);
 
   return <CompetitionLadder entries={entries} size={OVERLAY_LADDER_SIZE} />;
 }
@@ -294,9 +295,10 @@ function DemoOverlayFeed() {
 // Named by the two goal surfaces rather than by everything they are not: an exclusion list has to be
 // extended by hand every time a surface that is not a goal is added, and the compiler only says so as a
 // missing-key error somewhere unrelated.
-type GoalBoxKey = "goalLikes" | "goalViewers";
+type GoalBoxKey = "goalSubs" | "goalLikes" | "goalViewers";
 
 const BOX_METRIC: Record<GoalBoxKey, GoalMetric> = {
+  goalSubs: "subs",
   goalLikes: "likes",
   goalViewers: "viewers",
 };
@@ -458,7 +460,15 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           )}
           {config.visible.members && (
             <DraggableBox boxKey="members" pxScale={canvasScale * k}>
-              <MemberCountStrip count={DEMO_MEMBER_COUNT} />
+              <MemberCountStrip
+                count={DEMO_MEMBER_COUNT}
+                messages={config.messages}
+              />
+            </DraggableBox>
+          )}
+          {config.visible.goalSubs && (
+            <DraggableBox boxKey="goalSubs" pxScale={canvasScale * k}>
+              <GoalBox boxKey="goalSubs" data={metricFor("subs")} />
             </DraggableBox>
           )}
           {config.visible.goalLikes && (
@@ -483,7 +493,7 @@ export function DemoPreviewStage({ goals }: { goals: Counts | null }) {
           )}
           {config.visible.game && (
             <DraggableBox boxKey="game" pxScale={canvasScale * k}>
-              <GameWindow />
+              <GameWindow placeholder />
             </DraggableBox>
           )}
         </div>

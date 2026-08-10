@@ -4,6 +4,7 @@ import type { FeaturedAuthor } from "@/app/layout.types";
 import {
   DEMO_OVERLAY_EVENT,
   demoOverlayChannelName,
+  OVERLAY_LADDER_MAX,
   OVERLAY_LAYOUT_EVENT,
   overlayLayoutChannelName,
   type DemoOverlaySnapshot,
@@ -251,7 +252,7 @@ export function useDemoOverlayBroadcast(
         }))
         .filter((e) => e.score > 0)
         .sort((a, b) => b.score - a.score)
-        .slice(0, 18),
+        .slice(0, OVERLAY_LADDER_MAX),
       highlights: [...messages]
         .reverse()
         .filter((m) => m.promoted && !m.dismissed)

@@ -75,11 +75,6 @@ export type GoalMetric = "subs" | "likes" | "viewers";
 
 export const GOAL_METRICS: GoalMetric[] = ["subs", "likes", "viewers"];
 
-// The main broadcast overlay no longer carries a subscriber bar: that slot is
-// the members strip. Subscriber goals still exist everywhere else the goals data
-// is read, including the standalone goals overlay route.
-export const OVERLAY_GOAL_METRICS: GoalMetric[] = ["likes", "viewers"];
-
 export type MetricProgress = {
   current: number;
   target: number;

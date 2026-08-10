@@ -20,8 +20,29 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { vodAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import {
+  MEMBER_STRIP_HEIGHT,
+  MEMBER_STRIP_WIDTH,
+  MemberMessagePreview,
+} from "@/components/overlay/member-count-strip";
+import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
+import { visibleLength } from "@/lib/overlay-markup";
+import {
+  AlignCenter,
+  AlignLeft,
+  Bold,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Eye,
+  EyeOff,
+  Italic,
+  RefreshCw,
+  Underline,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useDemoLayoutStore } from "./demo.stores";
+import { DEMO_MEMBER_COUNT, type StripMessage } from "./demo.types";
 import { toast } from "sonner";
 import {
   useOutstandingRepairs,
@@ -384,6 +405,280 @@ function ProjectsSection() {
           </div>
         </div>
       )}
+    </Section>
+  );
+}
+
+// The overlay strip is 810 wide; the settings column is not. The preview is the
+// real strip, scaled, so what is judged is the surface the message lands on.
+const MESSAGE_PREVIEW_SCALE = 0.42;
+
+function MessageEditor({
+  message,
+  position,
+  total,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  message: StripMessage;
+  position: number;
+  total: number;
+  onChange: (next: StripMessage) => void;
+  onRemove: () => void;
+  onMove: (by: -1 | 1) => void;
+}) {
+  const value = message.text;
+  const ref = useRef<HTMLInputElement>(null);
+  const [refused, setRefused] = useState(false);
+  const remaining = OVERLAY_MESSAGE_MAX_VISIBLE - visibleLength(value);
+
+  const commit = (next: string, caret?: number) => {
+    if (visibleLength(next) > OVERLAY_MESSAGE_MAX_VISIBLE) {
+      setRefused(true);
+      return;
+    }
+    setRefused(false);
+    onChange({ ...message, text: next });
+    if (caret !== undefined) {
+      requestAnimationFrame(() => {
+        ref.current?.focus();
+        ref.current?.setSelectionRange(caret, caret);
+      });
+    }
+  };
+
+  // Wrapping the selection is why the streamer presses a button rather than
+  // typing punctuation. With nothing selected an empty pair lands at the cursor.
+  const wrap = (open: string, close: string) => {
+    const el = ref.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? start;
+    const next =
+      value.slice(0, start) +
+      open +
+      value.slice(start, end) +
+      close +
+      value.slice(end);
+    commit(next, start + open.length + (end - start));
+  };
+
+  // React's onChange for a colour input fires on every step of the drag, which
+  // would leave a colour token behind for every shade the streamer passed
+  // through. The native change event fires once, when a colour is actually
+  // chosen.
+  const colourRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef(wrap);
+  useEffect(() => {
+    wrapRef.current = wrap;
+  });
+  useEffect(() => {
+    const el = colourRef.current;
+    if (!el) return;
+    const commitColour = () => wrapRef.current(`{${el.value}|`, "}");
+    el.addEventListener("change", commitColour);
+    return () => el.removeEventListener("change", commitColour);
+  }, []);
+
+  const markButton = (
+    label: string,
+    icon: React.ReactNode,
+    open: string,
+    close: string
+  ) => (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className="h-7 w-7"
+      aria-label={label}
+      // Keep the caret where it is: a button that takes focus first loses the
+      // selection it was meant to wrap.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => wrap(open, close)}
+    >
+      {icon}
+    </Button>
+  );
+
+  return (
+    <li className="space-y-2 p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="w-5 shrink-0 text-xs text-muted-foreground">
+          {position + 1}
+        </span>
+        <Input
+          ref={ref}
+          value={value}
+          onChange={(e) => commit(e.target.value)}
+          aria-label={`Message ${position + 1}`}
+          placeholder="Chat to become a member at Vids.Tube!"
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 pl-7">
+        {markButton("Bold", <Bold className="h-3.5 w-3.5" />, "**", "**")}
+        {markButton("Italic", <Italic className="h-3.5 w-3.5" />, "*", "*")}
+        {markButton(
+          "Underline",
+          <Underline className="h-3.5 w-3.5" />,
+          "__",
+          "__"
+        )}
+        <input
+          ref={colourRef}
+          type="color"
+          aria-label={`Colour for message ${position + 1}`}
+          defaultValue="#ffcc00"
+          className="h-7 w-7 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5"
+        />
+        {/* Alignment belongs to the whole line rather than to a selection, so
+            it toggles the message instead of wrapping anything. */}
+        <Button
+          type="button"
+          size="icon"
+          variant={message.align === "center" ? "secondary" : "outline"}
+          className="h-7 w-7"
+          aria-label={`Centre message ${position + 1}`}
+          aria-pressed={message.align === "center"}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() =>
+            onChange({
+              ...message,
+              align: message.align === "center" ? "left" : "center",
+            })
+          }
+        >
+          {message.align === "center" ? (
+            <AlignCenter className="h-3.5 w-3.5" />
+          ) : (
+            <AlignLeft className="h-3.5 w-3.5" />
+          )}
+        </Button>
+        <span className="ml-1 text-xs text-muted-foreground">
+          {remaining} left
+        </span>
+        <span className="flex-1" />
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          aria-label={`Move message ${position + 1} up`}
+          disabled={position === 0}
+          onClick={() => onMove(-1)}
+        >
+          <ChevronUp className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          aria-label={`Move message ${position + 1} down`}
+          disabled={position === total - 1}
+          onClick={() => onMove(1)}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs text-destructive"
+          onClick={onRemove}
+        >
+          Remove
+        </Button>
+      </div>
+      {refused && (
+        <p className="pl-7 text-xs text-destructive">
+          Messages are limited to {OVERLAY_MESSAGE_MAX_VISIBLE} visible
+          characters, so the strip never overflows on air. Formatting does not
+          count.
+        </p>
+      )}
+      {/* Drawn on the overlay's own backing: a colour that would be unreadable
+          on air is unreadable here, before it reaches a broadcast. */}
+      <div
+        className="ml-7 overflow-hidden rounded-md"
+        style={{
+          width: MEMBER_STRIP_WIDTH * MESSAGE_PREVIEW_SCALE,
+          height: MEMBER_STRIP_HEIGHT * MESSAGE_PREVIEW_SCALE,
+          maxWidth: "100%",
+        }}
+      >
+        <div
+          style={{
+            transform: `scale(${MESSAGE_PREVIEW_SCALE})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <MemberMessagePreview
+            text={value}
+            align={message.align}
+            count={position === 0 ? DEMO_MEMBER_COUNT : null}
+          />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export function MessagesSection() {
+  // The draft, not the saved list: nothing typed here reaches the overlay or
+  // the database until Save changes is pressed in the toolbar.
+  const messages = useDemoLayoutStore((s) => s.draftMessages);
+  const setMessages = useDemoLayoutStore((s) => s.setDraftMessages);
+  const saved = useDemoLayoutStore((s) => s.config.messages);
+  const pending = JSON.stringify(messages) !== JSON.stringify(saved);
+
+  const replace = (index: number, next: StripMessage) =>
+    setMessages(messages.map((m, i) => (i === index ? next : m)));
+
+  const move = (index: number, by: -1 | 1) => {
+    const to = index + by;
+    if (to < 0 || to >= messages.length) return;
+    const next = [...messages];
+    [next[index], next[to]] = [next[to], next[index]];
+    setMessages(next);
+  };
+
+  return (
+    <Section title="Overlay messages">
+      <p className="text-xs text-muted-foreground">
+        The members strip cycles through these, showing the member count beside
+        the first one only. A single message does not cycle.
+      </p>
+      <ul className="divide-y rounded-md border">
+        {messages.map((message, i) => (
+          <MessageEditor
+            key={i}
+            message={message}
+            position={i}
+            total={messages.length}
+            onChange={(next) => replace(i, next)}
+            onRemove={() => setMessages(messages.filter((_, j) => j !== i))}
+            onMove={(by) => move(i, by)}
+          />
+        ))}
+      </ul>
+      <div className="flex items-center gap-3">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            setMessages([...messages, { text: "", align: "left" }])
+          }
+        >
+          Add message
+        </Button>
+        {pending && (
+          <span className="text-xs text-muted-foreground">
+            Not on the overlay yet — press Save changes.
+          </span>
+        )}
+      </div>
     </Section>
   );
 }
@@ -935,6 +1230,8 @@ export function SettingsTab({
           onCheckedChange={(v) => set({ wrapupThanksEnabled: v })}
         />
       </Section>
+
+      <MessagesSection />
 
       <ProjectsSection />
 

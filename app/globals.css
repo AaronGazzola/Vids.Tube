@@ -192,6 +192,31 @@
   }
 }
 
+/* The members strip advancing: the message showing leaves at the bottom while
+   the next arrives from above. Transform only, so OBS captures a composited
+   move rather than a relayout at the broadcast frame rate.
+
+   Written as 0%/100% rather than from/to on purpose: the CSS build drops
+   from/to keyframes entirely, and the strip then sits still with no error
+   anywhere. Both were verified against the served stylesheet. */
+@keyframes overlay-message-out {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes overlay-message-in {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
 @keyframes bubble-float {
   0%,
   100% {
@@ -199,17 +224,6 @@
   }
   50% {
     transform: translate(8px, -14px);
-  }
-}
-
-@keyframes arrow-nudge {
-  0%,
-  35%,
-  100% {
-    transform: translate(0, 0);
-  }
-  17% {
-    transform: translate(4px, -4px);
   }
 }
 

@@ -10,6 +10,10 @@ export const OVERLAY_CANVAS_H = 1920;
 export const OVERLAY_FEED_WIDTH = 420;
 export const OVERLAY_GOAL_HEIGHT = 110;
 export const OVERLAY_LADDER_SIZE = 52;
+// How many avatars the ladder lists. The live route, the demo snapshot and the
+// editor preview all cut to the same number, so the layout the owner arranges is
+// the one that goes to air.
+export const OVERLAY_LADDER_MAX = 16;
 
 // Nominal bounding box of each overlay at scale 1, used to size the OBS
 // browser source (multiplied by the saved scale).
@@ -39,8 +43,33 @@ export const OVERLAY_SURFACE_ALPHA = {
   goal: 0.4,
 } as const;
 
+// The sentence the strip carried before it could cycle. A layout saved before
+// messages existed falls back to it, which is why the change needs no version
+// bump: the fallback is indistinguishable from the old behaviour.
+export const DEFAULT_MEMBER_MESSAGE = "Chat to become a member at Vids.Tube!";
+
+// How long each message holds before the strip advances. Fixed rather than a
+// setting: nothing asked for control of the timing, and a per-message duration
+// is a setting to explain on a surface whose whole point is that it is
+// glanceable. One constant, so it can become a setting later without moving
+// anything else.
+export const OVERLAY_MESSAGE_DWELL_MS = 6000;
+export const OVERLAY_MESSAGE_TRANSITION_MS = 600;
+
+// One row of the strip, tall enough for the member total beside the message.
+// Fixed so the strip's height never depends on which message is showing.
+export const OVERLAY_MESSAGE_ROW_H = 40;
+
+// The strip never wraps, so a message that does not fit is clipped rather than
+// wrapped. 45 is chosen for the full-width case, which every message after the
+// first one gets. A first message near the cap runs into the member total
+// beside it and loses its last few characters, so the longest lines belong
+// anywhere but first.
+export const OVERLAY_MESSAGE_MAX_VISIBLE = 45;
+
 export type OverlayBoxKey =
   | "members"
+  | "goalSubs"
   | "goalLikes"
   | "goalViewers"
   | "competition"
@@ -55,6 +84,7 @@ export type DemoOverlayVisibility = {
   tts: boolean;
   ask: boolean;
   members: boolean;
+  goalSubs: boolean;
   goalLikes: boolean;
   goalViewers: boolean;
   competition: boolean;
@@ -112,9 +142,11 @@ export const DEMO_OVERLAY_EVENT = "snapshot";
 export const DEMO_OVERLAY_STALE_MS = 8000;
 export const DEMO_TTS_SAMPLE_SRC = "/demo/tts-sample.mp3";
 
-export const GOAL_METRIC_BOX: Partial<
-  Record<GoalMetric, "goalLikes" | "goalViewers">
+export const GOAL_METRIC_BOX: Record<
+  GoalMetric,
+  "goalSubs" | "goalLikes" | "goalViewers"
 > = {
+  subs: "goalSubs",
   likes: "goalLikes",
   viewers: "goalViewers",
 };

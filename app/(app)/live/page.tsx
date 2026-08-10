@@ -442,6 +442,9 @@ export default function LivePage() {
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
   const mobileChrome = useDemoLayoutStore((s) => s.config.mobileChrome);
   const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
+  const draftMessages = useDemoLayoutStore((s) => s.draftMessages);
+  const savedMessages = useDemoLayoutStore((s) => s.config.messages);
+  const commitMessages = useDemoLayoutStore((s) => s.commitMessages);
   const { data: myChannel } = useMyChannel();
 
   const demoGoals = settings?.goals ?? null;
@@ -464,8 +467,15 @@ export default function LivePage() {
   ) as StreamState;
   const isPublic = state === "live";
 
+  // Overlay messages are edited as a draft and join the same Save changes
+  // press as the rest of the Settings tab, so nothing typed there reaches a
+  // broadcast on its own.
+  const messagesPending =
+    JSON.stringify(draftMessages) !== JSON.stringify(savedMessages);
+
   const dirty =
-    !!form && !!dbForm && JSON.stringify(form) !== JSON.stringify(dbForm);
+    (!!form && !!dbForm && JSON.stringify(form) !== JSON.stringify(dbForm)) ||
+    messagesPending;
 
   const buildPayload = (f: SettingsForm) => ({
     title: f.title,
@@ -499,6 +509,9 @@ export default function LivePage() {
   });
 
   const doSave = async (f: SettingsForm) => {
+    // From here the layout's own debounced save persists the messages and the
+    // realtime push carries them to OBS, on the path a box move already uses.
+    commitMessages();
     await save.mutateAsync(buildPayload(f));
     const fresh = await settingsQuery.refetch();
     if (fresh.data) {

@@ -125,6 +125,16 @@ direction.
 
 ## Noticed on the way, unrelated
 
+- **AZ-253** — the post-broadcast repair backlog. `doppler run -- npx tsx
+  scripts/verify-post-broadcast.ts` reports 46 ended broadcasts that never completed the
+  pass cleanly: 40 with no record and 6 attempted and failed. One of the six is the
+  **10-Aug-2026** broadcast, the one the AZ-222 run-sheet was worked through on — two
+  attempts, no finish time, no step results at all, so nothing was stored to diagnose from.
+  Clearing the lot is one command, `npm run repair -- --limit 46`, which takes the most
+  recent first so 10-Aug goes first. The default limit of 5 is a deliberate brake, not a
+  bug: each broadcast is minutes of serial work plus a Claude call over its whole chat log,
+  so run it attended and keep the terminal output. AZ-222 cannot close until 10-Aug reads
+  clean.
 - **AZ-196** claims the vitest toolchain is broken. It is not: unit tests run with
   `NODE_OPTIONS=--experimental-require-module doppler run -- npx vitest run`. The Node flag
   is needed until Node moves past 22.12, and Doppler supplies the env vars three worker

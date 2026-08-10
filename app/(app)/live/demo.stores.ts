@@ -11,6 +11,7 @@ import {
   type DemoLayoutConfig,
   type DemoOverlayKey,
   type OverlayFeedSound,
+  type StripMessage,
 } from "./demo.types";
 
 // ── Layout store ───────────────────────────────────────────────────────────
@@ -34,8 +35,21 @@ type LayoutState = {
   setMobileChrome: (v: boolean) => void;
   setBoxOpacity: (key: DemoBoxKey, v: number) => void;
   setFeedSound: (v: OverlayFeedSound) => void;
+  // Messages are edited as a draft and only enter the config on Save changes.
+  // Everything that reaches the overlay reads the config, so a half-typed
+  // sentence never goes on air and the layout autosave never sees a keystroke.
+  draftMessages: StripMessage[];
+  setDraftMessages: (messages: StripMessage[]) => void;
+  commitMessages: () => void;
   resetLayout: () => void;
 };
+
+export function messagesDirty(s: {
+  config: DemoLayoutConfig;
+  draftMessages: StripMessage[];
+}): boolean {
+  return JSON.stringify(s.draftMessages) !== JSON.stringify(s.config.messages);
+}
 
 export const useDemoLayoutStore = create<LayoutState>((set) => ({
   config: DEFAULT_DEMO_LAYOUT,
@@ -45,7 +59,10 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
   setPersist: (key, v) =>
     set((s) => ({ persist: { ...s.persist, [key]: v } })),
   setPanelOpen: (v) => set({ panelOpen: v }),
-  hydrate: (c) => set({ config: mergeDemoLayout(c), hydrated: true }),
+  hydrate: (c) => {
+    const config = mergeDemoLayout(c);
+    return set({ config, hydrated: true, draftMessages: config.messages });
+  },
   setBox: (key, box) =>
     set((s) => ({
       config: { ...s.config, boxes: { ...s.config.boxes, [key]: box } },
@@ -71,6 +88,15 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
       },
     })),
   setFeedSound: (v) => set((s) => ({ config: { ...s.config, feedSound: v } })),
+  draftMessages: DEFAULT_DEMO_LAYOUT.messages,
+  setDraftMessages: (draftMessages) => set({ draftMessages }),
+  // Committing puts the draft into the config, and from there the debounced
+  // layout save persists it and the realtime push carries it to OBS. No second
+  // save path, and nothing new for the overlay to subscribe to.
+  commitMessages: () =>
+    set((s) => ({
+      config: { ...s.config, messages: s.draftMessages },
+    })),
   resetLayout: () =>
     set((s) => ({
       config: { ...s.config, boxes: DEFAULT_DEMO_LAYOUT.boxes },
