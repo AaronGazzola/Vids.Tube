@@ -51,8 +51,11 @@ absence of a policy violation plus a screenshot showing the creature.
 
 ## 5. Land it
 
-- [ ] 5.1 Raise the composite check over live video as a Linear issue: how the window reads over real video
-      needs a running stream and the owner's eye.
-- [ ] 5.2 Add `NEXT_PUBLIC_GAME_EMBED_URL` to Doppler so a normal build picks the address up. The
-      verification runs passed the value in on the command line; nothing has been written to Doppler.
-- [ ] 5.3 Run `openspec validate --strict` and archive.
+- [x] 5.1 Raised as AZ-244. How the window reads over real video needs a running stream and the owner's
+      eye, so it is checked on the next broadcast alongside the other on-stream checks.
+- [x] 5.2 Moved out to AZ-245 rather than done, because there is nothing correct to write yet. The address
+      only exists locally: the eco3d change that deploys the dragon embed is still active, and writing a
+      local address into the production configuration would fail for every viewer and widen the production
+      `frame-src` to a local origin. The window renders nothing while the address is unset and the surface
+      ships off, so nothing is exposed by leaving it unset.
+- [x] 5.3 Run `openspec validate --strict` and archive.
