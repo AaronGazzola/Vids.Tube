@@ -15,6 +15,13 @@ transfers.
 machine is not resized: both rungs measured 0.50 of a core at 2.1x real time against a
 real recording, on the machine as it stands.
 
+> **BLOCKED, 10-Aug-2026 — the design's packaging approach does not work, and the fix
+> costs about 2 seconds of live latency, which is the owner's call.** Sections 2 and 4
+> are done and proven. Section 5 is built on a false assumption and must be rewritten.
+> Full detail, including the three options put to the owner, is in
+> `TEMP-2026-08-10-quality-ladder-handover.md`. Resolve that question before touching
+> anything below.
+
 ## 1. Know the source before matching it
 
 - [x] 1.1 Measured, and the assumption it replaced was wrong. The publisher sends
@@ -32,20 +39,20 @@ real recording, on the machine as it stands.
 
 ## 2. The transcoder
 
-- [ ] 2.1 Add `scripts/vm/mtx-ladder.sh` taking the channel path, reading
-      `rtmp://127.0.0.1:1935/<path>` once and publishing two renditions back to
-      `rtmp://127.0.0.1:1935/<path>_720` and `<path>_540`. One process, one decode, video
-      split and scaled twice, per the design.
-- [ ] 2.2 In that script, copy audio rather than re-encoding it, so every rendition carries
-      byte-identical audio.
-- [ ] 2.3 In that script, fix the keyframe interval to the measured 1.000 s and disable
-      scene-cut keyframes, so no rendition gains a keyframe the others lack.
-- [ ] 2.4 Encode 720x1280 at about 2.5 Mbps and 540x960 at about 1.2 Mbps with a bounded
-      rate, so a complex scene cannot push a rendition above the bandwidth its master
-      playlist entry advertises.
-- [ ] 2.5 Have the script write its process id to a known location and exit non-zero when
-      the source is unreachable, so the lifecycle hooks can stop it and a failure to start
-      is visible in the machine's log rather than silent.
+- [x] 2.1 Done. `scripts/vm/mtx-ladder.sh` reads the source once over loopback and
+      publishes both renditions. Confirmed on the machine: ffprobe against the running
+      rungs reports h264 720x1280 and 540x960 at 30 fps.
+- [x] 2.2 Confirmed by probing both rungs and the source: aac, 48000 Hz, stereo on all
+      three. Audio is copied, not re-encoded.
+- [x] 2.3 Partly, and the remainder is not solvable in this script. Scene-cut keyframes are
+      off and the interval is the measured 1.000 s, confirmed by probing every rung. The
+      rungs are nonetheless half a second out of phase with the source (source at x.056,
+      rungs at x.533), because republishing over RTMP resets the timeline. Two attempts
+      failed: a timer expression, then `-force_key_frames source`. Alignment cannot be
+      fixed here; it needs the packaging decision in the handover.
+- [x] 2.4 Done, with a bounded rate on both rungs.
+- [x] 2.5 Done — process id file, refusal when the source is unreachable, and a log line
+      either way.
 
 ## 3. The lifecycle
 
@@ -62,21 +69,22 @@ real recording, on the machine as it stands.
 
 ## 4. Admitting the transcoder's publish
 
-- [ ] 4.1 In `app/api/ingest/_shared.ts` (or the auth route it serves), recognise a
-      rendition path as the channel path plus a rendition suffix, so a rendition path is
-      distinguishable from a channel path rather than guessed at.
-- [ ] 4.2 In `app/api/ingest/auth/route.ts`, authorise a publish to a rendition path when
-      the publisher's address is the machine's own loopback, and reject it otherwise.
-      Reading the publisher's address from the authentication call is what makes this
-      possible without a new secret.
-- [ ] 4.3 Leave channel paths unchanged: a publish to a channel path is still authorised
-      only by its stream key, from any address.
-- [ ] 4.4 Add `tests/unit/ingest-auth-rendition.test.ts` asserting all four cases: loopback
-      publish to a rendition path is admitted; non-loopback publish to a rendition path is
-      rejected with and without a valid stream key; a channel-path publish still turns on
-      the key alone.
+- [x] 4.1 Done in `lib/renditions.ts` rather than the ingest module, so the definition is
+      shared and testable without pulling in a database client.
+- [x] 4.2 Done. A rendition publish is admitted from loopback and refused, with a log line
+      naming the address, from anywhere else.
+- [x] 4.3 Confirmed by reading the route: a channel path still turns on its stream key
+      alone, from any address.
+- [x] 4.4 Done, in `tests/unit/ingest-auth-rendition.test.ts`. Covers the loopback forms
+      MediaMTX reports, remote addresses, a missing address defaulting closed, and
+      addresses that merely begin with the loopback digits.
 
 ## 5. The master playlist
+
+> **This whole section rests on a false assumption and must be rewritten once the
+> packaging decision is made.** MediaMTX's `index.m3u8` is itself a multivariant playlist
+> carrying a per-viewer session token, so a static master cannot reference it. The code
+> and tests exist and pass, but what they build cannot be served. See the handover.
 
 - [ ] 5.1 Add `lib/master-playlist.ts` with a pure function building a master playlist from
       a channel path and a rendition list, emitting bandwidth, resolution and codecs per
@@ -94,14 +102,17 @@ real recording, on the machine as it stands.
 
 ## 6. Handing viewers the ladder
 
-- [ ] 6.1 In `app/api/ingest/live/route.ts`, record the master playlist as the broadcast's
-      playback address instead of the single-rendition playlist.
+- [ ] 6.1 Record the master playlist as the broadcast's playback address. **Attempted and
+      deliberately reverted**: main auto-deploys, and pointing broadcasts at a master
+      playlist that does not exist on the machine would have broken the next broadcast
+      outright rather than leaving it merely unimproved. Do this only once the packaging
+      decision is made and the manifest is actually served.
 - [ ] 6.2 Leave the single-rendition address serving unchanged, so addresses stored on
       earlier broadcasts still resolve. Assert this in `tests/e2e/live-vod.spec.ts` rather
       than assuming it.
-- [ ] 6.3 Confirm by reading the worker's transcription path that it builds its own address
-      from its own configuration and is therefore unaffected; if it is not, keep it on the
-      publisher's rendition.
+- [x] 6.3 Confirmed by reading `worker/config.ts`: the worker builds its own address from
+      its own configuration and stays on the publisher's rendition, so it is unaffected by
+      whatever viewers are handed.
 
 ## 7. Prove the ladder works
 

@@ -14,15 +14,24 @@ OBS ──RTMP──► MediaMTX (:1935 ingest, :8888 HLS, :8889 WebRTC)
                  │  publish auth ─► POST https://vids.tube/api/ingest/auth
                  │  on-ready loop ─► POST https://vids.tube/api/ingest/live?path=<slug>   (every 30s)
                  │  on-not-ready ──► POST https://vids.tube/api/ingest/offline?path=<slug>
+                 │
+                 ├─ mtx-ladder.sh: ffmpeg reads <slug> over loopback, publishes
+                 │  <slug>_720 (720x1280, 2.5M) and <slug>_540 (540x960, 1.2M)
                  ▼
               nginx (:443 TLS, reverse proxy, proxy_buffering off, conn cap)
                  ▼
-        https://stream.vids.tube/<slug>/index.m3u8 ──► viewers (hls.js, LL-HLS)
+        https://stream.vids.tube/<slug>/master.m3u8 ──► viewers (hls.js, LL-HLS)
+             lists <slug>/index.m3u8 + <slug>_720 + <slug>_540
 ```
 
 - **MediaMTX** accepts RTMP, authenticates the publish via the app, **remuxes**
   to **Low-Latency HLS** (no transcode — OBS sends H.264/AAC, any aspect ratio),
   and fires the live/offline hooks.
+- **The ladder** transcodes two lower renditions so a viewer whose bandwidth
+  dips has somewhere to drop to instead of stalling. The publisher's own stream
+  is never re-encoded and is still what gets recorded for the VOD. Audio is
+  copied, and rung keyframes are pinned to the publisher's cadence, so switching
+  rendition neither moves the viewer nor glitches the sound.
 - **nginx** terminates TLS for `stream.vids.tube`, reverse-proxies MediaMTX's HLS
   port with **buffering off** (so LL-HLS parts stream through), and caps
   concurrent connections as the cost backstop. (We use nginx rather than Caddy for
@@ -32,7 +41,15 @@ OBS ──RTMP──► MediaMTX (:1935 ingest, :8888 HLS, :8889 WebRTC)
 
 ## Prerequisites
 
-- A Hetzner Cloud VM (CPX21/CPX22 is ample for remux-only), Ubuntu 24.04+.
+- A Hetzner Cloud VM, Ubuntu 24.04+. **2 vCPU / 4 GB is enough, including the
+  quality ladder.** Measured 10-Aug-2026 on the as-built machine against a real
+  recording: both rungs together cost **0.50 of a core at 2.1x real time**; a
+  single 720x1280 rung costs 0.35. An earlier estimate of "roughly two cores"
+  was wrong by about fourfold and had a resize planned around it, so do not size
+  up on the assumption that transcoding needs it. If a broadcast ever does
+  exhaust the machine, drop to the single rung before buying cores — and if you
+  do buy, note that sustained encoding belongs on a dedicated-vCPU plan rather
+  than a bigger shared one.
 - DNS control for `vids.tube`.
 - The two app secrets, already present in the Doppler **`prd`** config (Vercel
   pulls from `prd`); the VM must use the **same** `INGEST_SHARED_SECRET`:
@@ -75,6 +92,7 @@ Hook scripts (kept as files to avoid YAML quoting pitfalls). They inherit
 ```bash
 cat > /usr/local/bin/mtx-live.sh <<'SH'
 #!/usr/bin/env bash
+nohup /usr/local/bin/mtx-ladder.sh "${MTX_PATH}" >>/var/log/vids-tube-ladder.log 2>&1 &
 while true; do
   curl -s -o /dev/null -X POST -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" "https://vids.tube/api/ingest/live?path=${MTX_PATH}"
   sleep 30
@@ -82,11 +100,34 @@ done
 SH
 cat > /usr/local/bin/mtx-notready.sh <<'SH'
 #!/usr/bin/env bash
+/usr/local/bin/mtx-ladder-stop.sh "${MTX_PATH}" || true
 curl -s -o /dev/null -X POST -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" "https://vids.tube/api/ingest/offline?path=${MTX_PATH}"
 nohup /usr/local/bin/mtx-finalize-vod.sh "${MTX_PATH}" >>/var/log/vids-tube-finalize.log 2>&1 &
 SH
 chmod +x /usr/local/bin/mtx-live.sh /usr/local/bin/mtx-notready.sh
 ```
+
+> **Partly blocked, 10-Aug-2026.** The transcoder below is proven: it produces
+> real 720x1280 and 540x960 renditions with audio copied byte-identically, at
+> 0.50 of a core. What is *not* settled is how the three renditions are
+> advertised to a viewer as one ladder — the static master playlist approach was
+> tried and does not work. Do not turn the ladder on for viewers until that is
+> resolved. See `TEMP-2026-08-10-quality-ladder-handover.md`.
+
+Deploy the ladder scripts from the repo (`scripts/vm/`) and write the master
+playlist once per channel:
+
+```bash
+install -m 0755 mtx-ladder.sh mtx-ladder-stop.sh /usr/local/bin/
+mkdir -p /var/lib/vids-tube/hls/owner
+# from a checkout of the app repo:
+npx tsx scripts/vm/write-master-playlist.ts --path owner
+```
+
+**The ladder is off until `LADDER_ENABLED=1` is set in the MediaMTX service
+environment.** It ships off so the change can land without altering what viewers
+receive. Turning it on is AZ-250, which also watches the machine's load through
+the first broadcast that runs it.
 
 Config `/usr/local/etc/mediamtx.yml`:
 
@@ -121,7 +162,20 @@ paths:
     recordPath: /var/lib/vids-tube/rec/%path/%Y-%m-%d_%H-%M-%S-%f
     recordFormat: fmp4
     recordSegmentDuration: 24h
+
+  # Quality-ladder rungs, published by mtx-ladder.sh from this machine's own
+  # loopback. No record and no hooks: a rung must not start a second heartbeat,
+  # a second recording, or a finalize.
+  owner_720:
+  owner_540:
 ```
+
+The rungs are authenticated like everything else. The app admits a publish to a
+rung path only when MediaMTX reports the publisher's address as loopback, so a
+rung is not publishable from the internet and carries no stream key of its own.
+Do **not** add `authHTTPExclude` for these paths: that would exempt them from
+authentication altogether and leave them publishable by anyone who can reach
+:1935.
 
 systemd unit `/etc/systemd/system/mediamtx.service` (secret in the env, never in
 the config file or image):
@@ -166,6 +220,18 @@ limit_conn_zone $server_name zone=hlscap:10m;
 server {
     listen 80;
     server_name stream.vids.tube;
+
+    # DO NOT DEPLOY THIS BLOCK YET. The static master playlist does not work:
+    # MediaMTX's index.m3u8 is itself a multivariant playlist carrying a
+    # per-viewer session token, so a master cannot reference it. Kept here only
+    # so the nginx shape is ready once the packaging question is settled. See
+    # TEMP-2026-08-10-quality-ladder-handover.md.
+    location ~ ^/([^/]+)/master\.m3u8$ {
+        alias /var/lib/vids-tube/hls/$1/master.m3u8;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache" always;
+        types { } default_type application/vnd.apple.mpegurl;
+    }
 
     location / {
         limit_conn hlscap 120;     # LL-HLS holds requests open longer; headroom

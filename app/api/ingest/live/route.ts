@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reapStaleProcessingVods } from "@/lib/broadcast-end";
+import { variantPlaylistUrl } from "@/lib/master-playlist";
 import { decideGoLive } from "@/lib/stream";
 import { hasValidIngestSecret, resolveIngestChannel, supabaseAdmin } from "../_shared";
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   reapStaleProcessingVods(channel.id).catch((e) => console.error(e));
 
   const host = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
-  const hlsPath = `${host}/${mtxPath}/index.m3u8`;
+  const hlsPath = variantPlaylistUrl(host, mtxPath);
   const now = new Date().toISOString();
 
   const { data: active, error: activeError } = await supabaseAdmin
