@@ -10,9 +10,10 @@ function flag(name: string): string | undefined {
 const channelPath = flag("--path") ?? "owner";
 const root = flag("--root") ?? "/var/lib/vids-tube/hls";
 const target = join(root, channelPath, MASTER_PLAYLIST_NAME);
+const playlist = buildMasterPlaylist();
 
 mkdirSync(dirname(target), { recursive: true });
-writeFileSync(target, buildMasterPlaylist(channelPath), "utf8");
+writeFileSync(target, playlist, "utf8");
 
 console.log(`wrote ${target}`);
-console.log(buildMasterPlaylist(channelPath));
+console.log(playlist);

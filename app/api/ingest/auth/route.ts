@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { isLoopbackAddress } from "@/lib/loopback";
-import { isRenditionPath } from "@/lib/renditions";
 import { supabaseAdmin } from "../_shared";
 
 type AuthPayload = {
@@ -26,18 +24,6 @@ export async function POST(request: Request) {
 
   if (payload.action !== "publish") {
     return NextResponse.json({});
-  }
-
-  if (payload.path && isRenditionPath(payload.path)) {
-    if (isLoopbackAddress(payload.ip)) {
-      return NextResponse.json({});
-    }
-    console.error(
-      `ingest/auth: refused a publish to rendition path ${payload.path} from ${
-        payload.ip ?? "an unknown address"
-      }`
-    );
-    return new NextResponse(null, { status: 401 });
   }
 
   const key = payload.password || keyFromQuery(payload.query);

@@ -12,32 +12,42 @@ feeds it. It reflects the **as-built** deployment (nginx + LL-HLS).
 ```
 OBS ──RTMP──► MediaMTX (:1935 ingest, :8888 HLS, :8889 WebRTC)
                  │  publish auth ─► POST https://vids.tube/api/ingest/auth
-                 │  on-ready loop ─► POST https://vids.tube/api/ingest/live?path=<slug>   (every 30s)
+                 │  on-ready loop ─► POST https://vids.tube/api/ingest/live?path=<slug>[&ladder=1]
                  │  on-not-ready ──► POST https://vids.tube/api/ingest/offline?path=<slug>
                  │
-                 ├─ mtx-ladder.sh: ffmpeg reads <slug> over loopback, publishes
-                 │  <slug>_720 (720x1280, 2.5M) and <slug>_540 (540x960, 1.2M)
+                 ├─ mtx-ladder.sh: ONE ffmpeg reads <slug> over loopback and writes
+                 │  all three renditions into /var/lib/vids-tube/hls/<slug>/ —
+                 │  1080x1920 copied, 720x1280 @2.5M, 540x960 @1.2M, one master
                  ▼
               nginx (:443 TLS, reverse proxy, proxy_buffering off, conn cap)
-                 ▼
-        https://stream.vids.tube/<slug>/master.m3u8 ──► viewers (hls.js, LL-HLS)
-             lists <slug>/index.m3u8 + <slug>_720 + <slug>_540
+                 ├─ /<slug>/index.m3u8      ─► MediaMTX LL-HLS, single rendition, ~1–3s
+                 └─ /ladder/<slug>/…        ─► static files from the ladder, ~3–4s
+                                               master.m3u8 lists stream_540/720/1080
 ```
 
 - **MediaMTX** accepts RTMP, authenticates the publish via the app, **remuxes**
   to **Low-Latency HLS** (no transcode — OBS sends H.264/AAC, any aspect ratio),
-  and fires the live/offline hooks.
-- **The ladder** transcodes two lower renditions so a viewer whose bandwidth
-  dips has somewhere to drop to instead of stalling. The publisher's own stream
-  is never re-encoded and is still what gets recorded for the VOD. Audio is
-  copied, and rung keyframes are pinned to the publisher's cadence, so switching
-  rendition neither moves the viewer nor glitches the sound.
+  fires the live/offline hooks, and records the session for the VOD. Every path
+  is publishable only with a stream key; nothing on this machine publishes into
+  MediaMTX except the encoder.
+- **The ladder** gives a viewer whose bandwidth dips somewhere to drop to instead
+  of stalling. **One ffmpeg produces all three renditions into one HLS output**,
+  so every rendition shares a clock and their segments start at the same
+  instants. The publisher's own picture is copied, not re-encoded, and the VOD is
+  still recorded from MediaMTX's copy of it. Audio is copied onto all three, so
+  switching cannot glitch the sound.
 - **nginx** terminates TLS for `stream.vids.tube`, reverse-proxies MediaMTX's HLS
-  port with **buffering off** (so LL-HLS parts stream through), and caps
-  concurrent connections as the cost backstop. (We use nginx rather than Caddy for
-  `limit_conn` / `limit_rate`.)
-- Latency is ~1–3s. WebRTC (sub-second) is also exposed on `:8889` (WHEP) as a
-  future option if you want true real-time.
+  port with **buffering off** (so LL-HLS parts stream through), serves the
+  ladder's files statically, and caps concurrent connections as the cost
+  backstop. (We use nginx rather than Caddy for `limit_conn` / `limit_rate`.)
+- **Latency depends on which address a viewer is on.** MediaMTX's low-latency
+  HLS runs at ~1–3s and is what a broadcast records while the ladder is off. The
+  ladder runs at **~3–4s**, because ffmpeg's HLS muxer has no `EXT-X-PART`
+  support and therefore no low-latency mode. That ~2s was traded deliberately on
+  10-Aug-2026: stalling costs a viewer more than lag does, and chat is on
+  Vids.Tube rather than on the video. This is not a fault to chase.
+- WebRTC (sub-second) is also exposed on `:8889` (WHEP) as a future option if you
+  want true real-time.
 
 ## Prerequisites
 
@@ -89,12 +99,28 @@ tar xzf m.tar.gz && install -m 0755 mediamtx /usr/local/bin/mediamtx && mkdir -p
 Hook scripts (kept as files to avoid YAML quoting pitfalls). They inherit
 `INGEST_SHARED_SECRET` from the service env and `MTX_PATH` from MediaMTX:
 
+The live hook carries `&ladder=1` **only while a ladder is actually being
+produced** — the transcoder's pid file and the channel's master playlist both
+have to exist. That is what decides whether a broadcast records the master
+playlist or the single-rendition address, so the app can never hand viewers a
+manifest this machine is not producing.
+
+The check is re-run on **every heartbeat**, not once at go-live. A broadcast's
+recorded address therefore self-corrects within 30s: if the transcoder never
+starts or dies for good, the next heartbeat drops the flag and viewers are put
+back on MediaMTX's single-rendition playlist. Playback degrades rather than
+breaks.
+
 ```bash
 cat > /usr/local/bin/mtx-live.sh <<'SH'
 #!/usr/bin/env bash
 nohup /usr/local/bin/mtx-ladder.sh "${MTX_PATH}" >>/var/log/vids-tube-ladder.log 2>&1 &
 while true; do
-  curl -s -o /dev/null -X POST -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" "https://vids.tube/api/ingest/live?path=${MTX_PATH}"
+  LADDER_QS=""
+  if [ -f "/run/vids-tube-ladder-${MTX_PATH}.pid" ] && [ -f "/var/lib/vids-tube/hls/${MTX_PATH}/master.m3u8" ]; then
+    LADDER_QS="&ladder=1"
+  fi
+  curl -s -o /dev/null -X POST -H "x-ingest-secret: ${INGEST_SHARED_SECRET}" "https://vids.tube/api/ingest/live?path=${MTX_PATH}${LADDER_QS}"
   sleep 30
 done
 SH
@@ -107,15 +133,10 @@ SH
 chmod +x /usr/local/bin/mtx-live.sh /usr/local/bin/mtx-notready.sh
 ```
 
-> **Partly blocked, 10-Aug-2026.** The transcoder below is proven: it produces
-> real 720x1280 and 540x960 renditions with audio copied byte-identically, at
-> 0.50 of a core. What is *not* settled is how the three renditions are
-> advertised to a viewer as one ladder — the static master playlist approach was
-> tried and does not work. Do not turn the ladder on for viewers until that is
-> resolved. See `TEMP-2026-08-10-quality-ladder-handover.md`.
-
 Deploy the ladder scripts from the repo (`scripts/vm/`) and write the master
-playlist once per channel:
+playlist once per channel. The master is a static per-channel file; the
+transcoder writes the rendition playlists and segments beside it and refuses to
+start if the master is missing:
 
 ```bash
 install -m 0755 mtx-ladder.sh mtx-ladder-stop.sh /usr/local/bin/
@@ -124,10 +145,39 @@ mkdir -p /var/lib/vids-tube/hls/owner
 npx tsx scripts/vm/write-master-playlist.ts --path owner
 ```
 
-**The ladder is off until `LADDER_ENABLED=1` is set in the MediaMTX service
-environment.** It ships off so the change can land without altering what viewers
-receive. Turning it on is AZ-250, which also watches the machine's load through
-the first broadcast that runs it.
+Prove the packaging before turning anything on. This runs the real transcoder
+against a synthetic 1080x1920 source with a known keyframe cadence and checks
+that all three renditions advance, share segment boundaries and carry identical
+audio. It touches neither MediaMTX nor production:
+
+```bash
+# from a checkout of the app repo, on any machine with ffmpeg:
+sh scripts/vm/verify-ladder.sh
+```
+
+That covers packaging only. Confirm the lifecycle **on this machine**, because it
+depends on signals reaching the transcoder's process group: after the run,
+`pgrep -af ffmpeg` must return nothing and `/var/lib/vids-tube/hls/<slug>/` must
+hold `master.m3u8` and nothing else. A transcode left running between broadcasts
+is the expensive failure on a 2 vCPU box.
+
+**The ladder is on by default.** Installing these scripts and restarting MediaMTX
+is what turns it on; there is no second step. A viewer who cannot hold 5 Mbps is
+the normal case, so the ladder is the normal configuration.
+
+**Turning it off is `LADDER_ENABLED=0`** in the MediaMTX service environment plus
+`systemctl restart mediamtx`. The transcoder then never starts, so its pid file
+never appears, so the live hook stops flagging a ladder and new broadcasts record
+the single-rendition address again with latency back at ~1–3s. Broadcasts already
+recorded are unaffected either way.
+
+The ladder is off for a channel until its master playlist is written, because the
+transcoder refuses to start without one and the live hook only flags a ladder it
+can see. Adding a channel therefore means writing its master playlist, and
+forgetting to degrades that channel to today's playback rather than breaking it.
+
+Watching the machine's load and the real latency through the first broadcast that
+runs the ladder is AZ-250.
 
 Config `/usr/local/etc/mediamtx.yml`:
 
@@ -162,20 +212,14 @@ paths:
     recordPath: /var/lib/vids-tube/rec/%path/%Y-%m-%d_%H-%M-%S-%f
     recordFormat: fmp4
     recordSegmentDuration: 24h
-
-  # Quality-ladder rungs, published by mtx-ladder.sh from this machine's own
-  # loopback. No record and no hooks: a rung must not start a second heartbeat,
-  # a second recording, or a finalize.
-  owner_720:
-  owner_540:
 ```
 
-The rungs are authenticated like everything else. The app admits a publish to a
-rung path only when MediaMTX reports the publisher's address as loopback, so a
-rung is not publishable from the internet and carries no stream key of its own.
-Do **not** add `authHTTPExclude` for these paths: that would exempt them from
-authentication altogether and leave them publishable by anyone who can reach
-:1935.
+There are **no rendition paths**. The ladder writes files, so nothing publishes
+into MediaMTX except the encoder, and every path stays publishable only with a
+stream key. An earlier attempt republished each rung into its own MediaMTX path;
+it left the rungs half a second out of phase with the source and needed a
+loopback exception in publish authentication. Both are gone. Do **not** add
+`authHTTPExclude` for anything here.
 
 systemd unit `/etc/systemd/system/mediamtx.service` (secret in the env, never in
 the config file or image):
@@ -187,6 +231,9 @@ After=network.target
 
 [Service]
 Environment=INGEST_SHARED_SECRET=<paste prd value>
+# The quality ladder is on by default. Add Environment=LADDER_ENABLED=0 here to
+# turn it off: no transcoding, and broadcasts record the single-rendition
+# address, exactly as before the ladder existed.
 ExecStart=/usr/local/bin/mediamtx /usr/local/etc/mediamtx.yml
 Restart=always
 RestartSec=2
@@ -221,16 +268,20 @@ server {
     listen 80;
     server_name stream.vids.tube;
 
-    # DO NOT DEPLOY THIS BLOCK YET. The static master playlist does not work:
-    # MediaMTX's index.m3u8 is itself a multivariant playlist carrying a
-    # per-viewer session token, so a master cannot reference it. Kept here only
-    # so the nginx shape is ready once the packaging question is settled. See
-    # TEMP-2026-08-10-quality-ladder-handover.md.
-    location ~ ^/([^/]+)/master\.m3u8$ {
-        alias /var/lib/vids-tube/hls/$1/master.m3u8;
+    # The quality ladder, served as static files written by mtx-ladder.sh. This
+    # is a separate address space from the MediaMTX proxy below, so the
+    # single-rendition address every earlier broadcast recorded is untouched and
+    # turning the ladder off changes nothing here.
+    location /ladder/ {
+        alias /var/lib/vids-tube/hls/;
         add_header Access-Control-Allow-Origin "*" always;
-        add_header Cache-Control "no-cache" always;
-        types { } default_type application/vnd.apple.mpegurl;
+        add_header Cache-Control "no-cache" always;   # playlists change every segment
+        types {
+            application/vnd.apple.mpegurl m3u8;
+            video/iso.segment            m4s;
+            video/mp4                    mp4;
+        }
+        default_type application/vnd.apple.mpegurl;
     }
 
     location / {

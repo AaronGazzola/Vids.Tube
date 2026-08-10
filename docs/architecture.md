@@ -89,7 +89,7 @@ end
 subgraph NOTES["Cross-cutting concerns"]
   direction TB
   SEC["🔒 Security · RLS on every table; ready-only public video read ·<br/>stream_keys owner-only, server-validated · ingest hooks gated by<br/>x-ingest-secret · no middleware (query/RLS feature gating)"]
-  PERF["⚡ Performance · LL-HLS ~1–3s latency, remux-only (no transcode) ·<br/>60s staleness guard auto-expires dead streams · Realtime-presence viewer cap (25)"]
+  PERF["⚡ Performance · LL-HLS ~1–3s single rendition; quality ladder ~3–4s ·<br/>publisher's picture always copied, never re-encoded ·<br/>60s staleness guard auto-expires dead streams · Realtime-presence viewer cap (25)"]
   COST["💰 Cost · fixed-cost Hetzner VM, no per-viewer scaling ·<br/>edge caps limit_conn 120 / limit_rate 1500k · R2 zero egress via cdn.vids.tube"]
   SEC ~~~ PERF ~~~ COST
 end
