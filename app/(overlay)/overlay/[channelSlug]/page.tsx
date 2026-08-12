@@ -3,27 +3,16 @@
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 import { useLiveStream } from "@/app/layout.hooks";
 import type { GoalMetric } from "@/app/layout.types";
-import { GOAL_METRICS } from "@/app/layout.types";
 import { AskExchangeView } from "@/components/overlay/ask-exchange";
 import { BreakCard } from "@/components/overlay/break-card";
-import { CompetitionLadder } from "@/components/overlay/competition-ladder";
-import { GameWindow } from "@/components/overlay/game-window";
-import { GoalBar } from "@/components/overlay/goal-bar";
-import { MemberCountStrip } from "@/components/overlay/member-count-strip";
+import { OverlayStage } from "@/components/overlay/overlay-stage";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
 import type { DemoLayoutConfig } from "@/app/(app)/live/demo.types";
 import {
   DEMO_TTS_SAMPLE_SRC,
-  GOAL_METRIC_BOX,
-  OVERLAY_CANVAS_H,
-  OVERLAY_CANVAS_W,
-  OVERLAY_FEED_WIDTH,
-  OVERLAY_GOAL_HEIGHT,
   OVERLAY_LADDER_MAX,
-  OVERLAY_LADDER_SIZE,
   type DemoOverlaySnapshot,
-  type OverlayBox,
 } from "@/lib/demo-overlay";
 import { DEFAULT_GOALS, idleProgress } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
@@ -66,36 +55,6 @@ function ttsPlayKey(t: PlayableTts): string {
 // is what lets the owner click Highlight again to replay it on this same overlay.
 function highlightShowKey(m: { id: string; promoted_at: string | null }): string {
   return `${m.id}:${m.promoted_at ?? ""}`;
-}
-
-function Positioned({
-  box,
-  opacity = 1,
-  children,
-}: {
-  box: OverlayBox;
-  opacity?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className="absolute"
-      style={
-        {
-          left: box.x,
-          top: box.y,
-          // Drives the black backing of whatever sits inside, not the box as a
-          // whole: fading the element took the text with it, so a subtle overlay
-          // was also an unreadable one.
-          "--overlay-bg-opacity": opacity,
-          transform: `scale(${box.scale})`,
-          transformOrigin: "top left",
-        } as React.CSSProperties
-      }
-    >
-      {children}
-    </div>
-  );
 }
 
 function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
@@ -395,84 +354,35 @@ export default function OverlayFramePage({
 
   const breakEndsAt = breakQuery.data?.breakEndsAt ?? null;
 
+  const feedSlot = demo ? (
+    <DemoOverlayFeed snapshot={demo} />
+  ) : streamId ? (
+    <LiveFeedSlot streamId={streamId} soundOn={config.feedSound !== "off"} />
+  ) : null;
+
+  const breakSlot = demo
+    ? visible.break
+      ? <DemoBreak />
+      : null
+    : breakEndsAt
+      ? <BreakCard key={breakEndsAt} endsAt={breakEndsAt} />
+      : null;
+
   return (
-    <div
-      className="fixed left-0 top-0 overflow-hidden"
-      style={{ width: OVERLAY_CANVAS_W, height: OVERLAY_CANVAS_H }}
-    >
-      {feedVisible && (
-        <Positioned
-          box={boxes.highlight}
-          opacity={config.boxOpacity.highlight}
-        >
-          <div style={{ width: OVERLAY_FEED_WIDTH }}>
-            {demo ? (
-              <DemoOverlayFeed snapshot={demo} />
-            ) : (
-              streamId && (
-                <LiveFeedSlot
-                  streamId={streamId}
-                  soundOn={config.feedSound !== "off"}
-                />
-              )
-            )}
-          </div>
-        </Positioned>
-      )}
-
-      {visible.members && (
-        <Positioned box={boxes.members} opacity={config.boxOpacity.members}>
-          <MemberCountStrip
-            count={memberCount ?? 0}
-            messages={config.messages}
-          />
-        </Positioned>
-      )}
-
-      {GOAL_METRICS.map((m) => {
-        const boxKey = GOAL_METRIC_BOX[m];
-        const data = visible[boxKey] ? goalMetric(m) : null;
-        if (!data) return null;
-        return (
-          <Positioned
-            key={m}
-            box={boxes[boxKey]}
-            opacity={config.boxOpacity[boxKey]}
-          >
-            <GoalBar metric={m} data={data} height={OVERLAY_GOAL_HEIGHT} />
-          </Positioned>
-        );
-      })}
-
-      {visible.competition && competitionEntries.length > 0 && (
-        <Positioned
-          box={boxes.competition}
-          opacity={config.boxOpacity.competition}
-        >
-          <CompetitionLadder
-            entries={competitionEntries}
-            size={OVERLAY_LADDER_SIZE}
-          />
-        </Positioned>
-      )}
-
-      {visible.game && (
-        <Positioned box={boxes.game} opacity={config.boxOpacity.game}>
-          <GameWindow />
-        </Positioned>
-      )}
-
-      {demo
-        ? visible.break && (
-            <Positioned box={boxes.break} opacity={config.boxOpacity.break}>
-              <DemoBreak />
-            </Positioned>
-          )
-        : breakEndsAt && (
-            <Positioned box={boxes.break} opacity={config.boxOpacity.break}>
-              <BreakCard key={breakEndsAt} endsAt={breakEndsAt} />
-            </Positioned>
-          )}
-    </div>
+    <OverlayStage
+      config={config}
+      boxes={boxes}
+      visible={visible}
+      surface="obs"
+      values={{
+        feedVisible,
+        feedSlot,
+        feedSlotFilled: true,
+        memberCount: memberCount ?? 0,
+        goalMetric,
+        competitionEntries,
+        breakSlot,
+      }}
+    />
   );
 }

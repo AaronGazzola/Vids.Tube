@@ -8,30 +8,51 @@ chat/scoring/moderation) with the real overlay components layered over it in a
 repositionable, persisted layout — without going live, running the worker, or writing
 any real stream data. Supersedes the deleted `/studio/demo` page (`overlay-demo` /
 `overlay-demo-sim`).
-
 ## Requirements
-
 ### Requirement: Demo switch on the /live page
 
-The system SHALL provide a Demo switch — a shadcn/ui `Switch` — pinned to the far right
-of the `/live` tab bar, off by default. Turning it on SHALL put the page into a
-self-contained demo workflow in which the Preview and Activity tabs render a simulated
-stream; turning it off SHALL restore the real active stream. The demo SHALL make no
-writes to the stream, chat, scoring, featured, or moderation tables and SHALL NOT engage
-the worker or YouTube. The Settings tab SHALL continue to edit and save the real active
-stream in both modes, and the enabled state SHALL be ephemeral (off on load).
+The system SHALL provide a Demo switch — a shadcn/ui `Switch` — on the Overlays tab rather
+than in the `/live` tab bar, off by default. Turning it on SHALL render the overlays on the
+Overlays tab from simulated values; turning it off SHALL restore the real current values. A
+separate goal-reached switch SHALL sit beside it, setting every demo goal metric to at or
+above its target so the reached state can be composed against on demand.
+
+The Overlays tab SHALL also provide a checkbox choosing whether demo values reach OBS as well
+as the web app. While the checkbox is off, no demo snapshot SHALL be broadcast and OBS SHALL
+continue to render real values. While a broadcast is live and the checkbox is on, the control
+SHALL warn plainly that viewers are being shown invented values; it SHALL NOT be blocked.
+
+The demo SHALL make no writes to the stream, chat, scoring, featured, or moderation tables and
+SHALL NOT engage the worker or YouTube. The Settings tab SHALL continue to edit and save the
+real active stream in both modes, and the enabled state SHALL be ephemeral (off on load).
 
 #### Scenario: Toggle demo on
 
 - **WHEN** the owner turns the Demo switch on
-- **THEN** the Preview and Activity tabs switch to the simulated stream and no writes are
-  made to real stream/chat/scoring data
+- **THEN** the Overlays tab renders simulated values and no writes are made to real
+  stream/chat/scoring data
 
-#### Scenario: Toggle demo off restores the real stream
+#### Scenario: Toggle demo off restores real values
 
 - **WHEN** the owner turns the Demo switch off
-- **THEN** the real active stream returns with any Settings the owner saved intact,
-  unchanged by the demo
+- **THEN** the overlays return to the real current values, empty where there are none
+
+#### Scenario: Goal-reached state on demand
+
+- **WHEN** the owner turns the goal-reached switch on while demo is on
+- **THEN** every demo goal metric sits at or above its target and the overlays render their
+  reached state
+
+#### Scenario: Demo stays out of OBS by default
+
+- **WHEN** demo is on and the OBS checkbox is off
+- **THEN** the Overlays tab shows demo values while OBS continues to render real values
+
+#### Scenario: Warning when demo would reach viewers
+
+- **WHEN** a broadcast is live and the owner turns the OBS checkbox on
+- **THEN** a plain warning states that viewers will see invented values, and the choice is
+  still applied
 
 #### Scenario: Settings still edits the real stream during demo
 
@@ -43,8 +64,8 @@ stream in both modes, and the enabled state SHALL be ephemeral (off on load).
 
 The system SHALL show the pop-out icon in the tab bar only when the active tab is Preview
 or Activity, and it SHALL pop out that tab's content — the preview player for Preview, the
-Activity panel for Activity. The pop-out icon SHALL NOT appear on the Settings tab, and
-pop-out SHALL be unavailable while demo is on.
+Activity panel for Activity. The pop-out icon SHALL NOT appear on the Settings or Overlays
+tabs, and pop-out SHALL be unavailable while that tab's demo is on.
 
 #### Scenario: Pop-out follows the active tab
 
@@ -52,9 +73,9 @@ pop-out SHALL be unavailable while demo is on.
 - **THEN** a window opens rendering the preview player; on the Activity tab it renders the
   Activity panel
 
-#### Scenario: No pop-out on Settings
+#### Scenario: No pop-out on Settings or Overlays
 
-- **WHEN** the owner is on the Settings tab
+- **WHEN** the owner is on the Settings tab or the Overlays tab
 - **THEN** no pop-out icon is shown
 
 ### Requirement: Demo preview slideshow
@@ -130,106 +151,39 @@ be owner-scoped.
 
 ### Requirement: Simulated activity
 
-While demo is on, the system SHALL render the Activity tab — header (goal progress and
-competition), mod bot actions, and live chat with inline request handling — from a
-client-side generator using the same presentational components as the live Activity
-tab. Simulated messages SHALL arrive over time with a subset scored, a few
-featured/highlighted, and the leaderboard and goal counts updating, using the
-production standings and goal math. The collapsed competition section SHALL show only
-the top-3 badges and expand chevron; its "Competition" title SHALL appear only in the
-expanded state. The demo SHALL simulate the overlays' outputs, not the AI's decision
-quality.
+The Activity tab SHALL carry its own demo toggle, independent of the Overlays tab's Demo
+switch. Turning it on SHALL render the simulated activity feed and indicators; turning it off
+SHALL restore the real activity for the active stream. The toggle SHALL be off on load and
+SHALL make no writes to real data.
 
-#### Scenario: Simulated chat populates activity
+#### Scenario: Activity demo is independent
 
-- **WHEN** demo is on and the Activity tab is open
-- **THEN** simulated messages arrive over time and appear in the chat with the same
-  affordances as live
+- **WHEN** the owner turns demo on for the Overlays tab
+- **THEN** the Activity tab continues to show real activity until its own toggle is turned on
 
-#### Scenario: Scores and features update
+#### Scenario: Activity demo renders the simulated feed
 
-- **WHEN** the generator scores and features simulated messages
-- **THEN** the competition/leaderboard and featured highlights update via the production
-  standings and goal math
-
-#### Scenario: Collapsed competition is badges-only
-
-- **WHEN** the competition section is collapsed
-- **THEN** it shows the top-3 badges and the chevron without the "Competition"
-  title, which appears once expanded
-
-#### Scenario: Scope is visuals, not AI decisions
-
-- **WHEN** the owner uses the demo
-- **THEN** it reflects how the overlays and activity look and behave, not whether the
-  model would pick those messages or scores
+- **WHEN** the owner turns the Activity tab's demo toggle on
+- **THEN** the simulated activity feed and indicators render, and no writes are made to real
+  chat, scoring or moderation data
 
 ### Requirement: Demo toolbar state
 
-While demo is on, the status toolbar SHALL show a Demo indicator and SHALL hide the Go
-live, End stream, and Discard controls, because no stream-lifecycle action applies to a
-simulated stream. The Save changes control SHALL remain, still saving the real Settings
-form.
+While demo is on, the status toolbar SHALL show a Demo indicator. The Go live, End stream and
+Discard controls SHALL remain available, because demo is now a property of the Overlays tab
+rather than a page-wide mode and a real broadcast may be operated while overlays are being
+composed. The Save changes control SHALL remain, still saving the real Settings form.
 
-#### Scenario: Lifecycle controls hidden in demo
+#### Scenario: Demo is indicated but does not disable the broadcast
 
 - **WHEN** demo is on
-- **THEN** the toolbar shows a Demo indicator and hides Go live / End / Discard while
-  keeping Save changes
+- **THEN** the toolbar shows a Demo indicator and the Go live / End / Discard controls stay
+  available for the real stream state
 
-#### Scenario: Lifecycle controls return when demo is off
+#### Scenario: Indicator clears when demo is off
 
 - **WHEN** demo is turned off
-- **THEN** the toolbar restores the real status and the Go live / End / Discard controls
-  for the active stream state
-
-### Requirement: Overlay-feed parity on the demo stage
-
-The demo stage SHALL render the OBS overlay feed as a single slot inside the
-highlight box, using the same presentational components as the real overlay
-page: at most one of the highlighted message, TTS card, or ask exchange is
-visible at a time (priority highlight → TTS → ask), each in the shared
-highlight visual style, in the same position. The dashed "Highlight"
-placeholder SHALL appear only on the demo stage when the slot is empty — the
-real overlay page renders nothing when idle, so the audience never sees a
-placeholder. In the overlay control panel, the Highlight, TTS card, and !ask
-exchange rows SHALL each offer: a visibility toggle (persisted with the demo
-layout), a **Play** button that displays one demo value on the stage
-immediately, and a **persist** checkbox that keeps the played overlay on
-screen instead of auto-hiding when its animation, audio, or hold timer ends.
-
-#### Scenario: One element at a time
-
-- **WHEN** a demo TTS request and a demo ask are both approved while a
-  highlight is playing
-- **THEN** the stage shows them one after another in the same position, never
-  together
-
-#### Scenario: Placeholder is demo-only
-
-- **WHEN** the demo slot is empty
-- **THEN** the dashed "Highlight" outline shows on the demo stage, while the
-  real overlay page in the same state renders nothing
-
-#### Scenario: Play buttons drive the stage
-
-- **WHEN** the owner clicks Play under TTS card (or !ask exchange, or
-  Highlight)
-- **THEN** the stage immediately shows that demo value in the shared slot
-  without touching the Activity tab
-
-#### Scenario: Persist freezes the overlay
-
-- **WHEN** persist is checked for an overlay and it is played
-- **THEN** the overlay stays visible after its clip/hold/animation would have
-  ended, until persist is unchecked or the element is replaced
-
-#### Scenario: Toggles hide the new overlays
-
-- **WHEN** the owner switches "TTS card" or "!ask exchange" off in the
-  overlay panel
-- **THEN** that element no longer renders on the stage and the preference
-  persists with the saved demo layout
+- **THEN** the Demo indicator is removed and the toolbar shows the real status alone
 
 ### Requirement: Simulated interactivity requests and Activity panels
 
@@ -272,3 +226,4 @@ or ask request SHALL still play it on the stage.
 - **WHEN** a VidsBot row (ack or wrap-up message) appears in the demo chat
 - **THEN** it renders with the bot avatar, the name "VidsBot", and a BOT
   badge, with no moderation menu and no score badge
+

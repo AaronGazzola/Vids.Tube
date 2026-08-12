@@ -25,7 +25,18 @@ type LayoutState = {
   panelOpen: boolean;
   // Per-overlay "keep on screen" flags (ephemeral, not saved).
   persist: Record<DemoPersistKey, boolean>;
+  // Whether the resize/reposition containers are shown. Ephemeral by design:
+  // it describes what the owner is doing right now, not how the overlays are
+  // configured, so a layout can never be saved "in edit mode".
+  resizeMode: boolean;
+  // Whether the Overlays tab renders demo values, and whether those values are
+  // also broadcast to OBS. Both ephemeral, both off on load.
+  demo: boolean;
+  demoToObs: boolean;
   setPersist: (key: DemoPersistKey, v: boolean) => void;
+  setResizeMode: (v: boolean) => void;
+  setDemo: (v: boolean) => void;
+  setDemoToObs: (v: boolean) => void;
   setPanelOpen: (v: boolean) => void;
   hydrate: (c: DemoLayoutConfig | null) => void;
   setBox: (key: DemoBoxKey, box: DemoBox) => void;
@@ -56,8 +67,14 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
   hydrated: false,
   panelOpen: true,
   persist: { highlight: false, tts: false, ask: false },
+  resizeMode: false,
+  demo: false,
+  demoToObs: false,
   setPersist: (key, v) =>
     set((s) => ({ persist: { ...s.persist, [key]: v } })),
+  setResizeMode: (v) => set({ resizeMode: v }),
+  setDemo: (v) => set({ demo: v }),
+  setDemoToObs: (v) => set({ demoToObs: v }),
   setPanelOpen: (v) => set({ panelOpen: v }),
   hydrate: (c) => {
     const config = mergeDemoLayout(c);

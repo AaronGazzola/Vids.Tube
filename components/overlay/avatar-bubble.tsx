@@ -1,5 +1,7 @@
 import type { FeaturedAuthor } from "@/app/layout.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { avatarSizeBucket, withAvatarSize } from "@/lib/avatar-size";
+import { useOverlayScale } from "@/components/overlay/overlay-scale-context";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
 import { rankColor } from "@/lib/standings";
 import { channelAssetUrl } from "@/lib/storage";
@@ -29,9 +31,17 @@ export function AvatarBubble({
   showBadge?: boolean;
 }) {
   const name = author?.name ?? "viewer";
-  const url =
+  const rawUrl =
     (author?.avatarUrl ?? channelAssetUrl(author?.avatarPath ?? null)) ||
     placeholderAvatar(author?.handle ?? name);
+  const overlayScale = useOverlayScale();
+  const url = withAvatarSize(
+    rawUrl,
+    avatarSizeBucket(
+      size * overlayScale,
+      typeof window === "undefined" ? 1 : window.devicePixelRatio
+    )
+  );
   const isFirst = rank === 1;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;

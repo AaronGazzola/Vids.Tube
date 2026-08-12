@@ -29,21 +29,21 @@ import {
 } from "@/lib/schedule-validation";
 import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
-import { ExternalLink, SlidersHorizontal } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   DemoActivity,
   DemoActivityIndicators,
   DemoWrapupButton,
 } from "./demo-activity";
-import { DemoPreviewStage } from "./demo-preview";
+
 import {
   useDemoController,
   useDemoLayout,
   useDemoOverlayBroadcast,
   useOverlayLayoutBroadcast,
 } from "./demo.hooks";
-import { OverlayEditor } from "./overlay-editor";
+import { OverlaysTab } from "./overlays-tab";
 import { useDemoLayoutStore } from "./demo.stores";
 import { ActivityContent, ActivityIndicators, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
@@ -236,6 +236,7 @@ function StatusToolbar({
   onSaveClick,
   saving,
   demo,
+  activityDemo,
 }: {
   state: StreamState;
   broadcast: Stream | null;
@@ -244,6 +245,7 @@ function StatusToolbar({
   onSaveClick: () => void;
   saving: boolean;
   demo: boolean;
+  activityDemo: boolean;
 }) {
   const goLive = useGoLive();
   const endStream = useEndStream();
@@ -271,9 +273,8 @@ function StatusToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-t bg-background px-4 py-2">
-      {demo ? (
-        <Badge variant="secondary">Demo mode</Badge>
-      ) : (
+      {demo && <Badge variant="secondary">Demo mode</Badge>}
+      {(
         <>
           <Badge
             variant={
@@ -295,7 +296,7 @@ function StatusToolbar({
       )}
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        {!demo && canDiscard && (
+        {canDiscard && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={discard.isPending}>
@@ -321,14 +322,14 @@ function StatusToolbar({
           </AlertDialog>
         )}
 
-        {!demo && (state === "live" || state === "preview") && broadcast && (
+        {(state === "live" || state === "preview") && broadcast && (
           <BreakButton breakEndsAt={broadcast.break_ends_at} />
         )}
-        {!demo && state === "live" && streamId && (
+        {!activityDemo && state === "live" && streamId && (
           <WrapupButton streamId={streamId} />
         )}
-        {demo && <DemoWrapupButton />}
-        {!demo && (state === "live" ? (
+        {activityDemo && <DemoWrapupButton />}
+        {(state === "live" ? (
           disconnected ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -434,12 +435,10 @@ export default function LivePage() {
   const [syncedId, setSyncedId] = useState<string | null | undefined>(undefined);
   const [confirm, setConfirm] = useState<ScheduleSaveCheck | null>(null);
   const [tab, setTab] = useState("settings");
-  const [demo, setDemo] = useState(false);
-  const [editOverlays, setEditOverlays] = useState(false);
+  const [activityDemo, setActivityDemo] = useState(false);
   const [previewPortrait, setPreviewPortrait] = useState<boolean | null>(null);
-  const [playbackHealth, setPlaybackHealth] = useState(false);
-  const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
-  const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
+  const demo = useDemoLayoutStore((s) => s.demo);
+  const demoToObs = useDemoLayoutStore((s) => s.demoToObs);
   const mobileChrome = useDemoLayoutStore((s) => s.config.mobileChrome);
   const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
   const draftMessages = useDemoLayoutStore((s) => s.draftMessages);
@@ -450,8 +449,15 @@ export default function LivePage() {
   const demoGoals = settings?.goals ?? null;
 
   useDemoLayout(true);
-  useDemoController(demo);
-  useDemoOverlayBroadcast(demo, settings?.channelSlug ?? null, demoGoals);
+  useDemoController(demo || activityDemo);
+  // Gated on the OBS checkbox: with it off nothing is broadcast, so the overlay
+  // route's staleness timeout drops any snapshot it holds and OBS returns to
+  // real values on its own.
+  useDemoOverlayBroadcast(
+    demo && demoToObs,
+    settings?.channelSlug ?? null,
+    demoGoals
+  );
   useOverlayLayoutBroadcast(settings?.channelSlug ?? null);
 
   // Sync the form from the DB only when the active stream changes (not on every
@@ -559,14 +565,15 @@ export default function LivePage() {
             <TabsList>
               <TabsTrigger value="settings">Settings</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>
+              <TabsTrigger value="overlays">Overlays</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
             </TabsList>
             {tab === "activity" &&
-              (demo ? <DemoActivityIndicators /> : <ActivityIndicators />)}
+              (activityDemo ? <DemoActivityIndicators /> : <ActivityIndicators />)}
           </div>
           <div className="flex items-center gap-3">
             {settings?.channelSlug &&
-              !demo &&
+              !activityDemo &&
               (tab === "preview" || tab === "activity") && (
                 <Button
                   variant="outline"
@@ -590,27 +597,16 @@ export default function LivePage() {
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               )}
-            <div className="flex items-center gap-1.5 text-xs font-medium">
-              {demo && tab === "preview" && !panelOpen && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label="Show overlay controls"
-                  onClick={() => setPanelOpen(true)}
-                >
-                  <SlidersHorizontal className="h-4 w-4" />
-                </Button>
-              )}
-              <span>Demo</span>
-              <Switch
-                checked={demo}
-                onCheckedChange={(v) => {
-                  setDemo(v);
-                  if (v) setTab("preview");
-                }}
-              />
-            </div>
+            {tab === "activity" && (
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <span>Demo</span>
+                <Switch
+                  aria-label="Show simulated activity"
+                  checked={activityDemo}
+                  onCheckedChange={setActivityDemo}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -637,9 +633,7 @@ export default function LivePage() {
             value="preview"
             className="mt-0 h-full space-y-3 overflow-y-auto p-4 md:p-6"
           >
-            {demo ? (
-              <DemoPreviewStage goals={demoGoals} />
-            ) : previewSrc ? (
+            {previewSrc ? (
               <div className="relative">
                 <LivePlayer
                   src={previewSrc}
@@ -655,71 +649,47 @@ export default function LivePage() {
                   }
                   onPortraitChange={setPreviewPortrait}
                   overlay={disconnected ? <DisconnectedOverlay /> : null}
-                  diagnostics={playbackHealth}
-                  onCloseDiagnostics={() => setPlaybackHealth(false)}
                 />
                 {state === "preview" && (
                   <Badge variant="secondary" className="absolute left-2 top-2">
                     Preview — only you can see this
                   </Badge>
                 )}
-                {editOverlays && settings?.channelSlug ? (
-                  <OverlayEditor
-                    channelSlug={settings.channelSlug}
-                    onClose={() => setEditOverlays(false)}
-                  />
-                ) : (
-                  <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
-                    <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                      <span>
-                        {previewPortrait === false
-                          ? "Mobile layout (vertical streams only)"
-                          : "Mobile layout"}
-                      </span>
-                      <Switch
-                        checked={mobileChrome}
-                        onCheckedChange={setMobileChrome}
-                        disabled={previewPortrait === false}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                      <span>Playback health</span>
-                      <Switch
-                        checked={playbackHealth}
-                        onCheckedChange={setPlaybackHealth}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setEditOverlays(true)}
-                      className="rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/85"
-                    >
-                      Edit overlays
-                    </button>
+                <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
+                  <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                    <span>
+                      {previewPortrait === false
+                        ? "Mobile layout (vertical streams only)"
+                        : "Mobile layout"}
+                    </span>
+                    <Switch
+                      checked={mobileChrome}
+                      onCheckedChange={setMobileChrome}
+                      disabled={previewPortrait === false}
+                    />
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               <div className="relative flex aspect-9/16 max-h-[70vh] w-full items-center justify-center rounded-lg border bg-black/5 text-sm text-muted-foreground">
-                {!editOverlays && (
-                  <span>Start your encoder to see the private preview here.</span>
-                )}
-                {editOverlays && settings?.channelSlug ? (
-                  <OverlayEditor
-                    channelSlug={settings.channelSlug}
-                    onClose={() => setEditOverlays(false)}
-                  />
-                ) : (
-                  <button
-                    onClick={() => setEditOverlays(true)}
-                    className="absolute right-2 top-2 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/85"
-                  >
-                    Edit overlays
-                  </button>
-                )}
+                <span>Start your encoder to see the private preview here.</span>
               </div>
             )}
-            {!demo && (
-              <TranscriptPanel streamId={streamId} live={state === "live"} />
+            <TranscriptPanel streamId={streamId} live={state === "live"} />
+          </TabsContent>
+
+          <TabsContent
+            value="overlays"
+            className="mt-0 h-full p-4 md:p-6"
+          >
+            {settings?.channelSlug ? (
+              <OverlaysTab
+                channelSlug={settings.channelSlug}
+                goals={demoGoals}
+                isLive={state === "live"}
+              />
+            ) : (
+              <Skeleton className="h-96 w-full" />
             )}
           </TabsContent>
 
@@ -727,7 +697,7 @@ export default function LivePage() {
             value="activity"
             className="mt-0 flex h-full min-h-0 flex-col p-4 md:p-6"
           >
-            {demo ? <DemoActivity goals={demoGoals} /> : <ActivityContent />}
+            {activityDemo ? <DemoActivity goals={demoGoals} /> : <ActivityContent />}
           </TabsContent>
         </div>
       </Tabs>
@@ -741,6 +711,7 @@ export default function LivePage() {
           onSaveClick={onSaveClick}
           saving={save.isPending}
           demo={demo}
+          activityDemo={activityDemo}
         />
       )}
 

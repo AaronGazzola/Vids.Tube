@@ -64,12 +64,12 @@ async function loginAsOwner(page: Page) {
   await expect(page).toHaveURL("/");
 }
 
+// Demo now lives in the Overlays tab's control panel rather than the page
+// header, so reaching it means opening that tab first.
 async function enableDemo(page: Page) {
   await page.goto("/live");
-  const demoSwitch = page
-    .locator('div:has(> span:text-is("Demo"))')
-    .locator('button[role="switch"]');
-  await demoSwitch.click();
+  await page.getByRole("tab", { name: "Overlays" }).click();
+  await page.getByRole("switch", { name: "Show demo values" }).click();
 }
 
 test("demo interactivity: panels, overlay parity, wrap-up", async ({
@@ -80,7 +80,7 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
 
   await loginAsOwner(page);
   await enableDemo(page);
-  const stage = page.getByTestId("demo-stage");
+  const stage = page.getByTestId("overlays-stage");
 
   await expect(
     stage.locator("div.border-dashed", { hasText: "Highlight" })
@@ -96,7 +96,7 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
     timeout: 5_000,
   });
 
-  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByRole("tab", { name: "Overlays" }).click();
   const stageTts = stage.getByText(
     "big shoutout to the mods, you keep this place cozy"
   );
@@ -110,7 +110,7 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
   await expect(ask1).toBeVisible({ timeout: 10_000 });
   await ask1.getByRole("button", { name: "Answer" }).click();
 
-  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByRole("tab", { name: "Overlays" }).click();
   await expect(stage.getByText("what editor theme is that?")).toBeVisible({
     timeout: 10_000,
   });
@@ -127,7 +127,7 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
     .first();
   await ask2.getByRole("button", { name: "Question only" }).click();
 
-  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByRole("tab", { name: "Overlays" }).click();
   await expect(
     stage.getByText("how long have you been building vids.tube?")
   ).toBeVisible({ timeout: 10_000 });
@@ -170,7 +170,7 @@ test("demo interactivity: panels, overlay parity, wrap-up", async ({
 
   await expect(page.getByText("Competition", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.getByRole("tab", { name: "Overlays" }).click();
   await page.getByLabel("Persist Highlight").check();
   await page.getByRole("button", { name: "Play Highlight" }).click();
   const highlightText = stage.getByText(

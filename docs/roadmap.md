@@ -60,9 +60,12 @@ only generic touchpoints like `channel_projects` grounding for `!ask`).
   (1080x1920; landscape later via a `canvas` config field), all elements
   absolutely positioned from per-channel config (`overlay_layouts`, renamed
   from `demo_layouts`), optional `?token=` auth, realtime layout push. Layout
-  editing happens live on the /live Preview tab (element toggles,
-  position/scale, notification sounds/mute) — demo mode is only for simulated
-  activity. Old per-element overlay URLs are removed, no transition period.
+  editing happens on the /live Overlays tab (element toggles, position/scale,
+  notification sounds/mute), against the overlays' real current values and
+  through the same renderer the OBS route uses. Demo is a switch on that tab,
+  and reaches OBS only when its checkbox is ticked. The Activity tab has its
+  own separate demo toggle for simulated activity. Old per-element overlay URLs
+  are removed, no transition period.
 - **Activity tab stays chat-centric**: returning chatters get an avatar
   highlight ring + click popover (dossier, stats, level); metrics fold into
   the goals strip (combined YouTube + Vids.Tube counts, click popover with

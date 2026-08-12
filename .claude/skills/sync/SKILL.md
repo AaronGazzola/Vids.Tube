@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs, Supabase and the shared skills repo, then report in /simple format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, the Linear MCP or the Supabase MCP is unreachable. Invoke with /sync.
+description: Refresh the local skills from the shared skills repo first, including this one, then pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs and Supabase, read and delete any handover document left for this session, then report in /simple format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, the Linear MCP or the Supabase MCP is unreachable. Invoke with /sync.
 ---
 
 # /sync — project state sync + next-steps report
@@ -9,10 +9,11 @@ Gather the live state of git, Linear, OpenSpec, the roadmap docs, Supabase and
 the shared skills repo, cross-reference all of them against the actual code, and
 produce one short report that ends with the next steps.
 
-Only three writes are permitted, and no other: a fast-forward `git pull`, a
-fast-forward `git pull` inside the shared skills clone, and copying a newer
-skill file from the shared skills repo into this repo. Nothing is ever written
-to Linear, OpenSpec, Supabase, Vercel or any deployment.
+Only four writes are permitted, and no other: a fast-forward `git pull`, a
+fast-forward `git pull` inside the shared skills clone, copying a newer skill
+file from the shared skills repo into this repo, and deleting a handover
+document that has been read into context. Nothing is ever written to Linear,
+OpenSpec, Supabase, Vercel or any deployment.
 
 Every command in this skill authenticates with credentials that already exist:
 the user's SSH key for git, and already-connected MCP servers for Linear and
@@ -51,7 +52,82 @@ There is no fallback path for Supabase. The Supabase MCP must be connected. Do
 not substitute the Supabase CLI, and do not report a database section built from
 migration files alone.
 
-## 2. Gather (run independent reads in parallel)
+## 2. Shared skills repo — `skills.enabled`
+
+**This runs before anything is gathered, and before this file's own instructions
+are trusted.** The skills in this repo are copies of the skills in the shared
+skills repo named by `skills.repo`, and this skill is one of them. Sorting the
+copies out inside the gather phase would be too late: the instructions being
+followed would already be the stale ones.
+
+```bash
+# clone once per run, into a scratch dir, over SSH
+git clone --depth 50 <skills.repo.ssh> <scratch>/skills-repo
+```
+
+Compare every skill folder under `skills.path` (default `.claude/skills`) on
+both sides. Compare file **content ignoring line endings** — this repo stores
+CRLF and the shared repo stores LF, so a naive byte comparison reports every
+file as different:
+
+```bash
+diff -q --strip-trailing-cr <shared-file> <local-file>
+```
+
+For each file whose content genuinely differs, decide which side is newer, then
+act on that:
+
+```bash
+git status --porcelain -- <path>     # uncommitted local edit?
+git log -1 --format=%cI -- <path>    # otherwise, last-commit date
+```
+
+A local file with uncommitted changes is **always** treated as the newer side,
+whatever the commit dates say, because the local edit has not been committed yet
+and its commit date is therefore stale. Never overwrite an uncommitted local
+edit.
+
+- Shared repo newer → **copy the shared version over the local one, silently.**
+  This is a permitted write and it is **not reported**: a skill arriving from the
+  shared repo needs no decision from the user.
+- A skill present in the shared repo and missing here → copy it in, silently, for
+  the same reason.
+- Local repo newer → **do not push**, and **report it**. Name the skill and give
+  a one-line summary of what the local version changed, then ask whether the
+  local version should be pushed to the shared repo.
+- Dates equal but content differs → report as a conflict and ask; never guess.
+
+Copy the file exactly. Read and write it as **UTF-8 explicitly**: reading a
+UTF-8 file as the system codepage silently mangles every non-ASCII character,
+and the corruption looks like an unrelated edit on the next comparison.
+
+### Then re-read this skill before continuing
+
+Where the copy above replaced **this skill's own file**, the instructions
+currently in context are the ones that were just superseded.
+
+- Read the updated file from disk and follow **that** version for the rest of the
+  run, including its report format and any step this version does not have.
+- Where the updated version changes what must be gathered, gather it. Do not
+  carry a conclusion drawn under the old instructions into the new report.
+- Say nothing about this in the report. A skill arriving from the shared repo
+  needs no decision from the user, and that includes this one.
+
+### What reaches the report
+
+The **only** reason this section appears in the report is a local version the
+user may want pushed to the shared repo. Where every difference resolved in the
+shared repo's favour, the section is omitted entirely and no bullet mentions
+skills at all.
+
+Only skills that exist on **both** sides are compared. A skill that exists here
+and not in the shared repo is out of scope: it is not compared, not pushed, and
+not mentioned in the report at all.
+
+Never push to the shared repo without the user saying so in the current
+conversation.
+
+## 3. Gather (run independent reads in parallel)
 
 ### Git — `git.enabled`
 
@@ -92,60 +168,6 @@ CLI and no token:
 Do not invoke the `vercel` CLI and do not invoke the `gh` CLI. Neither is needed:
 `vercel ls` starts a device-login flow, and `gh` uses its own OAuth token rather
 than the SSH key.
-
-### Shared skills repo — `skills.enabled`
-
-The skills in this repo are copies of the skills in the shared skills repo named
-by `skills.repo`. Keep the two in step.
-
-```bash
-# clone once per run, into a scratch dir, over SSH
-git clone --depth 50 <skills.repo.ssh> <scratch>/skills-repo
-```
-
-Compare every skill folder under `skills.path` (default `.claude/skills`) on
-both sides. Compare file **content ignoring line endings** — this repo stores
-CRLF and the shared repo stores LF, so a naive byte comparison reports every
-file as different:
-
-```bash
-diff -q --strip-trailing-cr <shared-file> <local-file>
-```
-
-For each file whose content genuinely differs, decide which side is newer, then
-act on that:
-
-```bash
-git status --porcelain -- <path>     # uncommitted local edit?
-git log -1 --format=%cI -- <path>    # otherwise, last-commit date
-```
-
-A local file with uncommitted changes is **always** treated as the newer side,
-whatever the commit dates say, because the local edit has not been committed yet
-and its commit date is therefore stale. Never overwrite an uncommitted local
-edit.
-
-- Shared repo newer → **copy the shared version over the local one, silently.**
-  This is a permitted write and it is **not reported**: a skill arriving from the
-  shared repo needs no decision from the user.
-- A skill present in the shared repo and missing here → copy it in, silently, for
-  the same reason.
-- Local repo newer → **do not push**, and **report it**. Name the skill and give
-  a one-line summary of what the local version changed, then ask whether the
-  local version should be pushed to the shared repo.
-- Dates equal but content differs → report as a conflict and ask; never guess.
-
-The **only** reason this section appears in the report is a local version the
-user may want pushed to the shared repo. Where every difference resolved in the
-shared repo's favour, the section is omitted entirely and no bullet mentions
-skills at all.
-
-Only skills that exist on **both** sides are compared. A skill that exists here
-and not in the shared repo is out of scope: it is not compared, not pushed, and
-not mentioned in the report at all.
-
-Never push to the shared repo without the user saying so in the current
-conversation.
 
 ### OpenSpec — `openspec.enabled`
 
@@ -217,6 +239,43 @@ Read the paths listed in `docs.roadmap`. If the config lists none, search
 - Then one line stating where the project actually stands: which phase is done,
   which is in flight, what the next milestone is.
 
+### Handover documents — always, and read before anything is concluded
+
+A handover document is a one-shot baton written by the previous session so the
+next one can resume without re-deriving it. It is disposable by design and goes
+stale the moment anything changes. It is **never** a reference and is **never**
+cited as a source.
+
+`docs/handover/` is where `/handover` writes them, so search there first, then
+the repo root and the rest of `docs/`. Search tracked and untracked files, and
+look for both forms:
+
+- **The convention:** `TEMP` and a date in the filename, in any arrangement and
+  any date format (`TEMP-11-Aug-2026.md`, `TEMP_2026-08-11-handover.md`).
+- **The fallback:** any Markdown file whose own opening lines declare it
+  delete-after-reading or call itself a handover, whatever the filename or
+  wherever it sits. A document written before the convention existed is still a
+  handover document.
+
+Handle every document found, in this order:
+
+- **Read it in full first**, before the roadmap, the spec and the tickets are
+  judged. Its contents inform the whole report.
+- **Decide current or stale.** A handover document is stale when a
+  later-dated handover document exists, or when commits land after its date. The
+  most recent handover document is the current one; there is only ever one.
+- **Delete every handover document read**, current and stale alike. The current
+  one is deleted because it has now been read; a stale one is deleted because it
+  is superseded. Deletion needs no confirmation: the contents are in context and
+  the file is recoverable from git history.
+- **Never carry an undated claim from a handover document into the report as
+  current.** Where a handover claim matters, confirm it against the code, the
+  roadmap or the spec first, and report that source instead.
+
+Where the active spec carries a task to rewrite a handover document, that task
+now means writing a fresh `TEMP`-and-date file. Flag it where the task still
+names the deleted path.
+
 ### Optional integrations
 
 Run only when enabled, and give each one line in the report unless it is red:
@@ -225,7 +284,7 @@ values; flag if the locally selected config differs from `doppler.config`),
 Sentry (unresolved issues from the last 48h by event count), Trigger.dev (recent
 run statuses; flag failed or stuck).
 
-## 3. Report
+## 4. Report
 
 Everything gathered above is held in context so the user can ask follow-up
 questions. Almost none of it is printed. The report is a **synthesis, not an
@@ -272,6 +331,13 @@ bullet that merely proves the gathering happened is deleted.
 
 Use only these, in this order. Omit any section with nothing to say.
 
+- **Handover read and deleted** — one bullet per handover document handled, at
+  most 3, omitted entirely when none was found.
+  - Each bullet carries the document's date, whether the document was current or
+    stale, one clause saying what the document contained, and that the document
+    was deleted.
+  - The contents themselves are not reproduced: what a handover document says
+    about the project belongs in the sections below, confirmed against the code.
 - **Where things stand** — the position, in at most 4 bullets.
   - Which branch is checked out, whether that branch holds the latest work, and
     whether anything is undeployed.

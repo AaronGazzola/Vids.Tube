@@ -92,4 +92,4 @@ mid-transition.
 
 ## 6. Land it
 
-- [ ] 6.1 Run `openspec validate --strict` and archive.
+- [x] 6.1 Run `openspec validate --strict` and archive.
