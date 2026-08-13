@@ -155,11 +155,28 @@ Activity mini-card + approval → overlay mark-off animation → `!bingo`);
 end-of-stream podium (top 3 + personal-best callouts) as a wrap-up bot moment;
 badge evaluation beyond the Day One award (AZ-225).
 
-### V4 — Dragon game on stream (requires eco3d E4)
-Habitat overlay element (one habitat at a time at the bottom of the stream);
-chatter interactions designed in a dedicated design session alongside the
-game; Credits-to-game valve (egg purchases, gifts); gifting flow with print
-rights; hatch/reveal ceremonies as overlay moments.
+### V4 — The overlay platform, and the dragon game as tenant one
+**Restated 14-Aug-2026.** This phase is no longer a bespoke dragon integration.
+Vids.Tube becomes a general overlay-game platform: streamers browse a library,
+toggle overlays, and configure them, and third-party overlays are an explicit
+long-term goal. The dragon game from eco3d.shop is tenant one and gets no
+privileges a stranger would not get. Full reasoning and the six locked decisions
+are in `docs/overlay-platform.md`; the tenant side is in
+`../eco3d.shop/docs/game-architecture.md`.
+
+Foundation: an overlay registry; short-lived signed tokens naming overlay,
+channel and an opaque per-channel viewer; settings stored per channel per
+overlay as a blob the overlay owns, with the streamer-facing editor; the
+two-way message channel and the SDK the frame loads; event routing by
+subscription off the existing command registry; and replacing the single
+build-time overlay address, which cannot serve two streamers, with a
+per-channel frame carrying a token.
+
+Deferred by decision, not by oversight: the wildcard subdomain and proxy, the
+review flow, the permissions UI, and the public catalogue.
+
+Then the game itself: chatter interactions, the Credits-to-game valve, gifting
+with print rights, and hatch ceremonies as overlay moments.
 
 ### V5 — Creator toolkit & beyond (foundation shipped early)
 The stream timeline shipped 2026-08-08 out of phase order (AZ-206), because the
