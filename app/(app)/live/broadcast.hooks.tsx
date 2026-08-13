@@ -17,6 +17,7 @@ import {
   saveStreamSettingsAction,
   setBreakAction,
   type StreamSettingsInput,
+  listReusableBroadcastsAction,
   uploadBroadcastThumbnailAction,
   upsertBroadcastAction,
 } from "./broadcast.actions";
@@ -245,8 +246,6 @@ export function useEndStream() {
 }
 
 export function useUploadBroadcastThumbnail() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
@@ -257,16 +256,10 @@ export function useUploadBroadcastThumbnail() {
       }
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: broadcastKey });
-      toast.custom(() => (
-        <CustomToast
-          variant="success"
-          title="Thumbnail updated"
-          message="Your broadcast thumbnail is set."
-        />
-      ));
-    },
+    // Deliberately silent on success, and deliberately invalidating nothing.
+    // This now runs inside the settings save, which refetches and reports for
+    // itself; invalidating here is what used to resync the form mid-edit and
+    // throw away whatever else the owner had typed.
     onError: (error) => {
       toast.custom(() => (
         <CustomToast
@@ -305,6 +298,31 @@ export function useRegenerateStreamKey() {
         <CustomToast
           variant="error"
           title="Could not regenerate key"
+          message={error.message}
+        />
+      ));
+    },
+  });
+}
+
+export function useReusableBroadcasts(enabled: boolean) {
+  return useQuery({
+    queryKey: ["reusable-broadcasts"],
+    queryFn: () => listReusableBroadcastsAction(),
+    // Fetched only while the dialog is open, so opening /live costs nothing.
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useBroadcastSettingsFor() {
+  return useMutation({
+    mutationFn: (streamId: string) => getStreamSettingsAction(streamId),
+    onError: (error) => {
+      toast.custom(() => (
+        <CustomToast
+          variant="error"
+          title="Couldn't load those settings"
           message={error.message}
         />
       ));

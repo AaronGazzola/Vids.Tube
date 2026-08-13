@@ -54,6 +54,7 @@ import {
   useGoLive,
   useSaveStreamSettings,
   useSetBreak,
+  useUploadBroadcastThumbnail,
   useStreamSettings,
   useTranscript,
 } from "./broadcast.hooks";
@@ -113,6 +114,8 @@ function buildForm(s: StreamSettings): SettingsForm {
     waitingRoomChat: s.waitingRoomChat,
     chatterEnrichment: s.chatterEnrichment,
     disabledCommands: [...s.disabledCommands].sort(),
+    thumbnailPath: s.thumbnailPath,
+    thumbnailFile: null,
   };
 }
 
@@ -423,6 +426,7 @@ export default function LivePage() {
   const { data: broadcast } = useCurrentBroadcast();
   const settingsQuery = useStreamSettings();
   const save = useSaveStreamSettings();
+  const uploadThumbnail = useUploadBroadcastThumbnail();
 
   const settings = settingsQuery.data;
   const streamId = settings?.streamId ?? null;
@@ -514,13 +518,21 @@ export default function LivePage() {
     waitingRoomChat: f.waitingRoomChat,
     chatterEnrichment: f.chatterEnrichment,
     disabledCommands: f.disabledCommands,
+    thumbnailPath: f.thumbnailPath,
   });
 
   const doSave = async (f: SettingsForm) => {
     // From here the layout's own debounced save persists the messages and the
     // realtime push carries them to OBS, on the path a box move already uses.
     commitMessages();
-    await save.mutateAsync(buildPayload(f));
+    // A staged thumbnail reaches storage only now, so an abandoned choice never
+    // leaves an object behind and never touches the broadcast.
+    let payload = buildPayload(f);
+    if (f.thumbnailFile) {
+      const key = await uploadThumbnail.mutateAsync(f.thumbnailFile);
+      payload = { ...payload, thumbnailPath: key };
+    }
+    await save.mutateAsync(payload);
     const fresh = await settingsQuery.refetch();
     if (fresh.data) {
       setSyncedId(fresh.data.streamId);

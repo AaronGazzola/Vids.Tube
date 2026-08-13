@@ -13,11 +13,19 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { applyReusedSettings } from "@/lib/settings-reuse";
 import { vodAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import {
@@ -40,15 +48,16 @@ import {
   RefreshCw,
   Underline,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDemoLayoutStore } from "./demo.stores";
 import { DEMO_MEMBER_COUNT, type StripMessage } from "./demo.types";
 import { toast } from "sonner";
 import {
+  useBroadcastSettingsFor,
   useOutstandingRepairs,
   useRegenerateStreamKey,
+  useReusableBroadcasts,
   useStreamKey,
-  useUploadBroadcastThumbnail,
 } from "./broadcast.hooks";
 import {
   useChannelCommandsAdmin,
@@ -65,6 +74,21 @@ import {
 import { useOverlayUrlInfo, useRegenerateOverlayToken } from "./demo.hooks";
 
 const STREAM_HOST = process.env.NEXT_PUBLIC_STREAM_HOST ?? "";
+
+export const THUMB_ACCEPT = "image/jpeg,image/png,image/webp";
+const MAX_THUMB_BYTES = 5 * 1024 * 1024;
+
+// Checked here rather than only on upload, so a bad file is refused before it
+// is staged and the owner is told at the moment they choose it.
+export function thumbnailRejection(file: File): string | null {
+  if (!THUMB_ACCEPT.split(",").includes(file.type)) {
+    return "Unsupported file type — use JPG, PNG, or WebP.";
+  }
+  if (file.size > MAX_THUMB_BYTES) {
+    return "File too large — thumbnail must be 5 MB or smaller.";
+  }
+  return null;
+}
 
 export type SettingsForm = {
   title: string;
@@ -91,6 +115,10 @@ export type SettingsForm = {
   waitingRoomChat: boolean;
   chatterEnrichment: boolean;
   disabledCommands: string[];
+  // The stored key, and a file chosen but not yet uploaded. Staging the file
+  // here is what lets Save changes be the only writer.
+  thumbnailPath: string | null;
+  thumbnailFile: File | null;
 };
 
 function Section({
@@ -933,10 +961,23 @@ export function SettingsTab({
   isPublic: boolean;
   workerRunning: boolean;
 }) {
-  const uploadThumbnail = useUploadBroadcastThumbnail();
   const urlInfo = useOverlayUrlInfo();
   const regenerateToken = useRegenerateOverlayToken();
-  const thumbnailUrl = vodAssetUrl(thumbnailPath);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+
+  // A staged file is previewed from a local object URL, revoked when it is
+  // replaced or the tab unmounts, so nothing has to reach storage to be seen.
+  const stagedUrl = useMemo(
+    () => (form.thumbnailFile ? URL.createObjectURL(form.thumbnailFile) : null),
+    [form.thumbnailFile]
+  );
+  useEffect(
+    () => () => {
+      if (stagedUrl) URL.revokeObjectURL(stagedUrl);
+    },
+    [stagedUrl]
+  );
+  const thumbnailUrl = stagedUrl ?? vodAssetUrl(form.thumbnailPath ?? thumbnailPath);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const overlayUrl = urlInfo.data
@@ -947,6 +988,8 @@ export function SettingsTab({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <ReuseSettingsDialog form={form} setForm={setForm} isLive={isPublic} />
+
       <Section title="Broadcast details">
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
@@ -993,13 +1036,29 @@ export function SettingsTab({
           <Input
             id="thumbnail"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={uploadThumbnail.isPending}
+            accept={THUMB_ACCEPT}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadThumbnail.mutate(file);
+              const file = e.target.files?.[0] ?? null;
+              if (!file) return;
+              const rejection = thumbnailRejection(file);
+              if (rejection) {
+                setThumbnailError(rejection);
+                e.target.value = "";
+                return;
+              }
+              setThumbnailError(null);
+              set({ thumbnailFile: file });
             }}
           />
+          {thumbnailError ? (
+            <p className="text-xs text-destructive">{thumbnailError}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {form.thumbnailFile
+                ? "Chosen. It is stored when you save changes."
+                : "JPG, PNG or WebP, up to 5 MB."}
+            </p>
+          )}
         </div>
       </Section>
 
@@ -1254,5 +1313,102 @@ export function SettingsTab({
 
       <RepairSection />
     </div>
+  );
+}
+
+// Copies a previous broadcast into the form and nothing else. Save changes is
+// still the only writer, so opening this, browsing it and picking the wrong
+// broadcast all cost nothing.
+export function ReuseSettingsDialog({
+  form,
+  setForm,
+  isLive,
+}: {
+  form: SettingsForm;
+  setForm: (f: SettingsForm) => void;
+  isLive: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: broadcasts, isPending } = useReusableBroadcasts(open);
+  const load = useBroadcastSettingsFor();
+
+  const choose = async (streamId: string) => {
+    const settings = await load.mutateAsync(streamId);
+    setForm(applyReusedSettings(form, settings));
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        className="self-start"
+        disabled={isLive}
+        onClick={() => setOpen(true)}
+      >
+        Reuse stream settings
+      </Button>
+      {isLive && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Not while you are live.
+        </p>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reuse stream settings</DialogTitle>
+            <DialogDescription>
+              Copies everything from a previous broadcast except its YouTube URL
+              and its scheduled time. Nothing is saved until you click Save
+              changes.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isPending ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !broadcasts?.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No previous broadcasts yet.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {broadcasts.map((b) => (
+                <li key={b.id}>
+                  <button
+                    onClick={() => void choose(b.id)}
+                    disabled={load.isPending}
+                    className="flex w-full items-center gap-3 rounded-md border p-2 text-left hover:bg-accent disabled:opacity-50"
+                  >
+                    {b.thumbnailPath ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={vodAssetUrl(b.thumbnailPath) ?? ""}
+                        alt=""
+                        className="aspect-video w-28 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex aspect-video w-28 shrink-0 items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">
+                        No thumbnail
+                      </div>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {b.title}
+                      </span>
+                      {b.startedAt && (
+                        <span className="block text-xs text-muted-foreground">
+                          {new Date(b.startedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

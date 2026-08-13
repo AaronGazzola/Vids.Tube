@@ -577,6 +577,7 @@ export type StreamSettings = {
   bridgeEnabled: boolean;
   greetReturning: boolean;
   workerRunning: boolean;
+  thumbnailPath: string | null;
 };
 
 export type StreamSettingsInput = {
@@ -604,25 +605,35 @@ export type StreamSettingsInput = {
   wrapupThanksEnabled: boolean;
   bridgeEnabled: boolean;
   greetReturning: boolean;
+  // Undefined leaves the stored thumbnail alone; null clears it; a key sets it.
+  thumbnailPath?: string | null;
 };
 
-export async function getStreamSettingsAction(): Promise<StreamSettings> {
+// Given an id, loads that broadcast whatever its status; otherwise the active
+// one. Reuse reads through the same function as the tab itself, so the two can
+// never disagree about what a setting is.
+export async function getStreamSettingsAction(
+  streamId?: string
+): Promise<StreamSettings> {
   const owned = await getOwnedChannel();
   if ("error" in owned) {
     throw new Error(owned.error);
   }
   const { channel } = owned.data;
 
-  const { data: stream, error } = await supabaseAdmin
+  const base = supabaseAdmin
     .from("streams")
     .select(
-      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat, disabled_commands"
+      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat, disabled_commands, thumbnail_path"
     )
-    .eq("channel_id", channel.id)
-    .in("status", ["draft", "scheduled", "preview", "live"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq("channel_id", channel.id);
+  const { data: stream, error } = streamId
+    ? await base.eq("id", streamId).maybeSingle()
+    : await base
+        .in("status", ["draft", "scheduled", "preview", "live"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
   if (error) {
     console.error(error);
     throw new Error("Failed to load settings");
@@ -645,6 +656,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     return {
       streamId: null,
       status: "none",
+      thumbnailPath: null,
       channelSlug: channel.slug,
       title: "",
       description: "",
@@ -714,6 +726,7 @@ export async function getStreamSettingsAction(): Promise<StreamSettings> {
     wrapupThanksEnabled: scoring?.wrapup_thanks_enabled ?? true,
     bridgeEnabled: scoring?.bridge_enabled ?? true,
     greetReturning: scoring?.greet_returning ?? true,
+    thumbnailPath: stream?.thumbnail_path ?? null,
     highlightingEnabled: scoring?.highlighting_enabled ?? true,
     autoDisplayFeatured: scoring?.auto_display_featured ?? false,
     waitingRoomChat: stream.waiting_room_chat ?? false,
@@ -764,6 +777,7 @@ export async function saveStreamSettingsAction(
       description: string | null;
       waiting_room_chat: boolean;
       disabled_commands: string[];
+      thumbnail_path?: string | null;
       scheduled_start_at?: string | null;
       status?: string;
     } = {
@@ -772,6 +786,9 @@ export async function saveStreamSettingsAction(
       waiting_room_chat: input.waitingRoomChat,
       disabled_commands: input.disabledCommands,
     };
+    if (input.thumbnailPath !== undefined) {
+      update.thumbnail_path = input.thumbnailPath;
+    }
     // Don't flip a live row's status/schedule; a preview can still be scheduled.
     if (active.status !== "live") {
       update.scheduled_start_at = scheduledStartAt;
@@ -1006,23 +1023,11 @@ export async function uploadBroadcastThumbnailAction(
     return { error: "File too large — thumbnail must be 5 MB or smaller." };
   }
 
-  const { data: stream, error } = await supabaseAdmin
-    .from("streams")
-    .select("id, status")
-    .eq("channel_id", channel.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error(error);
-    throw new Error("Failed to load broadcast");
-  }
-  if (!stream || (stream.status !== "preview" && stream.status !== "live")) {
-    return { error: "Start your encoder before setting a thumbnail." };
-  }
-
-  const key = `live-thumb/${channel.id}/${stream.id}-${Date.now()}.${ext}`;
+  // Stores the bytes and hands back the key, nothing more. Which broadcast the
+  // key belongs to is decided by the settings save, so choosing a thumbnail no
+  // longer needs a broadcast to exist, an encoder to be connected, or the form
+  // to be resynced out from under whatever else the owner was editing.
+  const key = `live-thumb/${channel.id}/${Date.now()}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   try {
@@ -1032,15 +1037,44 @@ export async function uploadBroadcastThumbnailAction(
     throw new Error("Failed to upload thumbnail");
   }
 
-  const { error: updateError } = await supabaseAdmin
-    .from("streams")
-    .update({ thumbnail_path: key })
-    .eq("id", stream.id);
+  return { data: key };
+}
 
-  if (updateError) {
-    console.error(updateError);
-    throw new Error("Failed to save thumbnail");
+export type ReusableBroadcast = {
+  id: string;
+  title: string;
+  thumbnailPath: string | null;
+  startedAt: string | null;
+};
+
+// Ended broadcasts only. A draft or a live one is not something to copy from,
+// and the point of the list is to inherit from a broadcast that actually ran.
+export async function listReusableBroadcastsAction(): Promise<
+  ReusableBroadcast[]
+> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { channel } = owned.data;
+
+  const { data, error } = await supabaseAdmin
+    .from("streams")
+    .select("id, title, thumbnail_path, started_at")
+    .eq("channel_id", channel.id)
+    .eq("status", "ended")
+    .order("started_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load previous broadcasts");
   }
 
-  return { data: key };
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    title: s.title ?? "Untitled broadcast",
+    thumbnailPath: s.thumbnail_path,
+    startedAt: s.started_at,
+  }));
 }
