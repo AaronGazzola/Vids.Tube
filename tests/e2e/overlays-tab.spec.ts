@@ -71,14 +71,25 @@ async function openOverlays(page: Page) {
 // the one used for geometry.
 const BOX = "members";
 
-async function boxRect(page: Page) {
+// The overlay's position is a canvas coordinate, and the canvas is itself
+// scaled to fit the panel. Viewport pixels therefore move whenever the stage
+// re-measures, which says nothing about the overlay. Position is read from the
+// box's own left/top in canvas units; only size is read from the viewport,
+// where the ratio is what matters and the common factor cancels.
+async function boxGeometry(page: Page) {
   return page.evaluate((boxKey) => {
     const el = document.querySelector(
       `[data-testid="overlay-container-${boxKey}"]`
-    );
+    ) as HTMLElement | null;
     if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
+    const positioned = el.parentElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    return {
+      left: parseFloat(positioned.style.left || "0"),
+      top: parseFloat(positioned.style.top || "0"),
+      width: rect.width,
+      height: rect.height,
+    };
   }, BOX);
 }
 
@@ -133,7 +144,7 @@ test("dragging a corner resizes without changing the aspect ratio", async ({
     timeout: 10_000,
   });
 
-  const before = await boxRect(page);
+  const before = await boxGeometry(page);
   expect(before).not.toBeNull();
 
   const handle = page.getByTestId(`overlay-handle-${BOX}-br`);
@@ -147,16 +158,16 @@ test("dragging a corner resizes without changing the aspect ratio", async ({
   );
   await page.mouse.up();
 
-  const after = await boxRect(page);
+  const after = await boxGeometry(page);
   expect(after!.width).toBeGreaterThan(before!.width + 5);
 
   const ratioBefore = before!.width / before!.height;
   const ratioAfter = after!.width / after!.height;
   expect(Math.abs(ratioAfter - ratioBefore)).toBeLessThan(0.02);
 
-  // The opposite corner is the anchor, so the top-left must not have moved.
-  expect(Math.abs(after!.x - before!.x)).toBeLessThan(2);
-  expect(Math.abs(after!.y - before!.y)).toBeLessThan(2);
+  // The bottom-right handle anchors the top-left, which must not move at all.
+  expect(after!.left).toBeCloseTo(before!.left, 3);
+  expect(after!.top).toBeCloseTo(before!.top, 3);
 });
 
 test("turning the switch off makes dragging inert", async ({ page }) => {
@@ -171,24 +182,28 @@ test("turning the switch off makes dragging inert", async ({ page }) => {
   await expect(page.getByTestId(`overlay-container-${BOX}`)).toBeVisible({
     timeout: 10_000,
   });
-  const rect = await boxRect(page);
+  const before = await boxGeometry(page);
+  const grab = await page.getByTestId(`overlay-container-${BOX}`).boundingBox();
 
   await toggle.click();
   await expect(page.getByTestId(`overlay-container-${BOX}`)).toHaveCount(0);
 
-  await page.mouse.move(rect!.x + rect!.width / 2, rect!.y + rect!.height / 2);
+  await page.mouse.move(
+    grab!.x + grab!.width / 2,
+    grab!.y + grab!.height / 2
+  );
   await page.mouse.down();
   await page.mouse.move(
-    rect!.x + rect!.width / 2 + 150,
-    rect!.y + rect!.height / 2 + 150,
+    grab!.x + grab!.width / 2 + 150,
+    grab!.y + grab!.height / 2 + 150,
     { steps: 10 }
   );
   await page.mouse.up();
 
   await toggle.click();
-  const after = await boxRect(page);
-  expect(Math.abs(after!.x - rect!.x)).toBeLessThan(2);
-  expect(Math.abs(after!.y - rect!.y)).toBeLessThan(2);
+  const after = await boxGeometry(page);
+  expect(after!.left).toBeCloseTo(before!.left, 3);
+  expect(after!.top).toBeCloseTo(before!.top, 3);
 });
 
 test("the Preview tab carries only the preview and the transcript", async ({

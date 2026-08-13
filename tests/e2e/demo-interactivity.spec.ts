@@ -64,10 +64,15 @@ async function loginAsOwner(page: Page) {
   await expect(page).toHaveURL("/");
 }
 
-// Demo now lives in the Overlays tab's control panel rather than the page
-// header, so reaching it means opening that tab first.
+// Demo is no longer one page-wide switch. The Overlays tab has its own, in its
+// control panel, and the Activity tab has a separate one in the header. This
+// spec exercises both surfaces, so it turns on both.
+// Activity first, so this leaves the page on the Overlays tab where the stage
+// is, which is what every assertion after it reads.
 async function enableDemo(page: Page) {
   await page.goto("/live");
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await page.getByRole("switch", { name: "Show simulated activity" }).click();
   await page.getByRole("tab", { name: "Overlays" }).click();
   await page.getByRole("switch", { name: "Show demo values" }).click();
 }

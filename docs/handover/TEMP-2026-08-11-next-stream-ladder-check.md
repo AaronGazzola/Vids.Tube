@@ -89,14 +89,14 @@ never starts, so its pid file never appears, so the live hook stops flagging a l
 broadcasts record the single-rendition address again with latency back at 1 to 3 seconds.
 Broadcasts already recorded are unaffected. No app deploy is involved either way.
 
-## Known defect, worth fixing separately
+## The verification script, now fixed
 
-`verify-ladder.sh` cannot run where the runbook says to run it. The script resolves its paths
-relative to a repo checkout and shells out to `npx tsx` to write the master playlist, and the
-streaming machine has neither a checkout nor Node. A machine-local variant was used for the
-run above, differing only in that the static master playlist is copied in rather than
-generated; every assertion was untouched. Either vendor the playlist writer as shell, or say
-plainly in the runbook that the machine needs Node.
+`verify-ladder.sh` used to need a repo checkout and Node, which the streaming machine has
+neither of, so it could not run where the runbook said to run it. It now prefers the installed
+`/var/lib/vids-tube/hls/<channel>/master.m3u8` and only generates one when running from a
+checkout. On the machine it needs ffmpeg and nothing else, and it checks the exact playlist
+production serves. It has been redeployed and re-run there unmodified: all sixteen checks
+pass.
 
 ## Related
 

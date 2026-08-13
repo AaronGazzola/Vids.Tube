@@ -48,7 +48,35 @@ ffmpeg -hide_banner -loglevel error -y \
   -c:a aac -ac 2 -ar 48000 -shortest "${SOURCE}"
 
 mkdir -p "${OUT}"
-npx --yes tsx "${REPO}/scripts/vm/write-master-playlist.ts" --root "${WORK}" --path "${CHANNEL}" >/dev/null
+
+# The master playlist is static per channel, and the streaming machine already
+# has the real one installed. Preferring it means this runs on the machine with
+# nothing but ffmpeg — no checkout, no Node — and checks the exact file
+# production serves rather than a fresh copy that merely ought to match.
+# Generating from the repository is the fallback, for running from a checkout.
+MASTER=""
+if [ -n "${LADDER_MASTER:-}" ] && [ -f "${LADDER_MASTER}" ]; then
+  MASTER="${LADDER_MASTER}"
+else
+  for candidate in "${LADDER_HLS_INSTALL_ROOT:-/var/lib/vids-tube/hls}"/*/master.m3u8; do
+    [ -f "${candidate}" ] || continue
+    MASTER="${candidate}"
+    break
+  done
+fi
+
+if [ -n "${MASTER}" ]; then
+  echo "using the installed master playlist: ${MASTER}"
+  cp "${MASTER}" "${OUT}/master.m3u8"
+elif [ -f "${REPO}/scripts/vm/write-master-playlist.ts" ] && command -v npx >/dev/null 2>&1; then
+  echo "no installed master playlist; generating one from the repository"
+  npx --yes tsx "${REPO}/scripts/vm/write-master-playlist.ts" --root "${WORK}" --path "${CHANNEL}" >/dev/null
+else
+  echo "FAIL: no master playlist to verify against."
+  echo "  Install one at /var/lib/vids-tube/hls/<channel>/master.m3u8, or point"
+  echo "  LADDER_MASTER at a copy, or run this from a checkout with npx available."
+  exit 1
+fi
 
 echo "starting the transcoder, with nothing enabling it, since the ladder is on by default"
 LADDER_SOURCE="${SOURCE}" \

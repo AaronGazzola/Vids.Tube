@@ -151,7 +151,20 @@ that all three renditions advance, share segment boundaries and carry identical
 audio. It touches neither MediaMTX nor production:
 
 ```bash
-# from a checkout of the app repo, on any machine with ffmpeg:
+# on the streaming machine, once the scripts and the master playlist are installed:
+sh /usr/local/bin/verify-ladder.sh
+```
+
+It needs **ffmpeg and nothing else** there. The master playlist is static per
+channel, so rather than regenerating one the script uses the installed
+`/var/lib/vids-tube/hls/<channel>/master.m3u8` — the exact file production
+serves, which makes the master-references-real-playlists check meaningful rather
+than circular. Point `LADDER_MASTER` at a specific file to override the choice.
+
+From a checkout instead, with no channel installed, it falls back to generating
+the master playlist with `npx tsx` and runs the same way:
+
+```bash
 sh scripts/vm/verify-ladder.sh
 ```
 
