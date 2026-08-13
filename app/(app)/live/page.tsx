@@ -29,7 +29,7 @@ import {
 } from "@/lib/schedule-validation";
 import { isFeedDisconnected } from "@/lib/stream";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   DemoActivity,
@@ -439,6 +439,8 @@ export default function LivePage() {
   const [previewPortrait, setPreviewPortrait] = useState<boolean | null>(null);
   const demo = useDemoLayoutStore((s) => s.demo);
   const demoToObs = useDemoLayoutStore((s) => s.demoToObs);
+  const panelOpen = useDemoLayoutStore((s) => s.panelOpen);
+  const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
   const mobileChrome = useDemoLayoutStore((s) => s.config.mobileChrome);
   const setMobileChrome = useDemoLayoutStore((s) => s.setMobileChrome);
   const draftMessages = useDemoLayoutStore((s) => s.draftMessages);
@@ -560,14 +562,28 @@ export default function LivePage() {
         onValueChange={setTab}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="mx-4 mt-4 flex shrink-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="mx-4 mt-4 flex shrink-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <TabsList>
               <TabsTrigger value="settings">Settings</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>
               <TabsTrigger value="overlays">Overlays</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
             </TabsList>
+            {tab === "overlays" && (
+              <Button
+                variant={panelOpen ? "default" : "outline"}
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                aria-label={
+                  panelOpen ? "Hide overlay controls" : "Show overlay controls"
+                }
+                aria-pressed={panelOpen}
+                onClick={() => setPanelOpen(!panelOpen)}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+            )}
             {tab === "activity" &&
               (activityDemo ? <DemoActivityIndicators /> : <ActivityIndicators />)}
           </div>

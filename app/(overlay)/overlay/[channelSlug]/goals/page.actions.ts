@@ -1,15 +1,23 @@
 "use server";
 
-import type { GoalProgressResponse, YouTubeVideoData } from "@/app/layout.types";
+import type {
+  GoalMetric,
+  GoalProgressResponse,
+  YouTubeVideoData,
+} from "@/app/layout.types";
 import { computeGoalProgress } from "@/lib/goals";
 import { isLiveAndFresh } from "@/lib/stream";
 import { fetchSubs, fetchVideoData } from "@/lib/youtube";
 import { createClient } from "@/supabase/server-client";
 
-const INACTIVE = (isLive: boolean): GoalProgressResponse => ({
+const INACTIVE = (
+  isLive: boolean,
+  targets: Record<GoalMetric, number> | null = null
+): GoalProgressResponse => ({
   active: false,
   isLive,
   metrics: null,
+  targets,
 });
 
 // One YouTube fetch per key per TTL, shared by every overlay source polling
@@ -85,17 +93,30 @@ export async function getGoalProgressAction(
     .maybeSingle();
 
   const isLive = !!stream && isLiveAndFresh(stream, Date.now());
-  if (!stream || !isLive || !stream.youtube_video_id) {
-    return INACTIVE(isLive);
-  }
 
-  const { data: goals } = await supabase
-    .from("stream_goals")
-    .select("*")
-    .eq("stream_id", stream.id)
-    .maybeSingle();
+  // Read the saved goals for the latest broadcast whatever its state, so an
+  // idle bar can be drawn against the owner's targets rather than the defaults.
+  const { data: goals } = stream
+    ? await supabase
+        .from("stream_goals")
+        .select("*")
+        .eq("stream_id", stream.id)
+        .maybeSingle()
+    : { data: null };
+
+  const targets = goals
+    ? {
+        subs: goals.subs_goal,
+        likes: goals.likes_goal,
+        viewers: goals.viewers_goal,
+      }
+    : null;
+
+  if (!stream || !isLive || !stream.youtube_video_id) {
+    return INACTIVE(isLive, targets);
+  }
   if (!goals || !goals.started_at) {
-    return INACTIVE(isLive);
+    return INACTIVE(isLive, targets);
   }
 
   try {
@@ -116,9 +137,9 @@ export async function getGoalProgressAction(
         viewers: goals.viewers_goal,
       }
     );
-    return { active: true, isLive, metrics };
+    return { active: true, isLive, metrics, targets };
   } catch (e) {
     console.error(e);
-    return INACTIVE(isLive);
+    return INACTIVE(isLive, targets);
   }
 }

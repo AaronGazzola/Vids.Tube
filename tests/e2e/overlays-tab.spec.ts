@@ -65,6 +65,21 @@ async function openOverlays(page: Page) {
   await expect(page.getByTestId("overlays-stage")).toBeVisible({
     timeout: 20_000,
   });
+  await settle(page);
+}
+
+// Overlays first render at their defaults and jump to the saved layout when it
+// arrives. Measuring before that lands reads a position nobody chose, so wait
+// until two consecutive samples agree.
+async function settle(page: Page) {
+  let previous: string | null = null;
+  for (let i = 0; i < 40; i += 1) {
+    const current = JSON.stringify(await boxGeometry(page));
+    if (current !== "null" && current === previous) return;
+    previous = current;
+    await page.waitForTimeout(250);
+  }
+  throw new Error("the overlay layout never settled");
 }
 
 // The members strip is always visible by default and has a stable box, so it is
@@ -76,14 +91,17 @@ const BOX = "members";
 // re-measures, which says nothing about the overlay. Position is read from the
 // box's own left/top in canvas units; only size is read from the viewport,
 // where the ratio is what matters and the common factor cancels.
+// Read from the positioned box, which exists whether or not resize mode is on.
+// Reading from the container would mean toggling the mode to take a
+// measurement, and the layout autosaves and rehydrates in between, which moves
+// the box for reasons that have nothing to do with what is being tested.
 async function boxGeometry(page: Page) {
   return page.evaluate((boxKey) => {
-    const el = document.querySelector(
-      `[data-testid="overlay-container-${boxKey}"]`
+    const positioned = document.querySelector(
+      `[data-testid="overlay-box-${boxKey}"]`
     ) as HTMLElement | null;
-    if (!el) return null;
-    const positioned = el.parentElement as HTMLElement;
-    const rect = el.getBoundingClientRect();
+    if (!positioned) return null;
+    const rect = positioned.getBoundingClientRect();
     return {
       left: parseFloat(positioned.style.left || "0"),
       top: parseFloat(positioned.style.top || "0"),
@@ -108,6 +126,90 @@ test("the tab opens with the panel shown and nothing resizable", async ({
     page.getByTestId(`overlay-container-${BOX}`)
   ).toHaveCount(0);
   await expect(page.getByTestId(`overlay-handle-${BOX}-br`)).toHaveCount(0);
+});
+
+test("empty overlays are on screen with nothing live and demo off", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await loginAsOwner(page);
+  await openOverlays(page);
+  const stage = page.getByTestId("overlays-stage");
+
+  // The whole point of the tab: the layout is there without inventing data.
+  // An empty leaderboard draws nothing, so it is present rather than visible,
+  // which is what makes it positionable once resize mode is on.
+  await expect(stage.getByTestId("competition-ladder")).toBeAttached();
+  await expect(stage.locator("mask#ring-track-subs")).toHaveCount(1);
+  await expect(stage.locator("mask#ring-track-likes")).toHaveCount(1);
+  await expect(stage.locator("mask#ring-track-viewers")).toHaveCount(1);
+
+  // The one overlay with no resting state stays out of the way.
+  await expect(
+    stage.locator("div.border-dashed", { hasText: "Highlight" })
+  ).toHaveCount(0);
+});
+
+test("the panel is toggled from beside the tabs, not from the stage", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await loginAsOwner(page);
+  await openOverlays(page);
+
+  const toggle = page.getByRole("button", { name: "Hide overlay controls" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+
+  const reopen = page.getByRole("button", { name: "Show overlay controls" });
+  await expect(reopen).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    page.getByTestId("overlays-stage").getByRole("button", { name: "Overlays" })
+  ).toHaveCount(0);
+
+  await reopen.click();
+  await expect(
+    page.getByRole("button", { name: "Hide overlay controls" })
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("every overlay is grabbable at a narrow width, with the tabs on their own line", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 620, height: 900 });
+  await loginAsOwner(page);
+  await openOverlays(page);
+  await page
+    .getByRole("switch", { name: "Show resize and reposition containers" })
+    .click();
+
+  // Which overlays are enabled is the owner's choice, so the property under
+  // test is that whatever is on the stage can be grabbed — including anything
+  // currently drawing nothing, which would otherwise collapse to no size.
+  const containers = page.locator('[data-testid^="overlay-container-"]');
+  await expect(containers.first()).toBeVisible({ timeout: 20_000 });
+  const count = await containers.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (let i = 0; i < count; i += 1) {
+    const box = await containers.nth(i).boundingBox();
+    expect(box, `container ${i} has no box`).not.toBeNull();
+    expect(box!.width).toBeGreaterThan(0);
+    expect(box!.height).toBeGreaterThan(0);
+  }
+
+  // The reflow is judged on the Activity tab, which is the one carrying
+  // controls on the right of the header for the tabs to be pushed above.
+  await page.getByRole("tab", { name: "Activity" }).click();
+  const demoSwitch = page.getByRole("switch", {
+    name: "Show simulated activity",
+  });
+  await expect(demoSwitch).toBeVisible({ timeout: 10_000 });
+
+  const tabs = await page.getByRole("tablist").boundingBox();
+  const control = await demoSwitch.boundingBox();
+  expect(control!.y).toBeGreaterThan(tabs!.y + tabs!.height - 2);
 });
 
 test("turning the switch on reveals four corner handles on a visible overlay", async ({
@@ -178,20 +280,17 @@ test("turning the switch off makes dragging inert", async ({ page }) => {
     name: "Show resize and reposition containers",
   });
 
-  await toggle.click();
-  await expect(page.getByTestId(`overlay-container-${BOX}`)).toBeVisible({
+  // Never turned on: the box is read through its positioned wrapper, so the
+  // measurement does not depend on the mode being toggled.
+  await expect(page.getByTestId(`overlay-box-${BOX}`)).toBeVisible({
     timeout: 10_000,
   });
-  const before = await boxGeometry(page);
-  const grab = await page.getByTestId(`overlay-container-${BOX}`).boundingBox();
-
-  await toggle.click();
   await expect(page.getByTestId(`overlay-container-${BOX}`)).toHaveCount(0);
 
-  await page.mouse.move(
-    grab!.x + grab!.width / 2,
-    grab!.y + grab!.height / 2
-  );
+  const before = await boxGeometry(page);
+  const grab = await page.getByTestId(`overlay-box-${BOX}`).boundingBox();
+
+  await page.mouse.move(grab!.x + grab!.width / 2, grab!.y + grab!.height / 2);
   await page.mouse.down();
   await page.mouse.move(
     grab!.x + grab!.width / 2 + 150,
@@ -200,10 +299,15 @@ test("turning the switch off makes dragging inert", async ({ page }) => {
   );
   await page.mouse.up();
 
-  await toggle.click();
   const after = await boxGeometry(page);
   expect(after!.left).toBeCloseTo(before!.left, 3);
   expect(after!.top).toBeCloseTo(before!.top, 3);
+
+  // And the mode still works when asked for.
+  await toggle.click();
+  await expect(page.getByTestId(`overlay-container-${BOX}`)).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test("the Preview tab carries only the preview and the transcript", async ({

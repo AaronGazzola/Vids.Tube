@@ -11,19 +11,29 @@ import { describe, expect, it } from "vitest";
 
 const CONFIG = DEFAULT_DEMO_LAYOUT;
 
-// What the composer hands the renderer when no broadcast is live: no goal
-// metrics, nobody scored, no feed item, no break. Nothing stands in for them.
+const SAVED_TARGET = 250;
+
+// What the composer hands the renderer when no broadcast is live: goals at zero
+// against the owner's saved targets, nobody scored, no feed item, no break.
+// Nothing is invented, and nothing is hidden merely for being empty.
 const EMPTY: OverlayStageValues = {
   feedVisible: true,
   feedSlot: null,
   feedSlotFilled: false,
   memberCount: 0,
-  goalMetric: () => null,
+  goalMetric: () => ({
+    current: 0,
+    target: SAVED_TARGET,
+    total: 0,
+    goal: SAVED_TARGET,
+    pct: 0,
+    reached: false,
+  }),
   competitionEntries: [],
   breakSlot: null,
 };
 
-function renderEmpty() {
+function renderEmpty(resizeMode = false) {
   return renderToStaticMarkup(
     <OverlayStage
       config={CONFIG}
@@ -31,16 +41,24 @@ function renderEmpty() {
       visible={CONFIG.visible}
       surface="composer"
       values={EMPTY}
+      resizeMode={resizeMode}
     />
   );
 }
 
 describe("the Overlays tab with nothing live", () => {
-  it("renders no goal bar at all rather than an idle or invented one", () => {
+  it("renders every goal bar, at zero, so they can be positioned", () => {
     const markup = renderEmpty();
-    expect(markup).not.toContain("ring-track-subs");
-    expect(markup).not.toContain("ring-track-likes");
-    expect(markup).not.toContain("ring-track-viewers");
+    expect(markup).toContain("ring-track-subs");
+    expect(markup).toContain("ring-track-likes");
+    expect(markup).toContain("ring-track-viewers");
+  });
+
+  it("draws the goal bars against the saved target, not a demo one", () => {
+    const markup = renderEmpty();
+    for (const target of Object.values(DEMO_GOAL_TARGETS)) {
+      expect(markup).not.toContain(`>${target}<`);
+    }
   });
 
   it("shows a zero member count, not the demo count", () => {
@@ -49,18 +67,15 @@ describe("the Overlays tab with nothing live", () => {
     expect(markup).not.toContain(`>${DEMO_MEMBER_COUNT}<`);
   });
 
-  it("renders no leaderboard when nobody has scored", () => {
-    expect(renderEmpty()).not.toContain("rainbow-ring");
+  it("renders the leaderboard frame even with nobody scored", () => {
+    expect(renderEmpty()).toContain("competition-ladder");
   });
 
-  it("shows the empty feed placeholder rather than a demo highlight", () => {
-    expect(renderEmpty()).toContain("Highlight");
+  it("hides the idle highlight placeholder while not positioning", () => {
+    expect(renderEmpty()).not.toContain("Highlight");
   });
 
-  it("carries no demo goal target into the markup", () => {
-    const markup = renderEmpty();
-    for (const target of Object.values(DEMO_GOAL_TARGETS)) {
-      expect(markup).not.toContain(`>${target}<`);
-    }
+  it("shows the highlight placeholder once resize mode is on", () => {
+    expect(renderEmpty(true)).toContain("Highlight");
   });
 });

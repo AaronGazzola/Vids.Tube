@@ -335,7 +335,7 @@ export default function OverlayFramePage({
       return goalData.metrics[m];
     }
     if (goalData && !goalData.isLive) {
-      return idleProgress(DEFAULT_GOALS[m]);
+      return idleProgress(goalData.targets?.[m] ?? DEFAULT_GOALS[m]);
     }
     return null;
   };

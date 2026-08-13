@@ -23,4 +23,7 @@ export type OverlayStageProps = {
   surface: OverlayStageSurface;
   values: OverlayStageValues;
   wrapBox?: (boxKey: DemoBoxKey, node: ReactNode) => ReactNode;
+  // Only the composer draws the idle placeholder, and only while the owner is
+  // positioning things. The audience surface never draws it at all.
+  resizeMode?: boolean;
 };

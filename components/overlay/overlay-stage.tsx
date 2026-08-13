@@ -20,16 +20,19 @@ import {
 import type { ReactNode } from "react";
 
 function Positioned({
+  boxKey,
   box,
   opacity = 1,
   children,
 }: {
+  boxKey: DemoBoxKey;
   box: OverlayBox;
   opacity?: number;
   children: ReactNode;
 }) {
   return (
     <div
+      data-testid={`overlay-box-${boxKey}`}
       className="absolute"
       style={
         {
@@ -67,11 +70,16 @@ export function OverlayStage({
   surface,
   values,
   wrapBox,
+  resizeMode = false,
 }: OverlayStageProps) {
   const wrap = (boxKey: DemoBoxKey, node: ReactNode) =>
     wrapBox ? wrapBox(boxKey, node) : node;
 
-  const showFeedPlaceholder = surface === "composer" && !values.feedSlotFilled;
+  // The composer exists to show what is there, including nothing: an empty
+  // leaderboard is a fact worth seeing and positioning. The audience must never
+  // be shown an empty frame, so the same values render differently there.
+  const renderEmpty = surface === "composer";
+  const showFeedPlaceholder = renderEmpty && resizeMode && !values.feedSlotFilled;
 
   return (
     <div
@@ -83,7 +91,7 @@ export function OverlayStage({
       style={{ width: OVERLAY_CANVAS_W, height: OVERLAY_CANVAS_H }}
     >
       {values.feedVisible && (
-        <Positioned box={boxes.highlight} opacity={config.boxOpacity.highlight}>
+        <Positioned boxKey="highlight" box={boxes.highlight} opacity={config.boxOpacity.highlight}>
           <div style={{ width: OVERLAY_FEED_WIDTH }}>
             {wrap(
               "highlight",
@@ -94,7 +102,7 @@ export function OverlayStage({
       )}
 
       {visible.members && (
-        <Positioned box={boxes.members} opacity={config.boxOpacity.members}>
+        <Positioned boxKey="members" box={boxes.members} opacity={config.boxOpacity.members}>
           {wrap(
             "members",
             <MemberCountStrip
@@ -112,6 +120,7 @@ export function OverlayStage({
         return (
           <Positioned
             key={metric}
+            boxKey={boxKey}
             box={boxes[boxKey]}
             opacity={config.boxOpacity[boxKey]}
           >
@@ -127,8 +136,10 @@ export function OverlayStage({
         );
       })}
 
-      {visible.competition && values.competitionEntries.length > 0 && (
+      {visible.competition &&
+        (renderEmpty || values.competitionEntries.length > 0) && (
         <Positioned
+          boxKey="competition"
           box={boxes.competition}
           opacity={config.boxOpacity.competition}
         >
@@ -143,13 +154,13 @@ export function OverlayStage({
       )}
 
       {visible.game && (
-        <Positioned box={boxes.game} opacity={config.boxOpacity.game}>
+        <Positioned boxKey="game" box={boxes.game} opacity={config.boxOpacity.game}>
           {wrap("game", <GameWindow />)}
         </Positioned>
       )}
 
       {values.breakSlot && (
-        <Positioned box={boxes.break} opacity={config.boxOpacity.break}>
+        <Positioned boxKey="break" box={boxes.break} opacity={config.boxOpacity.break}>
           {wrap("break", values.breakSlot)}
         </Positioned>
       )}

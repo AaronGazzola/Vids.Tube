@@ -130,7 +130,7 @@ export function CompetitionLadder({
   }, [burst]);
 
   return (
-    <div className="relative" style={{ width, height }}>
+    <div data-testid="competition-ladder" className="relative" style={{ width, height }}>
       {ranked.map((e) => {
         const st = standings.get(e.key) ?? { rank: ranked.length, progress: 0 };
         const f = rankScale(st.rank);

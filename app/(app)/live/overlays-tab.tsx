@@ -105,7 +105,7 @@ export function OverlaysTab({
   const feedVisible =
     config.visible.highlight || config.visible.tts || config.visible.ask;
   const demoValues = useOverlayDemoValues(goals, feedVisible);
-  const realValues = useOverlayComposerValues(channelSlug, feedVisible);
+  const realValues = useOverlayComposerValues(channelSlug, feedVisible, goals);
   const values = demo ? demoValues : realValues;
 
   const safeIndex = frames.length ? index % frames.length : 0;
@@ -182,6 +182,7 @@ export function OverlaysTab({
             visible={config.visible}
             surface="composer"
             values={values}
+            resizeMode={resizeMode}
             wrapBox={(boxKey: DemoBoxKey, node) => (
               <OverlayContainer
                 boxKey={boxKey}
@@ -251,15 +252,6 @@ export function OverlaysTab({
         </span>
       </div>
 
-      {!panelOpen && (
-        <button
-          onClick={() => setPanelOpen(true)}
-          className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/85"
-        >
-          Overlays
-        </button>
-      )}
-
       {panelOpen && (
         <div className="absolute right-3 top-3 flex max-h-[calc(100%-1.5rem)] w-48 flex-col gap-2 overflow-y-auto rounded-lg bg-black/70 p-2.5 text-xs text-white backdrop-blur-sm">
           <div className="flex items-center justify-between">
@@ -267,7 +259,7 @@ export function OverlaysTab({
             <button
               onClick={() => setPanelOpen(false)}
               className="rounded p-0.5 text-white/70 hover:bg-white/15 hover:text-white"
-              aria-label="Hide overlay controls"
+              aria-label="Close overlay controls"
             >
               <X className="h-4 w-4" />
             </button>

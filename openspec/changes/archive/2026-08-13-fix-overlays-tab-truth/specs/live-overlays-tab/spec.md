@@ -19,11 +19,12 @@ falling back to the built-in defaults only when no targets are saved.
 - **THEN** the Overlays tab shows those goal bars, those leaderboard entries and that
   highlight, matching what the OBS route renders
 
-#### Scenario: Empty overlays stay on screen
+#### Scenario: Empty overlays stay on the stage
 
 - **WHEN** no broadcast is live and the Overlays tab is opened
-- **THEN** the goal bars render at zero against the saved targets and the leaderboard renders
-  as an empty frame, rather than being absent from the stage
+- **THEN** the goal bars render at zero against the saved targets, and the leaderboard is
+  present on the stage rather than omitted from it, drawing nothing because it is empty and
+  becoming positionable once resize mode is on
 
 #### Scenario: The audience sees nothing instead of an empty frame
 

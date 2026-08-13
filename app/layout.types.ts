@@ -88,6 +88,10 @@ export type GoalProgressResponse = {
   active: boolean;
   isLive: boolean;
   metrics: Record<GoalMetric, MetricProgress> | null;
+  // The targets saved for the latest broadcast, carried even when no goal is
+  // running, so an idle goal bar reads against the owner's own numbers rather
+  // than the built-in defaults.
+  targets: Record<GoalMetric, number> | null;
 };
 
 export type FeaturedAuthor = {

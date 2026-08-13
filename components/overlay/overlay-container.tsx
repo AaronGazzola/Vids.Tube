@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useRef, useState, type ReactNode } from "react";
 
+const MIN_BOX = 96;
+
 const CORNERS: { corner: ResizeCorner; className: string; cursor: string }[] = [
   { corner: "tl", className: "-left-2 -top-2", cursor: "cursor-nwse-resize" },
   { corner: "tr", className: "-right-2 -top-2", cursor: "cursor-nesw-resize" },
@@ -120,6 +122,10 @@ export function OverlayContainer({
       data-testid={`overlay-container-${boxKey}`}
       onPointerDown={startDrag}
       className="relative cursor-move touch-none select-none"
+      // An overlay rendering nothing has no size, so its container would
+      // collapse and could not be grabbed. The minimum applies only while
+      // positioning, and only bites when the content is smaller than it.
+      style={{ minWidth: MIN_BOX, minHeight: MIN_BOX }}
     >
       <OverlayScaleProvider
         scale={holdScaleWhileDragging(
@@ -135,6 +141,17 @@ export function OverlayContainer({
         className="pointer-events-none absolute inset-0 border-dashed border-sky-300"
         style={{ borderWidth: 2 * handleScale }}
       />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-br bg-sky-300 px-1 font-medium text-sky-950"
+        style={{
+          fontSize: 11 * handleScale,
+          lineHeight: 1.4,
+          padding: `${1 * handleScale}px ${3 * handleScale}px`,
+        }}
+      >
+        {label}
+      </span>
       {CORNERS.map(({ corner, className, cursor }) => (
         <div
           key={corner}

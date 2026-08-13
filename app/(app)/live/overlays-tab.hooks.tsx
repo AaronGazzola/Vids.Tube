@@ -19,6 +19,7 @@ import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import type { OverlayStageValues } from "@/components/overlay/overlay-stage.types";
 import { TtsCard } from "@/components/overlay/tts-card";
 import { OVERLAY_LADDER_MAX } from "@/lib/demo-overlay";
+import { DEFAULT_GOALS, idleProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
 
@@ -107,7 +108,8 @@ function useComposerFeedFilled(streamId: string | null): boolean {
 // the tab's whole purpose is to show what viewers would see.
 export function useOverlayComposerValues(
   channelSlug: string,
-  feedVisible: boolean
+  feedVisible: boolean,
+  targets: Counts | null
 ): OverlayStageValues {
   const { data: channel } = useChannel(channelSlug);
   const streamQuery = useLiveStream(channel?.id);
@@ -120,11 +122,17 @@ export function useOverlayComposerValues(
   const { data: memberCount } = useMemberCount(channelSlug);
   const feedSlotFilled = useComposerFeedFilled(streamId);
 
+  // Never null. An overlay with no value still has a place on the stage, and a
+  // goal with no broadcast behind it is honestly zero against its target rather
+  // than absent. Targets come from the Settings tab, falling back to the
+  // built-in defaults only when nothing is saved.
   const goalMetric = (metric: GoalMetric) => {
     if (goalData?.active && goalData.metrics) {
       return goalData.metrics[metric];
     }
-    return null;
+    const target =
+      targets?.[metric] ?? goalData?.targets?.[metric] ?? DEFAULT_GOALS[metric];
+    return idleProgress(target);
   };
 
   const competitionEntries: CompetitionEntry[] = (scores ?? [])

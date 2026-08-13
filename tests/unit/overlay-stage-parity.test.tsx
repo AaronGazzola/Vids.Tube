@@ -23,7 +23,11 @@ function values(overrides: Partial<OverlayStageValues> = {}): OverlayStageValues
     feedSlotFilled: true,
     memberCount: 143,
     goalMetric: () => METRIC,
-    competitionEntries: [],
+    // Non-empty by default, so the identity check compares two populated
+    // stages. Emptiness is a deliberate difference and is asserted separately.
+    competitionEntries: [
+      { key: "someone", author: null, score: 12 },
+    ],
     breakSlot: null,
     ...overrides,
   };
@@ -31,7 +35,8 @@ function values(overrides: Partial<OverlayStageValues> = {}): OverlayStageValues
 
 function render(
   surface: "obs" | "composer",
-  overrides: Partial<OverlayStageValues> = {}
+  overrides: Partial<OverlayStageValues> = {},
+  resizeMode = false
 ) {
   return renderToStaticMarkup(
     <OverlayStage
@@ -40,9 +45,16 @@ function render(
       visible={CONFIG.visible}
       surface={surface}
       values={values(overrides)}
+      resizeMode={resizeMode}
     />
   );
 }
+
+const EMPTY: Partial<OverlayStageValues> = {
+  feedSlot: null,
+  feedSlotFilled: false,
+  competitionEntries: [],
+};
 
 // The root wrapper is the one deliberate difference: the audience surface is a
 // fixed full-viewport frame, the composer sits inside a scaled canvas. Below the
@@ -60,17 +72,26 @@ describe("OverlayStage parity across surfaces", () => {
     expect(body(render("composer"))).toBe(body(render("obs")));
   });
 
-  it("differs only by the placeholder when the feed is empty", () => {
-    const empty = { feedSlot: null, feedSlotFilled: false };
-    const obs = body(render("obs", empty));
-    const composer = body(render("composer", empty));
+  // The one place the surfaces are meant to differ: the composer shows what is
+  // there including nothing, and the audience is never shown an empty frame.
+  it("shows an empty leaderboard on the composer and none on the audience surface", () => {
+    expect(body(render("composer", EMPTY))).toContain("competition-ladder");
+    expect(body(render("obs", EMPTY))).not.toContain("competition-ladder");
+  });
 
-    expect(obs).not.toBe(composer);
-    expect(obs).not.toContain("Highlight");
-    expect(composer).toContain("Highlight");
-    expect(composer.replace(/<div class="flex h-24[\s\S]*?<\/div>/, "")).toBe(
-      obs
-    );
+  it("renders a zero goal bar on both surfaces, since zero is a real value", () => {
+    expect(body(render("composer", EMPTY))).toContain("ring-track-subs");
+    expect(body(render("obs", EMPTY))).toContain("ring-track-subs");
+  });
+
+  it("keeps the idle placeholder off both surfaces until positioning starts", () => {
+    expect(body(render("composer", EMPTY))).not.toContain("Highlight");
+    expect(body(render("obs", EMPTY))).not.toContain("Highlight");
+  });
+
+  it("shows the placeholder only on the composer, and only while resizing", () => {
+    expect(body(render("composer", EMPTY, true))).toContain("Highlight");
+    expect(body(render("obs", EMPTY, true))).not.toContain("Highlight");
   });
 
   it("puts the audience surface in fixed position and the composer in the canvas", () => {
