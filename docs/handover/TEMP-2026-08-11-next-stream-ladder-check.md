@@ -1,4 +1,4 @@
-# TEMP handover — what to check on the next broadcast, 11-Aug-2026
+# TEMP handover — what to check on the next broadcast, 14-Aug-2026
 
 Delete this file once the ladder has been confirmed on a broadcast and both AZ-252 and AZ-222
 are closed.
@@ -81,6 +81,19 @@ that is left, and it closes AZ-252 and archives the OpenSpec change `add-live-qu
   latency as a bug.
 - **After the broadcast ends**, confirm `pgrep -af ffmpeg` returns nothing and
   `/var/lib/vids-tube/hls/owner/` holds `master.m3u8` and nothing else.
+
+## Clean up after a clean broadcast, not before
+
+The previous hook scripts and the previous nginx site are still on the machine, each kept
+beside its replacement with a `.pre-ladder` suffix. They are the rollback path that does not
+depend on a checkout, so they stay until a broadcast has run cleanly with the ladder. Delete
+them once it has:
+
+```bash
+ssh root@stream.vids.tube 'rm -f /usr/local/bin/mtx-live.sh.pre-ladder \
+  /usr/local/bin/mtx-notready.sh.pre-ladder \
+  /etc/nginx/sites-available/stream.vids.tube.pre-ladder'
+```
 
 ## If it goes wrong
 
