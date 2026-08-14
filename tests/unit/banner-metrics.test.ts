@@ -32,7 +32,7 @@ const OFF_AIR: GoalProgressResponse = {
 
 const COUNTS = {
   memberCount: 143,
-  totalChatters: 512,
+  chattersThisStream: 84,
   chatsThisStream: 1180,
   commandsThisStream: 96,
   newMembersThisStream: 9,
@@ -54,7 +54,7 @@ describe("resolveBannerMetrics", () => {
     expect(values.newSubsThisStream).toBe(37);
     expect(values.likesThisStream).toBe(214);
     expect(values.currentViewers).toBe(63);
-    expect(values.totalChatters).toBe(512);
+    expect(values.chattersThisStream).toBe(84);
     expect(values.chatsThisStream).toBe(1180);
     expect(values.commandsThisStream).toBe(96);
     expect(values.members).toBe(143);
@@ -78,23 +78,22 @@ describe("resolveBannerMetrics", () => {
     expect(values.commandsThisStream).toBeNull();
   });
 
-  it("keeps the lifetime kinds off air, since they do not need a broadcast", () => {
+  it("keeps the member count off air, since it does not need a broadcast", () => {
     const values = resolveBannerMetrics({ goals: OFF_AIR, ...COUNTS });
     expect(values.members).toBe(143);
-    expect(values.totalChatters).toBe(512);
   });
 
   it("treats a count that has not loaded as absent rather than zero", () => {
     const values = resolveBannerMetrics({
       goals: OFF_AIR,
       memberCount: undefined,
-      totalChatters: undefined,
+      chattersThisStream: undefined,
       chatsThisStream: undefined,
       commandsThisStream: undefined,
       newMembersThisStream: undefined,
     });
     expect(values.members).toBeNull();
-    expect(values.totalChatters).toBeNull();
+    expect(values.chattersThisStream).toBeNull();
     expect(values.commandsThisStream).toBeNull();
     expect(values.chatsThisStream).toBeNull();
   });

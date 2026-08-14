@@ -24,6 +24,7 @@ import { OVERLAY_LADDER_MAX } from "@/lib/demo-overlay";
 import { DEFAULT_GOALS, idleProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { useChannel } from "@/app/[channelSlug]/page.hooks";
+import { useInstalledGameOverlay } from "./overlay-registry.hooks";
 
 // The composer shows what viewers are seeing, so it must never consume it: the
 // OBS route marks a highlight shown and a TTS played as it renders them, and
@@ -124,6 +125,7 @@ export function useOverlayComposerValues(
   const { data: memberCount } = useMemberCount(channelSlug);
   const { data: bannerCounts } = useBannerCounts(channelSlug);
   const feedSlotFilled = useComposerFeedFilled(streamId);
+  const gameInstallation = useInstalledGameOverlay();
 
   // Never null. An overlay with no value still has a place on the stage, and a
   // goal with no broadcast behind it is honestly zero against its target rather
@@ -157,7 +159,7 @@ export function useOverlayComposerValues(
     bannerMetrics: resolveBannerMetrics({
       goals: goalData,
       memberCount,
-      totalChatters: bannerCounts?.totalChatters,
+      chattersThisStream: bannerCounts?.chattersThisStream,
       chatsThisStream: bannerCounts?.chatsThisStream,
       commandsThisStream: bannerCounts?.commandsThisStream,
       newMembersThisStream: bannerCounts?.newMembersThisStream,
@@ -167,5 +169,6 @@ export function useOverlayComposerValues(
     breakSlot: breakEndsAt ? (
       <BreakCard key={breakEndsAt} endsAt={breakEndsAt} />
     ) : null,
+    gameInstallation,
   };
 }

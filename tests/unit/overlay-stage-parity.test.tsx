@@ -26,7 +26,7 @@ function values(overrides: Partial<OverlayStageValues> = {}): OverlayStageValues
       newSubsThisStream: 37,
       likesThisStream: 214,
       currentViewers: 63,
-      totalChatters: 512,
+      chattersThisStream: 84,
       chatsThisStream: 1180,
     commandsThisStream: 96,
       members: 143,
@@ -39,6 +39,7 @@ function values(overrides: Partial<OverlayStageValues> = {}): OverlayStageValues
       { key: "someone", author: null, score: 12 },
     ],
     breakSlot: null,
+    gameInstallation: null,
     ...overrides,
   };
 }

@@ -25,7 +25,7 @@ const EMPTY: OverlayStageValues = {
     newSubsThisStream: null,
     likesThisStream: null,
     currentViewers: null,
-    totalChatters: 0,
+    chattersThisStream: null,
     chatsThisStream: null,
     commandsThisStream: null,
     members: 0,
@@ -41,6 +41,7 @@ const EMPTY: OverlayStageValues = {
   }),
   competitionEntries: [],
   breakSlot: null,
+  gameInstallation: null,
 };
 
 function renderEmpty(resizeMode = false) {

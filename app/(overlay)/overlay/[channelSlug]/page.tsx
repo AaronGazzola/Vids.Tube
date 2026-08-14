@@ -30,6 +30,7 @@ import {
 } from "./page.actions";
 import {
   useDemoOverlaySnapshot,
+  useInstalledOverlay,
   useLiveOverlayLayout,
   useBannerCounts,
   useMemberCount,
@@ -304,6 +305,7 @@ export default function OverlayFramePage({
   const token = sp.get("token") ?? "";
 
   const layout = useLiveOverlayLayout(channelSlug, token);
+  const installation = useInstalledOverlay(channelSlug, token);
   const demo = useDemoOverlaySnapshot(channelSlug);
   const { data: channel } = useChannel(channelSlug);
   const streamQuery = useLiveStream(channel?.id);
@@ -384,7 +386,7 @@ export default function OverlayFramePage({
         bannerMetrics: resolveBannerMetrics({
           goals: goalData,
           memberCount,
-          totalChatters: bannerCounts?.totalChatters,
+          chattersThisStream: bannerCounts?.chattersThisStream,
           chatsThisStream: bannerCounts?.chatsThisStream,
           commandsThisStream: bannerCounts?.commandsThisStream,
           newMembersThisStream: bannerCounts?.newMembersThisStream,
@@ -392,6 +394,7 @@ export default function OverlayFramePage({
         goalMetric,
         competitionEntries,
         breakSlot,
+        gameInstallation: installation.data ?? null,
       }}
     />
   );

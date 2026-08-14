@@ -19,7 +19,7 @@ export function useBannerMetricValues(channelSlug: string): BannerMetricValues {
   return resolveBannerMetrics({
     goals,
     memberCount,
-    totalChatters: counts?.totalChatters,
+    chattersThisStream: counts?.chattersThisStream,
     chatsThisStream: counts?.chatsThisStream,
     commandsThisStream: counts?.commandsThisStream,
     newMembersThisStream: counts?.newMembersThisStream,

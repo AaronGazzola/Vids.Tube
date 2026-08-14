@@ -16,7 +16,7 @@ const METRICS = {
   newSubsThisStream: 37,
   likesThisStream: 214,
   currentViewers: 63,
-  totalChatters: 512,
+  chattersThisStream: 84,
   chatsThisStream: 1180,
   commandsThisStream: 96,
   members: COUNT,

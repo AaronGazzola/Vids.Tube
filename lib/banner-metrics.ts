@@ -4,7 +4,7 @@ import type { GoalProgressResponse } from "@/app/layout.types";
 export type BannerCountSources = {
   goals: GoalProgressResponse | null | undefined;
   memberCount: number | null | undefined;
-  totalChatters: number | null | undefined;
+  chattersThisStream: number | null | undefined;
   chatsThisStream: number | null | undefined;
   commandsThisStream: number | null | undefined;
   newMembersThisStream: number | null | undefined;
@@ -36,7 +36,7 @@ export function resolveBannerMetrics(
     newSubsThisStream: live && metrics ? metrics.subs.current : null,
     likesThisStream: live && metrics ? metrics.likes.current : null,
     currentViewers: live && metrics ? metrics.viewers.current : null,
-    totalChatters: num(sources.totalChatters),
+    chattersThisStream: num(sources.chattersThisStream),
     chatsThisStream: num(sources.chatsThisStream),
     commandsThisStream: num(sources.commandsThisStream),
     members: num(sources.memberCount),

@@ -17,6 +17,7 @@ import {
   type DemoViewer,
 } from "./demo.stores";
 import { DEMO_GOAL_TARGETS, DEMO_MEMBER_COUNT } from "./demo.types";
+import { useInstalledGameOverlay } from "./overlay-registry.hooks";
 
 const DEMO_BREAK_MS = 5 * 60_000;
 const DEMO_ASK_HOLD_MS = 10_000;
@@ -170,6 +171,8 @@ export function useOverlayDemoValues(
   const tts = useDemoGeneratorStore((s) => s.tts);
   const asks = useDemoGeneratorStore((s) => s.asks);
 
+  const gameInstallation = useInstalledGameOverlay();
+
   const targets = goals ?? DEMO_GOAL_TARGETS;
   const progress = computeGoalProgress(counts, null, targets as Counts);
 
@@ -202,7 +205,7 @@ export function useOverlayDemoValues(
       newSubsThisStream: 37,
       likesThisStream: 214,
       currentViewers: 63,
-      totalChatters: 512,
+      chattersThisStream: 84,
       chatsThisStream: 1180,
       commandsThisStream: 96,
       members: DEMO_MEMBER_COUNT,
@@ -211,5 +214,6 @@ export function useOverlayDemoValues(
     goalMetric,
     competitionEntries,
     breakSlot: config.visible.break ? <DemoBreak /> : null,
+    gameInstallation,
   };
 }

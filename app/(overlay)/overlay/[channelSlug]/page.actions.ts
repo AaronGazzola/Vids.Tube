@@ -6,6 +6,7 @@ import {
 } from "@/app/(app)/live/demo.types";
 import type { FeaturedMessageWithAuthor } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { authorFromRow } from "@/lib/featured-author";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
@@ -41,6 +42,52 @@ export async function getOverlayLayoutAction(
   return mergeDemoLayout(
     (data.config as Partial<DemoLayoutConfig> | null) ?? null
   );
+}
+
+export async function getInstalledOverlayAction(
+  channelSlug: string,
+  token: string
+): Promise<OverlayInstallation | null> {
+  const { data: channel, error: channelError } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", channelSlug)
+    .maybeSingle();
+  if (channelError) {
+    console.error(channelError);
+    throw new Error("Failed to fetch channel");
+  }
+  if (!channel) {
+    return null;
+  }
+  const { data: layout, error: layoutError } = await supabaseAdmin
+    .from("overlay_layouts")
+    .select("token")
+    .eq("channel_id", channel.id)
+    .maybeSingle();
+  if (layoutError) {
+    console.error(layoutError);
+    throw new Error("Failed to fetch overlay layout");
+  }
+  if (!layout || layout.token !== token) {
+    return null;
+  }
+  const { data, error } = await supabaseAdmin
+    .from("channel_overlays")
+    .select("id, overlays!inner (entry_url, status)")
+    .eq("channel_id", channel.id)
+    .eq("enabled", true)
+    .eq("overlays.status", "published")
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch installed overlay");
+  }
+  if (!data) {
+    return null;
+  }
+  return { installId: data.id, entryUrl: data.overlays.entry_url };
 }
 
 export async function getMemberCountAction(
@@ -317,7 +364,7 @@ export async function markAskShownAction(id: string): Promise<void> {
 }
 
 export type BannerCounts = {
-  totalChatters: number;
+  chattersThisStream: number | null;
   chatsThisStream: number | null;
   commandsThisStream: number | null;
   newMembersThisStream: number | null;
@@ -339,17 +386,12 @@ export async function getBannerCountsAction(
     .maybeSingle();
   if (!channel) {
     return {
-      totalChatters: 0,
+      chattersThisStream: null,
       chatsThisStream: null,
       commandsThisStream: null,
       newMembersThisStream: null,
     };
   }
-
-  const { count: chatters } = await supabaseAdmin
-    .from("memberships")
-    .select("*", { count: "exact", head: true })
-    .eq("community_channel_id", channel.id);
 
   // Null rather than zero off air: nobody has joined "this stream" when there
   // is no stream, and zero would be a claim.
@@ -364,6 +406,7 @@ export async function getBannerCountsAction(
 
   // Everything per-broadcast is null off air rather than zero: there is no
   // broadcast to have counted anything in.
+  let chatters: number | null = null;
   let chats: number | null = null;
   let commands: number | null = null;
   let newMembers: number | null = null;
@@ -373,6 +416,14 @@ export async function getBannerCountsAction(
       .select("*", { count: "exact", head: true })
       .eq("stream_id", streamRow.id);
     chats = chatCount ?? 0;
+
+    // Counted from the chat itself, so it is true while the broadcast runs
+    // rather than only once the post-broadcast pass has rebuilt aggregates.
+    const { data: uniqueChatters } = await supabaseAdmin.rpc(
+      "stream_unique_chatters",
+      { p_stream: streamRow.id }
+    );
+    chatters = uniqueChatters ?? 0;
 
     // Commands as they were used, which is what moves while streaming, not the
     // list of commands the channel has available.
@@ -392,7 +443,7 @@ export async function getBannerCountsAction(
   }
 
   return {
-    totalChatters: chatters ?? 0,
+    chattersThisStream: chatters,
     chatsThisStream: chats,
     commandsThisStream: commands,
     newMembersThisStream: newMembers,

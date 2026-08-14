@@ -189,11 +189,13 @@ test("the banner is the field, and a metric can be added to a message", async ({
     name: "Show a metric on message 1",
   });
   await expect(include).toBeChecked();
-  await page.getByRole("combobox", { name: "Metric for message 1" }).selectOption("totalChatters");
+  await page.getByRole("combobox", { name: "Metric for message 1" }).selectOption("chattersThisStream");
   await page.getByRole("combobox", { name: "Icon for message 1" }).selectOption("flame");
-  await expect(
-    banner.getByTestId("message-banner-metric")
-  ).toBeVisible();
+  // Off air the figure is unavailable, so the block shows its icon and a dash
+  // rather than disappearing and moving the layout.
+  const metric = banner.getByTestId("message-banner-metric");
+  await expect(metric).toBeVisible();
+  await expect(metric).toContainText("—");
 
   await include.uncheck();
   await expect(banner.getByTestId("message-banner-metric")).toHaveCount(0);

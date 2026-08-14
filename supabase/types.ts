@@ -233,6 +233,45 @@ export type Database = {
           },
         ]
       }
+      channel_overlays: {
+        Row: {
+          channel_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          overlay_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          overlay_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          overlay_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_overlays_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_overlays_overlay_id_fkey"
+            columns: ["overlay_id"]
+            isOneToOne: false
+            referencedRelation: "overlays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_projects: {
         Row: {
           blurb: string | null
@@ -1101,6 +1140,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      overlays: {
+        Row: {
+          created_at: string
+          entry_url: string
+          id: string
+          name: string
+          owner_user_id: string | null
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entry_url: string
+          id?: string
+          name: string
+          owner_user_id?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entry_url?: string
+          id?: string
+          name?: string
+          owner_user_id?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       score_events: {
         Row: {
@@ -1994,6 +2066,7 @@ export type Database = {
         }
         Returns: Json
       }
+      stream_unique_chatters: { Args: { p_stream: string }; Returns: number }
       sync_membership_credits: {
         Args: { p_membership_id: string }
         Returns: number
