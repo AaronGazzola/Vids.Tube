@@ -17,7 +17,8 @@ const METRICS = {
   likesThisStream: 214,
   currentViewers: 63,
   totalChatters: 512,
-  totalCommands: 1840,
+  chatsThisStream: 1180,
+  commandsThisStream: 96,
   members: COUNT,
   newMembersThisStream: 9,
 };
@@ -89,7 +90,7 @@ describe("a metric belongs to the message carrying it", () => {
     expect(showing().textContent).toContain("143");
   });
 
-  it("draws nothing at all when the number cannot be resolved", () => {
+  it("draws a dash and keeps the icon when the number cannot be resolved", () => {
     act(() => {
       root?.unmount();
     });
@@ -106,7 +107,11 @@ describe("a metric belongs to the message carrying it", () => {
     });
     expect(showing().textContent).toContain(FIRST);
     expect(showing().textContent).not.toContain("143");
-    expect(host!.querySelector('[data-testid="message-banner-metric"]')).toBeNull();
+    // The block stays, so the layout does not move when the number arrives.
+    const metric = host!.querySelector('[data-testid="message-banner-metric"]')!;
+    expect(metric).not.toBeNull();
+    expect(metric.textContent).toContain("—");
+    expect(metric.querySelector("svg")).not.toBeNull();
   });
 
   it("shows the number as it stands rather than the one from last cycle", () => {

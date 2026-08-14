@@ -20,7 +20,8 @@ export function useBannerMetricValues(channelSlug: string): BannerMetricValues {
     goals,
     memberCount,
     totalChatters: counts?.totalChatters,
-    totalCommands: counts?.totalCommands,
+    chatsThisStream: counts?.chatsThisStream,
+    commandsThisStream: counts?.commandsThisStream,
     newMembersThisStream: counts?.newMembersThisStream,
   });
 }

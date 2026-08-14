@@ -39,7 +39,8 @@ export const BANNER_METRIC_KINDS = [
   "likesThisStream",
   "currentViewers",
   "totalChatters",
-  "totalCommands",
+  "chatsThisStream",
+  "commandsThisStream",
   "members",
   "newMembersThisStream",
 ] as const;
@@ -51,7 +52,8 @@ export const BANNER_METRIC_LABELS: Record<BannerMetricKind, string> = {
   likesThisStream: "Likes this stream",
   currentViewers: "Current viewers",
   totalChatters: "Total unique chatters",
-  totalCommands: "Total chat commands",
+  chatsThisStream: "Chats this stream",
+  commandsThisStream: "Chat commands this stream",
   members: "Members",
   newMembersThisStream: "New members this stream",
 };

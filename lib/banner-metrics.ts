@@ -5,7 +5,8 @@ export type BannerCountSources = {
   goals: GoalProgressResponse | null | undefined;
   memberCount: number | null | undefined;
   totalChatters: number | null | undefined;
-  totalCommands: number | null | undefined;
+  chatsThisStream: number | null | undefined;
+  commandsThisStream: number | null | undefined;
   newMembersThisStream: number | null | undefined;
 };
 
@@ -36,7 +37,8 @@ export function resolveBannerMetrics(
     likesThisStream: live && metrics ? metrics.likes.current : null,
     currentViewers: live && metrics ? metrics.viewers.current : null,
     totalChatters: num(sources.totalChatters),
-    totalCommands: num(sources.totalCommands),
+    chatsThisStream: num(sources.chatsThisStream),
+    commandsThisStream: num(sources.commandsThisStream),
     members: num(sources.memberCount),
     newMembersThisStream: num(sources.newMembersThisStream),
   };

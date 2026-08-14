@@ -69,14 +69,17 @@ export function MessageBannerRow({
           Same size class as the sidebar, and pinned to the dark-mode letter in
           both themes — an overlay sits on a broadcast, not on a page, so it must
           not follow the owner's light or dark preference. */}
-      {metric && value !== null && (
+      {/* A metric with no number keeps its icon and shows a dash: vanishing
+          would move the layout the streamer arranged, and a zero would be a
+          claim nobody made. */}
+      {metric && (
         <div
           className="flex shrink-0 items-center gap-2.5 leading-none"
           data-testid="message-banner-metric"
         >
           <BannerIcon name={metric.icon} color={metric.color} />
           <span className="text-[38px] font-bold tabular-nums tracking-tight">
-            {value.toLocaleString("en-US")}
+            {value === null ? "—" : value.toLocaleString("en-US")}
           </span>
         </div>
       )}

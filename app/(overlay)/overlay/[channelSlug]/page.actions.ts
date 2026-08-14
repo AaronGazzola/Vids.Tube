@@ -318,7 +318,8 @@ export async function markAskShownAction(id: string): Promise<void> {
 
 export type BannerCounts = {
   totalChatters: number;
-  totalCommands: number;
+  chatsThisStream: number | null;
+  commandsThisStream: number | null;
   newMembersThisStream: number | null;
 };
 
@@ -337,7 +338,12 @@ export async function getBannerCountsAction(
     .eq("slug", channelSlug)
     .maybeSingle();
   if (!channel) {
-    return { totalChatters: 0, totalCommands: 0, newMembersThisStream: null };
+    return {
+      totalChatters: 0,
+      chatsThisStream: null,
+      commandsThisStream: null,
+      newMembersThisStream: null,
+    };
   }
 
   const { count: chatters } = await supabaseAdmin
@@ -345,35 +351,50 @@ export async function getBannerCountsAction(
     .select("*", { count: "exact", head: true })
     .eq("community_channel_id", channel.id);
 
-  const { count: commands } = await supabaseAdmin
-    .from("command_events")
-    .select("*", { count: "exact", head: true })
-    .eq("channel_id", channel.id);
-
   // Null rather than zero off air: nobody has joined "this stream" when there
   // is no stream, and zero would be a claim.
-  const { data: stream } = await supabaseAdmin
+  const { data: streamRow } = await supabaseAdmin
     .from("streams")
-    .select("started_at")
+    .select("id, started_at")
     .eq("channel_id", channel.id)
     .eq("status", "live")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  // Everything per-broadcast is null off air rather than zero: there is no
+  // broadcast to have counted anything in.
+  let chats: number | null = null;
+  let commands: number | null = null;
   let newMembers: number | null = null;
-  if (stream?.started_at) {
+  if (streamRow?.id) {
+    const { count: chatCount } = await supabaseAdmin
+      .from("chat_messages")
+      .select("*", { count: "exact", head: true })
+      .eq("stream_id", streamRow.id);
+    chats = chatCount ?? 0;
+
+    // Commands as they were used, which is what moves while streaming, not the
+    // list of commands the channel has available.
+    const { count: commandCount } = await supabaseAdmin
+      .from("command_events")
+      .select("*", { count: "exact", head: true })
+      .eq("stream_id", streamRow.id);
+    commands = commandCount ?? 0;
+  }
+  if (streamRow?.started_at) {
     const { count } = await supabaseAdmin
       .from("memberships")
       .select("*", { count: "exact", head: true })
       .eq("community_channel_id", channel.id)
-      .gte("first_seen_at", stream.started_at);
+      .gte("first_seen_at", streamRow.started_at);
     newMembers = count ?? 0;
   }
 
   return {
     totalChatters: chatters ?? 0,
-    totalCommands: commands ?? 0,
+    chatsThisStream: chats,
+    commandsThisStream: commands,
     newMembersThisStream: newMembers,
   };
 }

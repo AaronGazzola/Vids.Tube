@@ -313,7 +313,7 @@ describe("the banner is the thing being edited", () => {
   // The editor draws the real numbers, so with none resolved it draws none.
   // A stand-in figure here would mean composing a layout against something that
   // will never appear.
-  it("draws no number while there is none to draw", () => {
+  it("draws a dash while there is no number to draw", () => {
     mount([
       {
         ...msg("one"),
@@ -325,9 +325,9 @@ describe("the banner is the thing being edited", () => {
       },
     ]);
     const surface = host!.querySelector(".overlay-surface")!;
-    expect(
-      surface.querySelector('[data-testid="message-banner-metric"]')
-    ).toBeNull();
+    const metric = surface.querySelector('[data-testid="message-banner-metric"]')!;
+    expect(metric).not.toBeNull();
+    expect(metric.textContent).toContain("—");
     // The choice is still recorded, and its controls still show it.
     expect(
       host!.querySelector<HTMLInputElement>(
