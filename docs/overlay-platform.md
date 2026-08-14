@@ -137,7 +137,59 @@ today's choices must not foreclose it.
 - Event routing by subscription, wiring the existing command registry to whichever overlay subscribed.
 - Replacing the single build-time overlay address with a per-channel frame carrying a token.
 
-## 7. Not decided yet
+## 7. Planned, and what today's work must not block
+
+Recorded 14-Aug-2026. None of this is built, and none of it is scheduled. It is written down so that
+choices made now stay additive rather than becoming a wall.
+
+### Many framed overlays on one channel
+
+A channel should eventually run several games at once, each in its own box. The registry, the token, the
+settings blob and the event subscriptions are all keyed per overlay already, so none of them stands in
+the way.
+
+**What stands in the way today:** the overlay layout carries a fixed set of named boxes, one of which is
+`game`, and the installed overlay is looked up with a limit of one. Boxes have to become a list keyed by
+installation rather than a fixed set of names. That is layout work, additive, and it touches no part of
+the contract.
+
+### A box that resizes to any shape
+
+The game box is `480 × 320` at scale 1, and the saved layout scales it uniformly, so its aspect ratio is
+fixed. A framed overlay should instead be stretchable to any width and height the streamer drags.
+
+**What stands in the way today:** the box model stores a scale, not a size. It has to store width and
+height per box. Every other surface is a card that would keep using its nominal size, so this is an
+addition to the box model rather than a change to the surfaces.
+
+### An overlay declares how it wants to be sized
+
+Not every game can be any shape. An overlay declares its sizing behaviour, and the host honours it:
+
+- **`any`** — the overlay is given the box exactly as drawn and deals with it. The dragon game is this.
+- **A locked ratio** — the overlay is drawn as large as fits inside the box at its own ratio, centred,
+  with the remainder left transparent. The streamer still drags any box they like; the host does the
+  letterboxing so every overlay author does not have to.
+
+This is one column on the registry row, added when it is needed. Storing it now would be a column nothing
+reads.
+
+### The overlay learns its own size
+
+An overlay that uses its box as a play area needs to know how big that box is. It already can: the frame
+is a document and can measure its own viewport. The lifecycle `resized` message exists so an overlay can
+react without polling, not because measuring is impossible.
+
+**What must stay true:** the host never tells an overlay what its content should be, only how much room
+it has.
+
+### Sizing lives in settings, not in the contract
+
+How large a creature is relative to its box, and how deep the enclosure runs, are the overlay's own
+settings, stored in the blob the host does not interpret. This is exactly why the blob is opaque: the
+host must never grow a `creature_scale` column, or game two arrives and the column is meaningless.
+
+## 8. Not decided yet
 
 - Whether built-in overlays are eventually migrated onto the same contract, or stay a separate class
   forever.

@@ -32,6 +32,13 @@ Two things are true of all of it: none has been seen on a broadcast, and the
 three per-broadcast counts have never returned a live number. The next broadcast
 is what converts that.
 
+Planned and unscheduled, recorded 14-Aug-2026 so that today's choices stay
+additive: several framed overlays on one channel, a box the streamer can stretch
+to any size and ratio, and an overlay declaring whether it accepts any shape or
+wants its ratio held and the remainder letterboxed. What blocks each, and the one
+thing that must never move into the host, is written in
+`docs/overlay-platform.md` §7.
+
 ## Platform thesis
 
 Vids.Tube is a community-focused live streaming platform for small streamers,
