@@ -8,16 +8,29 @@ backlog (Az team, Vids.Tube project) filtered to the current phase — ticket
 titles carry phase labels like `[V1]`. Per CLAUDE.md governance, promote a
 ticket into a new OpenSpec change before writing any code.
 
-## Build position (2026-08-09)
+## Build position (2026-08-14)
 
 V1 is code-complete and V3's economy core landed early, ahead of V2. Every
 identity, membership, credit and greeting path exists in code; none of it has
-been confirmed on a live broadcast, so the whole block is gated behind one
+been confirmed on a live broadcast, so the whole block is still gated behind one
 streaming session and the run-sheet that drives it (AZ-222). V2 is the only
 phase still holding unbuilt foundation work (`stream_metrics`, the Activity
 redesign, the legal pages that unblock the quota application). The stream
 timeline shipped out of phase order because the shorts workflow of V5 cannot be
 designed without it.
+
+Shipped 11-Aug to 14-Aug-2026, all on the /live page and its overlays: the
+Overlays tab, which composes overlays against their real values through the same
+renderer the OBS route uses; settings inherited from a previous broadcast, with
+the thumbnail becoming an ordinary field that saves with everything else; the
+members box renamed to the message banner, written as styled text in the banner
+itself rather than as markup in a box beside it; and a metric per banner
+message, drawn from nine live counts. The overlay registry landed in parallel,
+giving a framed overlay an owner so a second streamer can be served.
+
+Two things are true of all of it: none has been seen on a broadcast, and the
+three per-broadcast counts have never returned a live number. The next broadcast
+is what converts that.
 
 ## Platform thesis
 
