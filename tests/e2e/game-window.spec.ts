@@ -94,9 +94,10 @@ test("the game window frames the game and is not refused by the security policy"
   const frame = page.locator('[data-testid="game-window"]');
   await expect(frame).toBeVisible({ timeout: 25_000 });
 
-  // The address is per channel, not per deployment: what is framed names this
-  // channel's installation.
-  await expect(frame).toHaveAttribute("src", new RegExp(`install=${installId}`));
+  // The address is per channel, not per deployment: what is framed carries a
+  // token minted for this channel's installation.
+  await expect(frame).toHaveAttribute("src", /[?&]t=[\w-]+\.[\w-]+\.[\w-]+/);
+  const framedAt0 = await frame.getAttribute("src");
 
   // Reaching inside proves the document loaded rather than being blocked.
   const inner = page.frameLocator('[data-testid="game-window"]').locator("canvas");
@@ -112,6 +113,11 @@ test("the game window frames the game and is not refused by the security policy"
     path: "test-results/game-window-t1.png",
   });
   expect(before.equals(after)).toBe(false);
+
+  // Twenty-six seconds is longer than the installation query's refetch interval,
+  // so the host has re-minted at least once by now. A changed address here would
+  // mean the frame reloaded and the game restarted mid-stream.
+  expect(await frame.getAttribute("src")).toBe(framedAt0);
 
   expect(violations, violations.join(" | ")).toHaveLength(0);
 });

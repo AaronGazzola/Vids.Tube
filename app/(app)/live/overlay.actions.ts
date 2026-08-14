@@ -5,6 +5,8 @@ import type {
   ViewerScoreWithAuthor,
 } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import type { OverlayInstallation } from "@/lib/overlay-frame";
+import { installationForChannel } from "@/lib/overlay-installation";
 import { authorFromRow } from "@/lib/featured-author";
 import { fetchSubs, fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
@@ -373,6 +375,17 @@ export async function listChannelOverlaysAction(): Promise<ChannelOverlayRow[]> 
     entryUrl: o.entry_url,
     installId: installByOverlay.get(o.id) ?? null,
   }));
+}
+
+// What the owner's surfaces frame. Separate from the list above, which exists to
+// install and remove: mixing them would mint a token every time the panel
+// redraws its checkboxes.
+export async function getChannelInstallationAction(): Promise<OverlayInstallation | null> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  return installationForChannel(owned.data.channel.id);
 }
 
 export async function installOverlayAction(

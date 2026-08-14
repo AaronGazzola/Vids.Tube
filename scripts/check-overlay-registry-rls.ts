@@ -104,6 +104,32 @@ async function main() {
     writeError ? writeError.message : "insert succeeded"
   );
 
+  // The signing secret is the one value here that must never be readable by a
+  // client, and overlays is world-readable when published, so the secret lives in
+  // a table with row level security and no policies at all.
+  await admin
+    .from("overlay_secrets")
+    .upsert({ overlay_id: probe.id, secret: "probe-secret" });
+
+  const { data: secretSeen } = await anon
+    .from("overlay_secrets")
+    .select("overlay_id")
+    .eq("overlay_id", probe.id);
+  check(
+    "a signing secret is not public, even for a published overlay",
+    (secretSeen ?? []).length === 0,
+    `${(secretSeen ?? []).length} rows visible signed out`
+  );
+
+  const { error: secretWriteError } = await anon
+    .from("overlay_secrets")
+    .insert({ overlay_id: probe.id, secret: "forged" });
+  check(
+    "a signed-out client cannot write a signing secret",
+    Boolean(secretWriteError),
+    secretWriteError ? secretWriteError.message : "insert succeeded"
+  );
+
   await admin.from("overlays").delete().eq("id", probe.id);
 
   if (failed) {

@@ -9,6 +9,7 @@ afterEach(() => {
 });
 
 const PERMITTED = "https://game.example";
+const ENTRY = `${PERMITTED}/rig`;
 
 describe("what the game window paints", () => {
   it("gives the layout editor an outline to position with nothing installed", () => {
@@ -21,7 +22,7 @@ describe("what the game window paints", () => {
   });
 
   it("gives the stream nothing with no overlay installed, and says so", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", ENTRY);
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(renderToStaticMarkup(<GameWindow installation={null} />)).toBe("");
     expect(logged).toHaveBeenCalledOnce();
@@ -30,7 +31,7 @@ describe("what the game window paints", () => {
   // A page load answers this question asynchronously. Reporting an empty box
   // before the answer arrives turns every load into a false alarm.
   it("says nothing while the installation is still being fetched", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", ENTRY);
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(renderToStaticMarkup(<GameWindow installation={undefined} />)).toBe(
       ""
@@ -38,26 +39,27 @@ describe("what the game window paints", () => {
     expect(logged).not.toHaveBeenCalled();
   });
 
-  it("frames the installed overlay, naming the installation", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+  it("frames the installed overlay, carrying its token", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", ENTRY);
     const html = renderToStaticMarkup(
       <GameWindow
-        installation={{ installId: "inst-1", entryUrl: `${PERMITTED}/rig` }}
+        installation={{ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" }}
         placeholder
       />
     );
-    expect(html).toContain(`${PERMITTED}/rig?install=inst-1`);
+    expect(html).toContain(`${ENTRY}?t=tok-1`);
     expect(html).not.toContain("border-dashed");
   });
 
   it("gives the stream nothing when the installed overlay is hosted elsewhere", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", ENTRY);
     vi.spyOn(console, "error").mockImplementation(() => {});
     const html = renderToStaticMarkup(
       <GameWindow
         installation={{
           installId: "inst-1",
           entryUrl: "https://elsewhere.example/rig",
+          token: "tok-1",
         }}
       />
     );
@@ -69,7 +71,7 @@ describe("what the game window paints", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const html = renderToStaticMarkup(
       <GameWindow
-        installation={{ installId: "inst-1", entryUrl: `${PERMITTED}/rig` }}
+        installation={{ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" }}
       />
     );
     expect(html).toBe("");

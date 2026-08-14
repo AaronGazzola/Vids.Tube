@@ -41,9 +41,9 @@ The framed **origin** SHALL be read from an environment value at build time, and
 the saved layout, from any database row, or from the page's query string.
 
 The framed **path, query and fragment** SHALL be derived from the overlay installed on the channel being
-rendered: the entry address recorded in the overlay registry, with the installation's id appended as an
-`install` query parameter. The rest of the authored entry address SHALL be carried through unaltered, and
-SHALL NOT be interpreted by the host.
+rendered: the entry address recorded in the overlay registry, with a signed token for that installation
+appended as a `t` query parameter. The rest of the authored entry address SHALL be carried through
+unaltered, and SHALL NOT be interpreted by the host.
 
 Where the channel has no enabled installation, where the environment value is absent or is not a valid
 address, or where the entry address's origin is not the build-time origin, the surface SHALL render
@@ -73,13 +73,13 @@ viewer, by a streamer, or by a saved layout SHALL ever be framed.
 
 - **GIVEN** two channels that have each installed the same overlay
 - **WHEN** both overlay routes are loaded
-- **THEN** each frame carries that channel's own installation id in its `install` parameter
+- **THEN** each frame carries a token naming that channel and that channel's own installation
 
 #### Scenario: The authored address is carried through
 
 - **GIVEN** an entry address that already carries query parameters of its own
 - **WHEN** the frame is rendered
-- **THEN** those parameters are present unchanged, alongside the appended `install` parameter
+- **THEN** those parameters are present unchanged, alongside the appended `t` parameter
 
 ### Requirement: The overlay may frame one named origin, and remains unframeable itself
 

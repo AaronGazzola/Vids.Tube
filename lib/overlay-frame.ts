@@ -1,14 +1,15 @@
 export type OverlayInstallation = {
   installId: string;
   entryUrl: string;
+  token: string;
 };
 
 export function framedOverlayUrl(
   entryUrl: string,
-  installId: string,
+  token: string,
   permittedOrigin: string
 ): string | null {
-  if (!entryUrl || !installId || !permittedOrigin) {
+  if (!entryUrl || !token || !permittedOrigin) {
     return null;
   }
   let entry: URL;
@@ -22,6 +23,6 @@ export function framedOverlayUrl(
   if (entry.origin !== permitted.origin) {
     return null;
   }
-  entry.searchParams.set("install", installId);
+  entry.searchParams.set("t", token);
   return entry.toString();
 }

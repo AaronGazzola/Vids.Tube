@@ -7,6 +7,7 @@ import {
 import type { FeaturedMessageWithAuthor } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
+import { installationForChannel } from "@/lib/overlay-installation";
 import { authorFromRow } from "@/lib/featured-author";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
@@ -72,22 +73,7 @@ export async function getInstalledOverlayAction(
   if (!layout || layout.token !== token) {
     return null;
   }
-  const { data, error } = await supabaseAdmin
-    .from("channel_overlays")
-    .select("id, overlays!inner (entry_url, status)")
-    .eq("channel_id", channel.id)
-    .eq("enabled", true)
-    .eq("overlays.status", "published")
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error(error);
-    throw new Error("Failed to fetch installed overlay");
-  }
-  if (!data) {
-    return null;
-  }
-  return { installId: data.id, entryUrl: data.overlays.entry_url };
+  return installationForChannel(channel.id);
 }
 
 export async function getMemberCountAction(

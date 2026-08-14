@@ -1141,6 +1141,32 @@ export type Database = {
           },
         ]
       }
+      overlay_secrets: {
+        Row: {
+          created_at: string
+          overlay_id: string
+          secret: string
+        }
+        Insert: {
+          created_at?: string
+          overlay_id: string
+          secret: string
+        }
+        Update: {
+          created_at?: string
+          overlay_id?: string
+          secret?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overlay_secrets_overlay_id_fkey"
+            columns: ["overlay_id"]
+            isOneToOne: true
+            referencedRelation: "overlays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       overlays: {
         Row: {
           created_at: string

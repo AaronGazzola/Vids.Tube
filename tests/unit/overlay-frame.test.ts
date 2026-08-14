@@ -4,28 +4,31 @@ import { framedOverlayUrl } from "@/lib/overlay-frame";
 const ORIGIN = "https://eco3d.shop";
 
 describe("framedOverlayUrl", () => {
-  it("appends the installation to a bare entry address", () => {
+  it("appends the token to a bare entry address", () => {
     expect(framedOverlayUrl(`${ORIGIN}/game/embed`, "abc", ORIGIN)).toBe(
-      `${ORIGIN}/game/embed?install=abc`
+      `${ORIGIN}/game/embed?t=abc`
     );
   });
 
   it("joins an existing query rather than replacing it", () => {
     expect(
       framedOverlayUrl(`${ORIGIN}/game/embed?rig=r1&legw=0.4`, "abc", ORIGIN)
-    ).toBe(`${ORIGIN}/game/embed?rig=r1&legw=0.4&install=abc`);
+    ).toBe(`${ORIGIN}/game/embed?rig=r1&legw=0.4&t=abc`);
   });
 
   it("keeps the fragment, which is where the rig configuration lives", () => {
     expect(
       framedOverlayUrl(`${ORIGIN}/game/embed#rig=r1&legw=0.4`, "abc", ORIGIN)
-    ).toBe(`${ORIGIN}/game/embed?install=abc#rig=r1&legw=0.4`);
+    ).toBe(`${ORIGIN}/game/embed?t=abc#rig=r1&legw=0.4`);
   });
 
-  it("replaces an install parameter the entry address tried to set itself", () => {
+  // An entry address is authored by the overlay's owner, so this is not an attack
+  // so much as a footgun: whatever it claims about its own identity is overwritten
+  // by what the host actually minted.
+  it("overrides a token the entry address tried to set itself", () => {
     expect(
-      framedOverlayUrl(`${ORIGIN}/game/embed?install=forged`, "abc", ORIGIN)
-    ).toBe(`${ORIGIN}/game/embed?install=abc`);
+      framedOverlayUrl(`${ORIGIN}/game/embed?t=forged`, "abc", ORIGIN)
+    ).toBe(`${ORIGIN}/game/embed?t=abc`);
   });
 
   it("refuses an origin other than the permitted one", () => {

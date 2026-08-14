@@ -5,12 +5,14 @@ import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  getChannelInstallationAction,
   installOverlayAction,
   listChannelOverlaysAction,
   removeOverlayAction,
 } from "./overlay.actions";
 
 const channelOverlaysKey = ["channel-overlays"] as const;
+const channelInstallationKey = ["channel-installation"] as const;
 
 export function useChannelOverlays() {
   return useQuery({
@@ -21,26 +23,23 @@ export function useChannelOverlays() {
 
 // The owner-side surfaces frame whatever the audience surface would frame, so
 // the composer cannot show a game the stream is not showing. Undefined until the
-// list has loaded: an unanswered question is not an empty answer.
+// answer arrives: an unanswered question is not an empty answer.
 export function useInstalledGameOverlay():
   | OverlayInstallation
   | null
   | undefined {
-  const { data } = useChannelOverlays();
-  if (!data) {
-    return undefined;
-  }
-  const installed = data.find((o) => o.installId);
-  if (!installed?.installId) {
-    return null;
-  }
-  return { installId: installed.installId, entryUrl: installed.entryUrl };
+  const { data } = useQuery({
+    queryKey: channelInstallationKey,
+    queryFn: () => getChannelInstallationAction(),
+  });
+  return data;
 }
 
 function useInvalidateOverlays() {
   const queryClient = useQueryClient();
   return () => {
     queryClient.invalidateQueries({ queryKey: channelOverlaysKey });
+    queryClient.invalidateQueries({ queryKey: channelInstallationKey });
   };
 }
 

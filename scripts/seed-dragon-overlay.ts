@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { newOverlaySecret } from "../lib/overlay-token";
 import type { Database } from "../supabase/types";
 
 const admin = createClient<Database>(
@@ -36,6 +37,28 @@ async function main() {
     process.exit(1);
   }
 
+  // Only ever written when absent. Regenerating a secret invalidates every token
+  // already handed to a running browser source, so re-running this script must
+  // never be the thing that does it.
+  const { data: existingSecret, error: secretReadError } = await admin
+    .from("overlay_secrets")
+    .select("overlay_id")
+    .eq("overlay_id", overlay.id)
+    .maybeSingle();
+  if (secretReadError) {
+    console.error(secretReadError);
+    process.exit(1);
+  }
+  if (!existingSecret) {
+    const { error: secretError } = await admin
+      .from("overlay_secrets")
+      .insert({ overlay_id: overlay.id, secret: newOverlaySecret() });
+    if (secretError) {
+      console.error(secretError);
+      process.exit(1);
+    }
+  }
+
   const { data: channel, error: channelError } = await admin
     .from("channels")
     .select("id")
@@ -68,9 +91,12 @@ async function main() {
   const { count: installCount } = await admin
     .from("channel_overlays")
     .select("id", { count: "exact", head: true });
+  const { count: secretCount } = await admin
+    .from("overlay_secrets")
+    .select("overlay_id", { count: "exact", head: true });
 
   console.warn(
-    `registry rows: ${overlayCount ?? 0}, installations: ${installCount ?? 0}`
+    `registry rows: ${overlayCount ?? 0}, installations: ${installCount ?? 0}, secrets: ${secretCount ?? 0}`
   );
 }
 

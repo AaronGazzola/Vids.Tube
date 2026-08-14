@@ -3,6 +3,7 @@
 import { OverlayEmptyState } from "@/components/overlay/empty-placeholder";
 import { OVERLAY_BASE_DIMS } from "@/lib/demo-overlay";
 import { framedOverlayUrl, type OverlayInstallation } from "@/lib/overlay-frame";
+import { useState } from "react";
 
 // The window hosting a framed overlay. What is framed comes from the overlay this channel installed, so
 // two streamers running the same overlay frame two different addresses. The ORIGIN is still build-time
@@ -21,13 +22,31 @@ export function GameWindow({
   placeholder?: boolean;
 }) {
   const permittedOrigin = process.env.NEXT_PUBLIC_GAME_EMBED_URL ?? "";
-  const url = installation
-    ? framedOverlayUrl(
-        installation.entryUrl,
-        installation.installId,
-        permittedOrigin
-      )
-    : null;
+  // The address is pinned to the INSTALLATION, not to the token. The host re-mints
+  // on every poll of the installation, and letting each fresh token reach `src`
+  // would reload the frame every fifteen seconds and restart whatever it was
+  // running. A different installation is the one case that should swap the frame.
+  //
+  // State rather than a memo, because a memo is a performance hint React is free
+  // to discard, and a discarded one here restarts the game.
+  const [pinned, setPinned] = useState<{ key: string; url: string | null }>({
+    key: "",
+    url: null,
+  });
+  const key = installation
+    ? `${installation.installId}|${installation.entryUrl}|${permittedOrigin}`
+    : "";
+
+  let url = installation && pinned.key === key ? pinned.url : null;
+  if (installation && pinned.key !== key) {
+    url = framedOverlayUrl(
+      installation.entryUrl,
+      installation.token,
+      permittedOrigin
+    );
+    setPinned({ key, url });
+  }
+
   if (!url) {
     if (placeholder)
       return (
