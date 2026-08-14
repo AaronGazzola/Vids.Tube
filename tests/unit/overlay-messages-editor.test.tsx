@@ -34,27 +34,51 @@ function mount(initial: { text: string; align: "left" | "center" }[]) {
 }
 
 const field = (n = 0) =>
-  host!.querySelector<HTMLInputElement>(`[aria-label="Message ${n + 1}"]`)!;
+  host!.querySelector<HTMLElement>(`[aria-label="Message ${n + 1}"]`)!;
 
 const button = (label: string) =>
   host!.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
 
+// The field is contenteditable, so typing means replacing its text and letting
+// it read itself back, which is what a keystroke does in a browser.
 function type(value: string, n = 0) {
   const el = field(n);
   act(() => {
-    // What React's onChange sees when a streamer types.
-    Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value"
-    )!.set!.call(el, value);
+    el.textContent = value;
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
 
+// Selecting inside a contenteditable means a DOM range over its text nodes.
 function select(from: number, to: number, n = 0) {
   const el = field(n);
-  el.focus();
-  el.setSelectionRange(from, to);
+  const texts: Text[] = [];
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) texts.push(node as Text);
+    else node.childNodes.forEach(walk);
+  };
+  walk(el);
+  const locate = (offset: number): [Node, number] => {
+    let left = offset;
+    for (const t of texts) {
+      const len = t.textContent?.length ?? 0;
+      if (left <= len) return [t, left];
+      left -= len;
+    }
+    const last = texts[texts.length - 1];
+    return last ? [last, last.textContent?.length ?? 0] : [el, 0];
+  };
+  const range = document.createRange();
+  const [sn, so] = locate(from);
+  const [en, eo] = locate(to);
+  range.setStart(sn, so);
+  range.setEnd(en, eo);
+  const selection = window.getSelection()!;
+  selection.removeAllRanges();
+  selection.addRange(range);
+  act(() => {
+    el.dispatchEvent(new Event("mouseup", { bubbles: true }));
+  });
 }
 
 beforeEach(() => {
@@ -94,11 +118,15 @@ describe("a control wraps what the streamer selected", () => {
     expect(messages()[0]).toBe("say __it__ now");
   });
 
-  it("inserts an empty pair at the cursor when nothing is selected", () => {
+  // Styling applies to a selection now that the field is styled text rather
+  // than markup: there is no punctuation to drop at a cursor, and an empty pair
+  // would be invisible in a field that shows the result rather than the source.
+  it("does nothing with nothing selected, and reads as off", () => {
     mount([msg("say now")]);
     select(4, 4);
     act(() => button("Bold").click());
-    expect(messages()[0]).toBe("say ****now");
+    expect(messages()[0]).toBe("say now");
+    expect(button("Bold").getAttribute("aria-pressed")).toBe("false");
   });
 });
 
@@ -218,7 +246,7 @@ describe("centring a message", () => {
   it("shows the centring in the preview", () => {
     mount([msg("one", "center")]);
     const preview = host!.querySelector(
-      '.overlay-surface [data-testid="member-strip-text"]'
+      '.overlay-surface [data-testid="message-banner-text"]'
     )!;
     expect(preview.className).toContain("text-center");
   });

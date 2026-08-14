@@ -24,7 +24,7 @@ export const OVERLAY_BASE_DIMS = {
   break: { w: 320, h: 150 },
   // Three quarters of the 1080-wide canvas, and short: the members strip shares
   // vertical space with the goals, the ladder and the highlight surface.
-  members: { w: 810, h: 128 },
+  messageBanner: { w: 810, h: 128 },
   // A landscape viewport for the game, which is a 3D scene rather than a card:
   // wide enough for a creature that travels, short enough to leave the canvas to
   // the surfaces that carry stream data.
@@ -39,7 +39,7 @@ export const OVERLAY_BASE_DIMS = {
 export const OVERLAY_SURFACE_ALPHA = {
   // The members strip is read at a glance over live video, so its slider maps
   // straight to the backing: 100 is solid black, 0 is gone.
-  members: 1,
+  messageBanner: 1,
   goal: 0.4,
 } as const;
 
@@ -68,7 +68,7 @@ export const OVERLAY_MESSAGE_ROW_H = 40;
 export const OVERLAY_MESSAGE_MAX_VISIBLE = 45;
 
 export type OverlayBoxKey =
-  | "members"
+  | "messageBanner"
   | "goalSubs"
   | "goalLikes"
   | "goalViewers"
@@ -83,7 +83,7 @@ export type DemoOverlayVisibility = {
   highlight: boolean;
   tts: boolean;
   ask: boolean;
-  members: boolean;
+  messageBanner: boolean;
   goalSubs: boolean;
   goalLikes: boolean;
   goalViewers: boolean;

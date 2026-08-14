@@ -47,7 +47,7 @@ function MessageRow({
           which is the trade for keeping the count where it is. */}
       <OverlayMessage
         text={text}
-        data-testid="member-strip-text"
+        data-testid="message-banner-text"
         className={cn(
           "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[32px] font-semibold leading-[1.15]",
           align === "center" && "text-center"
@@ -76,7 +76,7 @@ function MessageRow({
 
 // The strip's own backing and type, drawn once and statically, so the editor
 // judges a message on the surface it will appear on rather than on a form.
-export function MemberMessagePreview({
+export function MessageBannerPreview({
   text,
   align,
   count,
@@ -90,7 +90,7 @@ export function MemberMessagePreview({
       style={
         {
           width: STRIP_WIDTH,
-          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.members,
+          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.messageBanner,
         } as React.CSSProperties
       }
       className="overlay-surface rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
@@ -102,9 +102,9 @@ export function MemberMessagePreview({
   );
 }
 
-export const MEMBER_STRIP_WIDTH = STRIP_WIDTH;
+export const MESSAGE_BANNER_WIDTH = STRIP_WIDTH;
 // Backing plus border plus one row: what the preview occupies before scaling.
-export const MEMBER_STRIP_HEIGHT = OVERLAY_MESSAGE_ROW_H + 26;
+export const MESSAGE_BANNER_HEIGHT = OVERLAY_MESSAGE_ROW_H + 26;
 
 // A wide, short banner rather than a stacked card: the strip competes for
 // vertical space with the goals, the ladder and the highlight surface on a
@@ -113,7 +113,7 @@ export const MEMBER_STRIP_HEIGHT = OVERLAY_MESSAGE_ROW_H + 26;
 // No backdrop blur. Blur frosts whatever is behind the strip, which reads as a
 // solid panel however far the opacity is wound down — it defeated the control
 // rather than obeying it. The backing is black alone, scaled by the slider.
-export function MemberCountStrip({
+export function MessageBanner({
   count,
   messages,
 }: {
@@ -163,7 +163,7 @@ export function MemberCountStrip({
       style={
         {
           width: STRIP_WIDTH,
-          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.members,
+          "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.messageBanner,
         } as React.CSSProperties
       }
       className="overlay-surface rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
@@ -173,7 +173,7 @@ export function MemberCountStrip({
       <div
         className="relative overflow-hidden"
         style={{ height: OVERLAY_MESSAGE_ROW_H }}
-        data-testid="member-strip-window"
+        data-testid="message-banner-window"
       >
         {leaving !== null && (
           <MessageRow
@@ -182,7 +182,7 @@ export function MemberCountStrip({
             align={list[leaving].align}
             count={leaving === 0 ? count : null}
             className="absolute inset-x-0 top-0"
-            data-testid="member-strip-leaving"
+            data-testid="message-banner-leaving"
             style={{
               animation: `overlay-message-out ${OVERLAY_MESSAGE_TRANSITION_MS}ms ease-in-out forwards`,
             }}
@@ -194,7 +194,7 @@ export function MemberCountStrip({
           align={list[showing].align}
           count={showing === 0 ? count : null}
           className="absolute inset-x-0 top-0"
-          data-testid="member-strip-showing"
+          data-testid="message-banner-showing"
           style={
             leaving !== null
               ? {

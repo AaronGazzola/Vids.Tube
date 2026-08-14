@@ -29,12 +29,20 @@ import { applyReusedSettings } from "@/lib/settings-reuse";
 import { vodAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import {
-  MEMBER_STRIP_HEIGHT,
-  MEMBER_STRIP_WIDTH,
-  MemberMessagePreview,
-} from "@/components/overlay/member-count-strip";
+  MESSAGE_BANNER_HEIGHT,
+  MESSAGE_BANNER_WIDTH,
+  MessageBannerPreview,
+} from "@/components/overlay/message-banner";
 import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
-import { visibleLength } from "@/lib/overlay-markup";
+import { parseOverlayMessage, visibleLength } from "@/lib/overlay-markup";
+import { serializeOverlayMessage } from "@/lib/overlay-markup-serialize";
+import {
+  applyColor,
+  applyMark,
+  markIsActive,
+  type RunMark,
+} from "@/lib/overlay-runs";
+import { MessageBannerField } from "./message-banner-field";
 import {
   AlignCenter,
   AlignLeft,
@@ -457,62 +465,60 @@ function MessageEditor({
   onMove: (by: -1 | 1) => void;
 }) {
   const value = message.text;
-  const ref = useRef<HTMLInputElement>(null);
   const [refused, setRefused] = useState(false);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
   const remaining = OVERLAY_MESSAGE_MAX_VISIBLE - visibleLength(value);
 
-  const commit = (next: string, caret?: number) => {
+  const commit = (next: string) => {
     if (visibleLength(next) > OVERLAY_MESSAGE_MAX_VISIBLE) {
       setRefused(true);
       return;
     }
     setRefused(false);
     onChange({ ...message, text: next });
-    if (caret !== undefined) {
-      requestAnimationFrame(() => {
-        ref.current?.focus();
-        ref.current?.setSelectionRange(caret, caret);
-      });
-    }
   };
 
-  // Wrapping the selection is why the streamer presses a button rather than
-  // typing punctuation. With nothing selected an empty pair lands at the cursor.
-  const wrap = (open: string, close: string) => {
-    const el = ref.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? start;
-    const next =
-      value.slice(0, start) +
-      open +
-      value.slice(start, end) +
-      close +
-      value.slice(end);
-    commit(next, start + open.length + (end - start));
+  // Styling works on the run list rather than on the characters, so a control
+  // toggles what is selected instead of inserting punctuation the streamer then
+  // has to look at.
+  const runs = parseOverlayMessage(value);
+  const toggle = (mark: RunMark) => {
+    const active = markIsActive(runs, selection.start, selection.end, mark);
+    commit(
+      serializeOverlayMessage(
+        applyMark(runs, selection.start, selection.end, mark, !active)
+      )
+    );
   };
 
-  // React's onChange for a colour input fires on every step of the drag, which
-  // would leave a colour token behind for every shade the streamer passed
-  // through. The native change event fires once, when a colour is actually
-  // chosen.
   const colourRef = useRef<HTMLInputElement>(null);
-  const wrapRef = useRef(wrap);
+  const colourStateRef = useRef({ runs, selection });
   useEffect(() => {
-    wrapRef.current = wrap;
+    colourStateRef.current = { runs, selection };
   });
+  // React's onChange for a colour input fires on every step of the drag, which
+  // would restyle for every shade passed through. The native change event fires
+  // once, when a colour is actually chosen.
   useEffect(() => {
     const el = colourRef.current;
     if (!el) return;
-    const commitColour = () => wrapRef.current(`{${el.value}|`, "}");
-    el.addEventListener("change", commitColour);
-    return () => el.removeEventListener("change", commitColour);
-  }, []);
+    const commitColour = () => {
+      const { runs: current, selection: sel } = colourStateRef.current;
+      onChange({
+        ...message,
+        text: serializeOverlayMessage(
+          applyColor(current, sel.start, sel.end, el.value)
+        ),
+      });
+    };
+    el.addEventListener('change', commitColour);
+    return () => el.removeEventListener('change', commitColour);
+  }, [message, onChange]);
 
   const markButton = (
     label: string,
     icon: React.ReactNode,
-    open: string,
-    close: string
+    mark: RunMark
   ) => (
     <Button
       type="button"
@@ -522,8 +528,9 @@ function MessageEditor({
       aria-label={label}
       // Keep the caret where it is: a button that takes focus first loses the
       // selection it was meant to wrap.
+      aria-pressed={markIsActive(runs, selection.start, selection.end, mark)}
       onMouseDown={(e) => e.preventDefault()}
-      onClick={() => wrap(open, close)}
+      onClick={() => toggle(mark)}
     >
       {icon}
     </Button>
@@ -535,23 +542,21 @@ function MessageEditor({
         <span className="w-5 shrink-0 text-xs text-muted-foreground">
           {position + 1}
         </span>
-        <Input
-          ref={ref}
+        <MessageBannerField
           value={value}
-          onChange={(e) => commit(e.target.value)}
-          aria-label={`Message ${position + 1}`}
-          placeholder="Chat to become a member at Vids.Tube!"
-          className="h-8 text-sm"
+          onChange={commit}
+          onSelectionChange={setSelection}
+          ariaLabel={`Message ${position + 1}`}
+          className="min-h-8 flex-1 rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />
       </div>
       <div className="flex flex-wrap items-center gap-1.5 pl-7">
-        {markButton("Bold", <Bold className="h-3.5 w-3.5" />, "**", "**")}
-        {markButton("Italic", <Italic className="h-3.5 w-3.5" />, "*", "*")}
+        {markButton("Bold", <Bold className="h-3.5 w-3.5" />, "bold")}
+        {markButton("Italic", <Italic className="h-3.5 w-3.5" />, "italic")}
         {markButton(
           "Underline",
           <Underline className="h-3.5 w-3.5" />,
-          "__",
-          "__"
+          "underline"
         )}
         <input
           ref={colourRef}
@@ -631,8 +636,8 @@ function MessageEditor({
       <div
         className="ml-7 overflow-hidden rounded-md"
         style={{
-          width: MEMBER_STRIP_WIDTH * MESSAGE_PREVIEW_SCALE,
-          height: MEMBER_STRIP_HEIGHT * MESSAGE_PREVIEW_SCALE,
+          width: MESSAGE_BANNER_WIDTH * MESSAGE_PREVIEW_SCALE,
+          height: MESSAGE_BANNER_HEIGHT * MESSAGE_PREVIEW_SCALE,
           maxWidth: "100%",
         }}
       >
@@ -642,7 +647,7 @@ function MessageEditor({
             transformOrigin: "top left",
           }}
         >
-          <MemberMessagePreview
+          <MessageBannerPreview
             text={value}
             align={message.align}
             count={position === 0 ? DEMO_MEMBER_COUNT : null}

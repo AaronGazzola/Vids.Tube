@@ -2,7 +2,7 @@ import { DEFAULT_MEMBER_MESSAGE } from "@/lib/demo-overlay";
 import type { Counts } from "@/lib/goals";
 
 export type DemoBoxKey =
-  | "members"
+  | "messageBanner"
   | "goalSubs"
   | "goalLikes"
   | "goalViewers"
@@ -50,7 +50,7 @@ export type DemoLayoutConfig = {
 };
 
 export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
-  "members",
+  "messageBanner",
   "goalSubs",
   "goalLikes",
   "goalViewers",
@@ -63,7 +63,7 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
 ];
 
 export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
-  members: "Members",
+  messageBanner: "Message banner",
   goalSubs: "Subs goal",
   goalLikes: "Likes goal",
   goalViewers: "Viewers goal",
@@ -82,7 +82,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   boxes: {
     // Centred across the top at scale 1: 810 wide on a 1080 canvas leaves 135
     // either side, so the strip reads as a banner rather than a floating box.
-    members: { x: 135, y: 56, scale: 1 },
+    messageBanner: { x: 135, y: 56, scale: 1 },
     // Mirrors the likes goal across the canvas, below the viewers goal: the two
     // columns the strip leaves free once it takes the top band.
     goalSubs: { x: 700, y: 380, scale: 2 },
@@ -96,7 +96,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     game: { x: 480, y: 600, scale: 1 },
   },
   visible: {
-    members: true,
+    messageBanner: true,
     goalSubs: true,
     goalLikes: true,
     goalViewers: true,
@@ -113,7 +113,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
   background: "slideshow",
   mobileChrome: false,
   boxOpacity: {
-    members: 1,
+    messageBanner: 1,
     goalSubs: 1,
     goalLikes: 1,
     goalViewers: 1,
@@ -141,7 +141,7 @@ type LegacyDemoLayoutConfig = Partial<DemoLayoutConfig> & {
 };
 
 export const DEMO_BOX_KEYS: DemoBoxKey[] = [
-  "members",
+  "messageBanner",
   "goalSubs",
   "goalLikes",
   "goalViewers",

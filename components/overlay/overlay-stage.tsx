@@ -5,7 +5,7 @@ import { GOAL_METRICS } from "@/app/layout.types";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GameWindow } from "@/components/overlay/game-window";
 import { GoalBar } from "@/components/overlay/goal-bar";
-import { MemberCountStrip } from "@/components/overlay/member-count-strip";
+import { MessageBanner } from "@/components/overlay/message-banner";
 import { OverlayScaleProvider } from "@/components/overlay/overlay-scale-context";
 import type { OverlayStageProps } from "@/components/overlay/overlay-stage.types";
 import {
@@ -101,11 +101,11 @@ export function OverlayStage({
         </Positioned>
       )}
 
-      {visible.members && (
-        <Positioned boxKey="members" box={boxes.members} opacity={config.boxOpacity.members}>
+      {visible.messageBanner && (
+        <Positioned boxKey="messageBanner" box={boxes.messageBanner} opacity={config.boxOpacity.messageBanner}>
           {wrap(
-            "members",
-            <MemberCountStrip
+            "messageBanner",
+            <MessageBanner
               count={values.memberCount}
               messages={config.messages}
             />

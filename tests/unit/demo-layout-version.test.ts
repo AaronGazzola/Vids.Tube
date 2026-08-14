@@ -4,16 +4,17 @@ import {
   DEMO_LAYOUT_VERSION,
   mergeDemoLayout,
 } from "@/app/(app)/live/demo.types";
+import { DEFAULT_MEMBER_MESSAGE } from "@/lib/demo-overlay";
 
 describe("overlay layout version 3", () => {
-  it("is version 3, because the members strip replaced the subscriber goal box", () => {
+  it("is version 3, because the message banner replaced the subscriber goal box", () => {
     expect(DEMO_LAYOUT_VERSION).toBe(3);
   });
 
-  it("offers a members box alongside the subscriber goal box", () => {
-    expect(DEFAULT_DEMO_LAYOUT.boxes).toHaveProperty("members");
+  it("offers a message banner alongside the subscriber goal box", () => {
+    expect(DEFAULT_DEMO_LAYOUT.boxes).toHaveProperty("messageBanner");
     expect(DEFAULT_DEMO_LAYOUT.boxes).toHaveProperty("goalSubs");
-    expect(DEFAULT_DEMO_LAYOUT.visible).toHaveProperty("members");
+    expect(DEFAULT_DEMO_LAYOUT.visible).toHaveProperty("messageBanner");
   });
 
   it("leaves the likes and viewers goals in place", () => {
@@ -67,9 +68,9 @@ describe("a layout saved before the change keeps every position it had", () => {
     expect(merged.boxes).not.toEqual(DEFAULT_DEMO_LAYOUT.boxes);
   });
 
-  it("gives the newly added members strip its default position", () => {
+  it("gives the newly added message banner its default position", () => {
     const merged = mergeDemoLayout(saved);
-    expect(merged.boxes.members).toEqual(DEFAULT_DEMO_LAYOUT.boxes.members);
+    expect(merged.boxes.messageBanner).toEqual(DEFAULT_DEMO_LAYOUT.boxes.messageBanner);
   });
 
   it("keeps the subscriber goal box the owner had placed", () => {
@@ -96,7 +97,7 @@ describe("a layout saved before the change keeps every position it had", () => {
 describe("messages ride alongside the layout without disturbing it", () => {
   const PLACED = {
     goalLikes: { x: 11, y: 22, scale: 1.5 },
-    members: { x: 200, y: 300, scale: 1.25 },
+    messageBanner: { x: 200, y: 300, scale: 1.25 },
     competition: { x: 55, y: 66, scale: 0.8 },
   };
 
@@ -104,7 +105,7 @@ describe("messages ride alongside the layout without disturbing it", () => {
     version: DEMO_LAYOUT_VERSION,
     boxes: { ...DEFAULT_DEMO_LAYOUT.boxes, ...PLACED },
     visible: { ...DEFAULT_DEMO_LAYOUT.visible, goalLikes: false, break: true },
-    boxOpacity: { ...DEFAULT_DEMO_LAYOUT.boxOpacity, members: 0.42 },
+    boxOpacity: { ...DEFAULT_DEMO_LAYOUT.boxOpacity, messageBanner: 0.42 },
   } as unknown as Parameters<typeof mergeDemoLayout>[0];
 
   const FIRST = { text: "first thing", align: "left" as const };
@@ -121,7 +122,7 @@ describe("messages ride alongside the layout without disturbing it", () => {
   it("keeps every position and scale once messages are added", () => {
     const merged = mergeDemoLayout(withMessages);
     expect(merged.boxes.goalLikes).toEqual(PLACED.goalLikes);
-    expect(merged.boxes.members).toEqual(PLACED.members);
+    expect(merged.boxes.messageBanner).toEqual(PLACED.messageBanner);
     expect(merged.boxes.competition).toEqual(PLACED.competition);
   });
 
@@ -129,7 +130,7 @@ describe("messages ride alongside the layout without disturbing it", () => {
     const merged = mergeDemoLayout(withMessages);
     expect(merged.visible.goalLikes).toBe(false);
     expect(merged.visible.break).toBe(true);
-    expect(merged.boxOpacity.members).toBe(0.42);
+    expect(merged.boxOpacity.messageBanner).toBe(0.42);
   });
 
   it("changes nothing but the messages", () => {
@@ -200,12 +201,12 @@ describe("messages ride alongside the layout without disturbing it", () => {
 
 describe("guards around a saved layout", () => {
   it("keeps positions from a layout already on the current version", () => {
-    const members = { x: 200, y: 300, scale: 1.25 };
+    const messageBanner = { x: 200, y: 300, scale: 1.25 };
     const merged = mergeDemoLayout({
       version: DEMO_LAYOUT_VERSION,
-      boxes: { ...DEFAULT_DEMO_LAYOUT.boxes, members },
+      boxes: { ...DEFAULT_DEMO_LAYOUT.boxes, messageBanner },
     });
-    expect(merged.boxes.members).toEqual(members);
+    expect(merged.boxes.messageBanner).toEqual(messageBanner);
   });
 
   it("keeps positions from a layout carrying no version at all", () => {
@@ -238,5 +239,12 @@ describe("guards around a saved layout", () => {
     expect(Object.keys(merged.boxes).sort()).toEqual(
       Object.keys(DEFAULT_DEMO_LAYOUT.boxes).sort()
     );
+  });
+});
+
+describe("the message banner ships one message", () => {
+  it("seeds exactly the call to action, and nothing else", () => {
+    expect(DEFAULT_DEMO_LAYOUT.messages).toHaveLength(1);
+    expect(DEFAULT_DEMO_LAYOUT.messages[0].text).toBe(DEFAULT_MEMBER_MESSAGE);
   });
 });

@@ -104,7 +104,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1080, height: 1920 });
   await page.goto(`/overlay/${ownerSlug}?token=${overlayToken}`);
   await expect(
-    page.locator('[data-testid="member-strip-window"]')
+    page.locator('[data-testid="message-banner-window"]')
   ).toBeVisible({ timeout: 25_000 });
 });
 
@@ -121,7 +121,7 @@ test("the strip shows each message in turn and the order repeats", async ({
     const read = () =>
       document
         .querySelector(
-          '[data-testid="member-strip-showing"] [data-testid="member-strip-text"]'
+          '[data-testid="message-banner-showing"] [data-testid="message-banner-text"]'
         )
         ?.textContent?.trim() ?? "";
     const deadline = performance.now() + dwell * 5;
@@ -150,7 +150,7 @@ test("the strip shows each message in turn and the order repeats", async ({
 test("the outgoing message leaves below the incoming one", async ({ page }) => {
   test.setTimeout(LONG_RUN_MS);
   const caught = await page.evaluate(async (dwell) => {
-    const win = document.querySelector('[data-testid="member-strip-window"]')!;
+    const win = document.querySelector('[data-testid="message-banner-window"]')!;
     return await new Promise<{
       showingTop: number;
       leavingTop: number;
@@ -161,10 +161,10 @@ test("the outgoing message leaves below the incoming one", async ({ page }) => {
       const tick = () => {
         const w = win.getBoundingClientRect();
         const showing = document.querySelector(
-          '[data-testid="member-strip-showing"]'
+          '[data-testid="message-banner-showing"]'
         );
         const leaving = document.querySelector(
-          '[data-testid="member-strip-leaving"]'
+          '[data-testid="message-banner-leaving"]'
         );
         if (showing && leaving) {
           const s = showing.getBoundingClientRect();
@@ -209,8 +209,8 @@ test("the outgoing message leaves below the incoming one", async ({ page }) => {
   expect(caught!.leavingText).not.toBe(caught!.showingText);
 
   await page
-    .locator('[data-testid="member-strip-window"]')
-    .screenshot({ path: "test-results/member-strip-mid-transition.png" });
+    .locator('[data-testid="message-banner-window"]')
+    .screenshot({ path: "test-results/message-banner-mid-transition.png" });
 });
 
 test("the strip keeps its height and its single line across every message", async ({
@@ -220,12 +220,12 @@ test("the strip keeps its height and its single line across every message", asyn
   const samples = await page.evaluate(
     async ([dwell, transition]) => {
       const strip = () =>
-        document.querySelector('[data-testid="member-strip-window"]')!;
+        document.querySelector('[data-testid="message-banner-window"]')!;
       const rows: { height: number; clipped: boolean; text: string }[] = [];
       // One reading per message, taken at rest rather than mid-transition.
       for (let i = 0; i < 4; i += 1) {
         const text = document.querySelector(
-          '[data-testid="member-strip-showing"] [data-testid="member-strip-text"]'
+          '[data-testid="message-banner-showing"] [data-testid="message-banner-text"]'
         ) as HTMLElement;
         rows.push({
           height: Math.round(strip().getBoundingClientRect().height),
@@ -252,7 +252,7 @@ test("a centred message is drawn centred on the broadcast", async ({ page }) => 
     const deadline = performance.now() + dwell * 6;
     while (performance.now() < deadline) {
       const row = document.querySelector(
-        '[data-testid="member-strip-showing"] [data-testid="member-strip-text"]'
+        '[data-testid="message-banner-showing"] [data-testid="message-banner-text"]'
       ) as HTMLElement | null;
       if (row?.textContent?.includes("A far longer sentence")) {
         return getComputedStyle(row).textAlign;
@@ -270,7 +270,7 @@ test("a centred message is drawn centred on the broadcast", async ({ page }) => 
     const deadline = performance.now() + dwell * 6;
     while (performance.now() < deadline) {
       const row = document.querySelector(
-        '[data-testid="member-strip-showing"] [data-testid="member-strip-text"]'
+        '[data-testid="message-banner-showing"] [data-testid="message-banner-text"]'
       ) as HTMLElement | null;
       if (row?.textContent?.includes("Short one")) {
         return getComputedStyle(row).textAlign;
@@ -292,7 +292,7 @@ test("formatting reaches the broadcast, and a mistake still shows its words", as
     // Wait for the formatted message to come round.
     while (performance.now() < deadline) {
       const row = document.querySelector(
-        '[data-testid="member-strip-showing"] [data-testid="member-strip-text"]'
+        '[data-testid="message-banner-showing"] [data-testid="message-banner-text"]'
       );
       if (row?.textContent?.includes("bold")) {
         return [...row.querySelectorAll("span")].map((el) => {
@@ -325,7 +325,7 @@ test("formatting reaches the broadcast, and a mistake still shows its words", as
   const literal = await page.evaluate(async (dwell) => {
     const deadline = performance.now() + dwell * 6;
     while (performance.now() < deadline) {
-      const row = document.querySelector('[data-testid="member-strip-showing"]');
+      const row = document.querySelector('[data-testid="message-banner-showing"]');
       if (row?.textContent?.includes("join")) return row.textContent;
       await new Promise((r) => setTimeout(r, 100));
     }

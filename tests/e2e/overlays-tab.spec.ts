@@ -82,9 +82,9 @@ async function settle(page: Page) {
   throw new Error("the overlay layout never settled");
 }
 
-// The members strip is always visible by default and has a stable box, so it is
+// The message banner is always visible by default and has a stable box, so it is
 // the one used for geometry.
-const BOX = "members";
+const BOX = "messageBanner";
 
 // The overlay's position is a canvas coordinate, and the canvas is itself
 // scaled to fit the panel. Viewport pixels therefore move whenever the stage

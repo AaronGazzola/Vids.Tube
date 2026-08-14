@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { MemberCountStrip } from "@/components/overlay/member-count-strip";
+import { MessageBanner } from "@/components/overlay/message-banner";
 import { OVERLAY_MESSAGE_DWELL_MS } from "@/lib/demo-overlay";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -22,7 +22,7 @@ function mount(messages: { text: string; align: "left" | "center" }[]) {
   document.body.appendChild(host);
   root = createRoot(host);
   act(() => {
-    root!.render(<MemberCountStrip count={COUNT} messages={messages} />);
+    root!.render(<MessageBanner count={COUNT} messages={messages} />);
   });
 }
 
@@ -33,9 +33,9 @@ function advance() {
 }
 
 const showing = () =>
-  host!.querySelector('[data-testid="member-strip-showing"]')!;
+  host!.querySelector('[data-testid="message-banner-showing"]')!;
 const leaving = () =>
-  host!.querySelector('[data-testid="member-strip-leaving"]');
+  host!.querySelector('[data-testid="message-banner-leaving"]');
 
 beforeEach(() => vi.useFakeTimers());
 
@@ -74,7 +74,7 @@ describe("the member count belongs to the first message", () => {
     advance();
     act(() => {
       root!.render(
-        <MemberCountStrip count={999} messages={[msg(FIRST), msg(SECOND)]} />
+        <MessageBanner count={999} messages={[msg(FIRST), msg(SECOND)]} />
       );
     });
     advance();
@@ -108,7 +108,7 @@ describe("several messages take turns", () => {
 describe("a single message does not cycle", () => {
   it("renders one message with no transition on it", () => {
     const html = renderToStaticMarkup(
-      <MemberCountStrip count={COUNT} messages={[msg(FIRST)]} />
+      <MessageBanner count={COUNT} messages={[msg(FIRST)]} />
     );
     expect(html).toContain(FIRST);
     expect(html).not.toContain("overlay-message-in");
@@ -125,7 +125,7 @@ describe("a single message does not cycle", () => {
 
   it("falls back to the site's own sentence when nothing is configured", () => {
     const html = renderToStaticMarkup(
-      <MemberCountStrip count={COUNT} messages={[]} />
+      <MessageBanner count={COUNT} messages={[]} />
     );
     expect(html).toContain("Chat to become a member at Vids.Tube!");
     expect(html).not.toContain("overlay-message-in");
@@ -142,24 +142,24 @@ describe("a single message does not cycle", () => {
 describe("a message can be centred on its line", () => {
   it("leaves a message on the left unless it is centred", () => {
     mount([msg(FIRST)]);
-    const text = showing().querySelector('[data-testid="member-strip-text"]')!;
+    const text = showing().querySelector('[data-testid="message-banner-text"]')!;
     expect(text.className).not.toContain("text-center");
   });
 
   it("centres a message the streamer chose to centre", () => {
     mount([msg(FIRST, "center")]);
-    const text = showing().querySelector('[data-testid="member-strip-text"]')!;
+    const text = showing().querySelector('[data-testid="message-banner-text"]')!;
     expect(text.className).toContain("text-center");
   });
 
   it("keeps alignment with its own message as the strip cycles", () => {
     mount([msg(FIRST, "center"), msg(SECOND)]);
     expect(
-      showing().querySelector('[data-testid="member-strip-text"]')!.className
+      showing().querySelector('[data-testid="message-banner-text"]')!.className
     ).toContain("text-center");
     advance();
     expect(
-      showing().querySelector('[data-testid="member-strip-text"]')!.className
+      showing().querySelector('[data-testid="message-banner-text"]')!.className
     ).not.toContain("text-center");
   });
 });
@@ -167,7 +167,7 @@ describe("a message can be centred on its line", () => {
 describe("formatting reaches the strip", () => {
   it("draws marked-up runs as elements rather than as characters", () => {
     const html = renderToStaticMarkup(
-      <MemberCountStrip count={COUNT} messages={[msg("say **it** {#ff0055|now}")]} />
+      <MessageBanner count={COUNT} messages={[msg("say **it** {#ff0055|now}")]} />
     );
     expect(html).toContain("font-bold");
     expect(html).toContain("#ff0055");
@@ -176,7 +176,7 @@ describe("formatting reaches the strip", () => {
 
   it("draws a malformed message as the words that were typed", () => {
     const html = renderToStaticMarkup(
-      <MemberCountStrip count={COUNT} messages={[msg("join **us today")]} />
+      <MessageBanner count={COUNT} messages={[msg("join **us today")]} />
     );
     expect(html).toContain("join **us today");
   });
