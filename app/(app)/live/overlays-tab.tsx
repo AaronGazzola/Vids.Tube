@@ -31,6 +31,7 @@ import {
   type DemoBackground,
   type DemoBoxKey,
 } from "./demo.types";
+import { OverlayInstallList } from "./overlay-install-list";
 import { useOverlayDemoValues } from "./overlays-demo";
 import { useOverlayComposerValues } from "./overlays-tab.hooks";
 
@@ -327,6 +328,10 @@ export function OverlaysTab({
               )}
             </div>
           ))}
+
+          <div className="my-0.5 h-px bg-white/15" />
+
+          <OverlayInstallList />
 
           <div className="my-0.5 h-px bg-white/15" />
 

@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   getFeaturedMessagesAction,
   getBannerCountsAction,
+  getInstalledOverlayAction,
   getMemberCountAction,
   getOverlayLayoutAction,
   getPlayableAskAction,
@@ -43,6 +44,17 @@ export function useMemberCount(channelSlug: string, enabled = true) {
     queryFn: () => getMemberCountAction(channelSlug),
     refetchInterval: 10_000,
     enabled,
+  });
+}
+
+// Which overlay this channel installed in the game box. On the same 15s cadence
+// as the layout, so installing one takes effect on the running browser source
+// without the streamer touching OBS.
+export function useInstalledOverlay(channelSlug: string, token: string) {
+  return useQuery({
+    queryKey: ["overlay-installation", channelSlug, token],
+    queryFn: () => getInstalledOverlayAction(channelSlug, token),
+    refetchInterval: 15_000,
   });
 }
 

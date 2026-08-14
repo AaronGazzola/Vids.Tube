@@ -101,6 +101,15 @@ The row id is a v4 uuid, so it is unguessable, carries no meaning, and is stable
 installation. It is not a secret and grants nothing on its own; it is a name, and the token that follows
 is what will grant.
 
+### "Not installed" and "not yet known" are different states
+
+`gameInstallation` is `OverlayInstallation | null | undefined`: undefined while the query is in flight,
+null once the answer is known to be nothing. The renderer logs the empty box only for null.
+
+Found by observation rather than by reasoning. Collapsing the two with `?? null` made every page load
+report `game window shown but no overlay is installed on this channel` twice before the frame appeared,
+which turns a real diagnostic into noise that would be ignored when it finally mattered.
+
 ### The registry is seeded by a script, not by a migration
 
 A migration cannot read `NEXT_PUBLIC_GAME_EMBED_URL`, and the first row's entry address is exactly that

@@ -327,6 +327,117 @@ export async function setScoringEnabledAction(
   return { data: { enabled } };
 }
 
+export type ChannelOverlayRow = {
+  overlayId: string;
+  slug: string;
+  name: string;
+  entryUrl: string;
+  installId: string | null;
+};
+
+export async function listChannelOverlaysAction(): Promise<ChannelOverlayRow[]> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+  const { channel } = owned.data;
+
+  const { data: overlays, error } = await supabaseAdmin
+    .from("overlays")
+    .select("id, slug, name, entry_url")
+    .eq("status", "published")
+    .order("name", { ascending: true });
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load overlays");
+  }
+
+  const { data: installs, error: installError } = await supabaseAdmin
+    .from("channel_overlays")
+    .select("id, overlay_id")
+    .eq("channel_id", channel.id)
+    .eq("enabled", true);
+  if (installError) {
+    console.error(installError);
+    throw new Error("Failed to load installed overlays");
+  }
+
+  const installByOverlay = new Map(
+    (installs ?? []).map((i) => [i.overlay_id, i.id])
+  );
+
+  return (overlays ?? []).map((o) => ({
+    overlayId: o.id,
+    slug: o.slug,
+    name: o.name,
+    entryUrl: o.entry_url,
+    installId: installByOverlay.get(o.id) ?? null,
+  }));
+}
+
+export async function installOverlayAction(
+  overlayId: string
+): Promise<ActionResult<{ installId: string }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  const { data: overlay, error } = await supabaseAdmin
+    .from("overlays")
+    .select("id, status")
+    .eq("id", overlayId)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load overlay");
+  }
+  if (!overlay || overlay.status !== "published") {
+    return { error: "That overlay is not available to install." };
+  }
+
+  const { data, error: insertError } = await supabaseAdmin
+    .from("channel_overlays")
+    .upsert(
+      { channel_id: channel.id, overlay_id: overlayId, enabled: true },
+      { onConflict: "channel_id,overlay_id" }
+    )
+    .select("id")
+    .maybeSingle();
+  if (insertError) {
+    console.error(insertError);
+    throw new Error("Failed to install overlay");
+  }
+  if (!data) {
+    throw new Error("Failed to install overlay");
+  }
+
+  return { data: { installId: data.id } };
+}
+
+export async function removeOverlayAction(
+  overlayId: string
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+  const { channel } = owned.data;
+
+  const { error } = await supabaseAdmin
+    .from("channel_overlays")
+    .delete()
+    .eq("channel_id", channel.id)
+    .eq("overlay_id", overlayId);
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to remove overlay");
+  }
+
+  return { data: { ok: true } };
+}
+
 export async function getViewerLeaderboardAction(
   streamId: string
 ): Promise<ViewerScoreWithAuthor[]> {

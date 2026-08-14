@@ -394,7 +394,7 @@ export default function OverlayFramePage({
         goalMetric,
         competitionEntries,
         breakSlot,
-        gameInstallation: installation.data ?? null,
+        gameInstallation: installation.data,
       }}
     />
   );

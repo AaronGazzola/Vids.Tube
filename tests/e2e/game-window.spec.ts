@@ -19,6 +19,7 @@ let ownerSlug: string;
 let ownerChannelId: string;
 let overlayToken: string | null = null;
 let savedLayout: Json | null = null;
+let installId: string | null = null;
 
 test.describe.configure({ mode: "serial" });
 
@@ -39,6 +40,15 @@ test.beforeAll(async () => {
     .maybeSingle();
   savedLayout = layout?.config ?? null;
   overlayToken = layout?.token ?? null;
+
+  const { data: install } = await admin
+    .from("channel_overlays")
+    .select("id")
+    .eq("channel_id", ownerChannelId)
+    .eq("enabled", true)
+    .limit(1)
+    .maybeSingle();
+  installId = install?.id ?? null;
 
   if (savedLayout) {
     const config = savedLayout as Record<string, unknown>;
@@ -71,10 +81,7 @@ test("the game window frames the game and is not refused by the security policy"
   page,
 }) => {
   test.skip(!overlayToken, "no overlay layout to read");
-  test.skip(
-    !process.env.NEXT_PUBLIC_GAME_EMBED_URL,
-    "no game address configured"
-  );
+  test.skip(!installId, "no overlay installed on the owner's channel");
 
   const violations: string[] = [];
   page.on("console", (m) => {
@@ -86,6 +93,10 @@ test("the game window frames the game and is not refused by the security policy"
 
   const frame = page.locator('[data-testid="game-window"]');
   await expect(frame).toBeVisible({ timeout: 25_000 });
+
+  // The address is per channel, not per deployment: what is framed names this
+  // channel's installation.
+  await expect(frame).toHaveAttribute("src", new RegExp(`install=${installId}`));
 
   // Reaching inside proves the document loaded rather than being blocked.
   const inner = page.frameLocator('[data-testid="game-window"]').locator("canvas");

@@ -3,26 +3,75 @@ import { GameWindow } from "@/components/overlay/game-window";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
-describe("what the game window paints with no game configured", () => {
-  it("gives the layout editor an outline to position", () => {
+const PERMITTED = "https://game.example";
+
+describe("what the game window paints", () => {
+  it("gives the layout editor an outline to position with nothing installed", () => {
     vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", "");
-    const html = renderToStaticMarkup(<GameWindow placeholder />);
+    const html = renderToStaticMarkup(
+      <GameWindow installation={null} placeholder />
+    );
     expect(html).toContain("border-dashed");
     expect(html).toContain("Game");
   });
 
-  it("gives the stream nothing", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", "");
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(renderToStaticMarkup(<GameWindow />)).toBe("");
+  it("gives the stream nothing with no overlay installed, and says so", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(renderToStaticMarkup(<GameWindow installation={null} />)).toBe("");
+    expect(logged).toHaveBeenCalledOnce();
   });
 
-  it("frames the game once an address is configured", () => {
-    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", "https://game.example/rig");
-    const html = renderToStaticMarkup(<GameWindow placeholder />);
-    expect(html).toContain("https://game.example/rig");
+  // A page load answers this question asynchronously. Reporting an empty box
+  // before the answer arrives turns every load into a false alarm.
+  it("says nothing while the installation is still being fetched", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(renderToStaticMarkup(<GameWindow installation={undefined} />)).toBe(
+      ""
+    );
+    expect(logged).not.toHaveBeenCalled();
+  });
+
+  it("frames the installed overlay, naming the installation", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    const html = renderToStaticMarkup(
+      <GameWindow
+        installation={{ installId: "inst-1", entryUrl: `${PERMITTED}/rig` }}
+        placeholder
+      />
+    );
+    expect(html).toContain(`${PERMITTED}/rig?install=inst-1`);
     expect(html).not.toContain("border-dashed");
+  });
+
+  it("gives the stream nothing when the installed overlay is hosted elsewhere", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", `${PERMITTED}/rig`);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const html = renderToStaticMarkup(
+      <GameWindow
+        installation={{
+          installId: "inst-1",
+          entryUrl: "https://elsewhere.example/rig",
+        }}
+      />
+    );
+    expect(html).toBe("");
+  });
+
+  it("gives the stream nothing when no origin is permitted", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", "");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const html = renderToStaticMarkup(
+      <GameWindow
+        installation={{ installId: "inst-1", entryUrl: `${PERMITTED}/rig` }}
+      />
+    );
+    expect(html).toBe("");
   });
 });

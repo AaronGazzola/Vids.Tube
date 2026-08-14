@@ -155,7 +155,7 @@ export function OverlayStage({
 
       {visible.game && (
         <Positioned boxKey="game" box={boxes.game} opacity={config.boxOpacity.game}>
-          {wrap("game", <GameWindow />)}
+          {wrap("game", <GameWindow installation={values.gameInstallation} />)}
         </Positioned>
       )}
 
