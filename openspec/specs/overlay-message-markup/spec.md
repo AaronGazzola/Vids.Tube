@@ -92,32 +92,31 @@ unsupported SHALL be taken as plain text.
 
 ### Requirement: The editor shows the message as the overlay will draw it
 
-The editable field SHALL render the message as styled text, so bold, italic, underline and
-colour are seen as they are applied rather than as markup. Alongside it, the banner's own
-rendering SHALL be shown on the banner's real backing at the banner's real proportions, with
-the member count beside the message as the overlay draws it, so the line's width and
-legibility are judged against the surface it lands on.
+The banner rendering itself SHALL be the editable surface: the banner is drawn at its real
+proportions on its real backing, scaled to fit the settings column, and its message text is
+typed directly into it. No separate text field SHALL exist.
 
-The banner is 810 pixels wide and the settings column is not, which is why the surface is
-shown beside the field rather than being the field: making the field itself the banner would
-either misrepresent its width or leave no room to type.
+The message SHALL render as styled text while it is typed, so bold, italic, underline and colour
+are seen as they are applied rather than as markup. A message's metric and icon SHALL render
+beside the text as they will on air, and SHALL NOT be editable inline, because a number pulled
+live is not something to type over.
 
-#### Scenario: The field reflects an edit
+#### Scenario: Typing into the banner itself
 
-- **WHEN** the streamer changes a message's text or formatting
-- **THEN** the field shows the styled result immediately, without markup characters
+- **WHEN** the streamer types a message
+- **THEN** the characters appear in the banner rendering, styled, on the banner's own backing
 
-#### Scenario: The surface is the overlay's own
+#### Scenario: There is nothing else to look at
 
 - **WHEN** a message is being edited
-- **THEN** it is also drawn on the same backing the banner uses, so a colour that would be
-  unreadable on air is unreadable here
+- **THEN** no separate preview is shown, because the thing being edited is the thing that goes
+  on air
 
-#### Scenario: The count is shown but not editable
+#### Scenario: The metric is shown but not typed into
 
-- **WHEN** the streamer edits the first message
-- **THEN** the member count appears beside it in that rendering as the overlay draws it, and
-  cannot be typed into
+- **WHEN** a message carries a metric
+- **THEN** its number and icon are drawn beside the text as the overlay draws them, and the
+  caret cannot be placed in them
 
 ### Requirement: A message's visible length is capped
 

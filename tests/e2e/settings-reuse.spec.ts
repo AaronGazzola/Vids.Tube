@@ -163,3 +163,44 @@ test("the reuse dialog lists ended broadcasts and fills the form", async ({
     "an edit that must survive"
   );
 });
+
+test("the banner is the field, and a metric can be added to a message", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await loginAsOwner(page);
+  await openSettings(page);
+
+  // The editable surface is inside the banner's own backing, and there is no
+  // second copy of the message to compare against.
+  const banner = page.locator(".overlay-surface").first();
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  const field = banner.getByRole("textbox", { name: "Message 1" });
+  await expect(field).toBeVisible();
+
+  const before = await field.textContent();
+  await field.click();
+  await page.keyboard.type("!");
+  await expect(field).not.toHaveText(before ?? "");
+
+  // The metric controls sit outside the banner, because a number pulled live is
+  // not something to type over.
+  const include = page.getByRole("checkbox", {
+    name: "Show a metric on message 1",
+  });
+  await expect(include).toBeChecked();
+  await page.getByRole("combobox", { name: "Metric for message 1" }).selectOption("totalChatters");
+  await page.getByRole("combobox", { name: "Icon for message 1" }).selectOption("flame");
+  await expect(
+    banner.getByTestId("message-banner-metric")
+  ).toBeVisible();
+
+  await include.uncheck();
+  await expect(banner.getByTestId("message-banner-metric")).toHaveCount(0);
+
+  // Nothing was saved: reloading brings the original message back.
+  await openSettings(page);
+  await expect(
+    page.locator(".overlay-surface").first().getByRole("textbox", { name: "Message 1" })
+  ).toHaveText(before ?? "");
+});

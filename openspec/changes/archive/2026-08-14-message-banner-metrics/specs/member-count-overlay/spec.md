@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: The member count belongs to the first message`
+- TO: `### Requirement: A metric belongs to the message that carries it`
+
 ## MODIFIED Requirements
 
 ### Requirement: A metric belongs to the message that carries it

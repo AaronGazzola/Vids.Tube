@@ -10,6 +10,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
   true;
 
 const COUNT = 143;
+// Every kind resolved, so a message asking for one gets a number.
+const METRICS = {
+  totalSubs: 4820,
+  newSubsThisStream: 37,
+  likesThisStream: 214,
+  currentViewers: 63,
+  totalChatters: 512,
+  totalCommands: 1840,
+  members: COUNT,
+  newMembersThisStream: 9,
+};
+const MEMBERS_METRIC = {
+  kind: "members" as const,
+  icon: "logo" as const,
+  color: "#ffffff",
+};
 const msg = (text: string, align: "left" | "center" = "left") => ({ text, align });
 const FIRST = "Chat to become a member!";
 const SECOND = "Ask me anything with !ask";
@@ -22,7 +38,7 @@ function mount(messages: { text: string; align: "left" | "center" }[]) {
   document.body.appendChild(host);
   root = createRoot(host);
   act(() => {
-    root!.render(<MessageBanner count={COUNT} messages={messages} />);
+    root!.render(<MessageBanner metrics={METRICS} messages={messages} />);
   });
 }
 
@@ -47,34 +63,61 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("the member count belongs to the first message", () => {
-  it("puts the count beside the first message", () => {
-    mount([msg(FIRST), msg(SECOND)]);
+describe("a metric belongs to the message carrying it", () => {
+  const withMetric = (text: string) => ({
+    ...msg(text),
+    metric: MEMBERS_METRIC,
+  });
+
+  it("draws the number beside the message that asked for it", () => {
+    mount([withMetric(FIRST), msg(SECOND)]);
     expect(showing().textContent).toContain(FIRST);
     expect(showing().textContent).toContain("143");
   });
 
-  it("shows no count once a later message is showing", () => {
-    mount([msg(FIRST), msg(SECOND)]);
+  it("draws no number beside a message that did not", () => {
+    mount([withMetric(FIRST), msg(SECOND)]);
     advance();
     expect(showing().textContent).toContain(SECOND);
     expect(showing().textContent).not.toContain("143");
   });
 
-  it("brings the count back when the cycle returns to the first message", () => {
-    mount([msg(FIRST), msg(SECOND)]);
+  it("puts a number on a later message when that is where it was asked for", () => {
+    mount([msg(FIRST), withMetric(SECOND)]);
+    expect(showing().textContent).not.toContain("143");
     advance();
-    advance();
-    expect(showing().textContent).toContain(FIRST);
     expect(showing().textContent).toContain("143");
   });
 
-  it("shows the total as it stands rather than the total from last cycle", () => {
-    mount([msg(FIRST), msg(SECOND)]);
+  it("draws nothing at all when the number cannot be resolved", () => {
+    act(() => {
+      root?.unmount();
+    });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => {
+      root!.render(
+        <MessageBanner
+          metrics={{ ...METRICS, members: null }}
+          messages={[withMetric(FIRST)]}
+        />
+      );
+    });
+    expect(showing().textContent).toContain(FIRST);
+    expect(showing().textContent).not.toContain("143");
+    expect(host!.querySelector('[data-testid="message-banner-metric"]')).toBeNull();
+  });
+
+  it("shows the number as it stands rather than the one from last cycle", () => {
+    mount([withMetric(FIRST), msg(SECOND)]);
     advance();
     act(() => {
       root!.render(
-        <MessageBanner count={999} messages={[msg(FIRST), msg(SECOND)]} />
+        <MessageBanner
+          metrics={{ ...METRICS, members: 999 }}
+          messages={[withMetric(FIRST), msg(SECOND)]}
+        />
       );
     });
     advance();
@@ -108,7 +151,7 @@ describe("several messages take turns", () => {
 describe("a single message does not cycle", () => {
   it("renders one message with no transition on it", () => {
     const html = renderToStaticMarkup(
-      <MessageBanner count={COUNT} messages={[msg(FIRST)]} />
+      <MessageBanner metrics={METRICS} messages={[msg(FIRST)]} />
     );
     expect(html).toContain(FIRST);
     expect(html).not.toContain("overlay-message-in");
@@ -125,7 +168,7 @@ describe("a single message does not cycle", () => {
 
   it("falls back to the site's own sentence when nothing is configured", () => {
     const html = renderToStaticMarkup(
-      <MessageBanner count={COUNT} messages={[]} />
+      <MessageBanner metrics={METRICS} messages={[]} />
     );
     expect(html).toContain("Chat to become a member at Vids.Tube!");
     expect(html).not.toContain("overlay-message-in");
@@ -167,7 +210,7 @@ describe("a message can be centred on its line", () => {
 describe("formatting reaches the strip", () => {
   it("draws marked-up runs as elements rather than as characters", () => {
     const html = renderToStaticMarkup(
-      <MessageBanner count={COUNT} messages={[msg("say **it** {#ff0055|now}")]} />
+      <MessageBanner metrics={METRICS} messages={[msg("say **it** {#ff0055|now}")]} />
     );
     expect(html).toContain("font-bold");
     expect(html).toContain("#ff0055");
@@ -176,8 +219,30 @@ describe("formatting reaches the strip", () => {
 
   it("draws a malformed message as the words that were typed", () => {
     const html = renderToStaticMarkup(
-      <MessageBanner count={COUNT} messages={[msg("join **us today")]} />
+      <MessageBanner metrics={METRICS} messages={[msg("join **us today")]} />
     );
     expect(html).toContain("join **us today");
+  });
+});
+
+describe("the icon beside a metric", () => {
+  const withIcon = (icon: string) => ({
+    ...msg(FIRST),
+    metric: { kind: "members" as const, icon: icon as never, color: "#ff0055" },
+  });
+
+  it("draws the chosen icon in the chosen colour", () => {
+    mount([withIcon("flame")]);
+    const metric = host!.querySelector('[data-testid="message-banner-metric"]')!;
+    const svg = metric.querySelector("svg")!;
+    expect(svg.getAttribute("fill")).toBe("#ff0055");
+  });
+
+  // A saved layout must never be able to break the banner.
+  it("falls back to the logo for a name this build does not know", () => {
+    mount([withIcon("nonsense")]);
+    const metric = host!.querySelector('[data-testid="message-banner-metric"]')!;
+    expect(metric.textContent).toContain("143");
+    expect(metric.querySelector("svg")).not.toBeNull();
   });
 });

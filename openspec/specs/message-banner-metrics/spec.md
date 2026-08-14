@@ -1,5 +1,8 @@
-## ADDED Requirements
+# message-banner-metrics Specification
 
+## Purpose
+TBD - created by archiving change message-banner-metrics. Update Purpose after archive.
+## Requirements
 ### Requirement: A banner message may carry one metric
 
 Each message on the message banner SHALL be able to carry at most one metric, or none. The
@@ -31,6 +34,12 @@ this stream.
 A metric named "this stream" SHALL be scoped to the live broadcast. A metric not so named SHALL
 be the channel's lifetime figure.
 
+Total subs SHALL additionally require a live broadcast, despite being a lifetime figure, because
+the subscriber count is read from YouTube as part of the goal poll. Polling YouTube while nothing
+is live would spend the daily quota to show a banner nobody is watching, and quota is the scarce
+resource. Members, total unique chatters and total chat commands come from the database and
+SHALL show at any time.
+
 #### Scenario: A per-stream metric counts only this broadcast
 
 - **WHEN** a message carries new subs this stream
@@ -53,10 +62,15 @@ count has not loaded.
 - **WHEN** no broadcast is live and a message carries current viewers
 - **THEN** the message shows its text alone, with no number and no icon, on both surfaces
 
-#### Scenario: A lifetime metric still shows off air
+#### Scenario: A database-backed lifetime metric still shows off air
 
 - **WHEN** no broadcast is live and a message carries members
 - **THEN** the member count is shown, because it does not depend on a broadcast
+
+#### Scenario: Total subs waits for a broadcast
+
+- **WHEN** no broadcast is live and a message carries total subs
+- **THEN** nothing is shown, because the subscriber count is read from YouTube only while live
 
 ### Requirement: The icon is chosen from a fixed set
 
@@ -85,3 +99,4 @@ settled rather than continuously while dragging.
 - **WHEN** the streamer opens a colour control and chooses a colour
 - **THEN** the picker is drawn in the page, and the message records one colour change rather
   than one per shade passed through
+

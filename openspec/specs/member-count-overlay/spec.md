@@ -57,20 +57,6 @@ The members box SHALL show a single configured message statically, with no trans
 - **WHEN** no messages are configured
 - **THEN** the strip shows the default sentence statically
 
-### Requirement: The member count belongs to the first message
-
-The members box SHALL show the member count alongside the first message only. While any later message is showing, the message SHALL take the full width of the strip, and the count SHALL return when the cycle returns to the first message.
-
-#### Scenario: A later message takes the full width
-
-- **WHEN** the strip is showing any message other than the first
-- **THEN** no count is shown and the message occupies the full width of the strip
-
-#### Scenario: The count returns with the first message
-
-- **WHEN** the cycle returns to the first message
-- **THEN** the count is shown beside it again, carrying the current total rather than the total from the previous cycle
-
 ### Requirement: Messages reach the overlay on the layout's own path
 
 Configured messages SHALL be stored in the saved overlay layout and SHALL reach the live overlay by the same push and the same poll that carry a layout edit, so a message change appears in the broadcast on the same path and within the same time as moving a box.
@@ -219,4 +205,30 @@ No further message SHALL be seeded.
 
 - **WHEN** a channel with no saved layout is loaded
 - **THEN** the message banner carries exactly one message, the call to action, beside the count
+
+### Requirement: A metric belongs to the message that carries it
+
+The message banner SHALL show a metric alongside a message only when that message carries one.
+While a message carrying no metric is showing, the message SHALL take the full width of the
+banner. The number SHALL be the current one each time it is shown, not the value from a previous
+cycle.
+
+The member count is one such metric rather than a fixed feature of the first message.
+
+#### Scenario: A message without a metric takes the full width
+
+- **WHEN** the banner is showing a message that carries no metric
+- **THEN** no number is shown and the message occupies the full width of the banner
+
+#### Scenario: A metric returns with its message
+
+- **WHEN** the cycle returns to a message carrying a metric
+- **THEN** that number is shown beside it again, carrying the current figure rather than the
+  figure from the previous cycle
+
+#### Scenario: Existing layouts keep their count
+
+- **WHEN** a layout saved before metrics existed is loaded
+- **THEN** its first message carries the member count with the Vids.Tube logo, exactly as the
+  banner rendered before
 

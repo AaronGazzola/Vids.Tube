@@ -26,6 +26,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import {
   getFeaturedMessagesAction,
+  getBannerCountsAction,
   getMemberCountAction,
   getOverlayLayoutAction,
   getPlayableAskAction,
@@ -234,5 +235,14 @@ export function usePlayableAsk(streamId: string | null) {
     queryFn: () => getPlayableAskAction(streamId!),
     enabled: !!streamId,
     refetchInterval: 2000,
+  });
+}
+
+export function useBannerCounts(channelSlug: string, enabled = true) {
+  return useQuery({
+    queryKey: ["overlay-banner-counts", channelSlug],
+    queryFn: () => getBannerCountsAction(channelSlug),
+    refetchInterval: 10_000,
+    enabled,
   });
 }

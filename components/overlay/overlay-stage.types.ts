@@ -1,6 +1,7 @@
 import type { DemoBoxKey, DemoLayoutConfig } from "@/app/(app)/live/demo.types";
 import type { GoalMetric, MetricProgress } from "@/app/layout.types";
 import type { CompetitionEntry } from "@/components/overlay/competition-ladder";
+import type { BannerMetricValues } from "@/lib/banner-metrics";
 import type { OverlayBox } from "@/lib/demo-overlay";
 import type { ReactNode } from "react";
 
@@ -10,7 +11,9 @@ export type OverlayStageValues = {
   feedVisible: boolean;
   feedSlot: ReactNode;
   feedSlotFilled: boolean;
-  memberCount: number;
+  // Every banner metric, resolved once per surface so the OBS route and the
+  // Overlays tab cannot arrive at different numbers.
+  bannerMetrics: BannerMetricValues;
   goalMetric: (metric: GoalMetric) => MetricProgress | null;
   competitionEntries: CompetitionEntry[];
   breakSlot: ReactNode | null;

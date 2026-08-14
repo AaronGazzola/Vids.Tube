@@ -20,7 +20,16 @@ const EMPTY: OverlayStageValues = {
   feedVisible: true,
   feedSlot: null,
   feedSlotFilled: false,
-  memberCount: 0,
+  bannerMetrics: {
+    totalSubs: null,
+    newSubsThisStream: null,
+    likesThisStream: null,
+    currentViewers: null,
+    totalChatters: 0,
+    totalCommands: 0,
+    members: 0,
+    newMembersThisStream: null,
+  },
   goalMetric: () => ({
     current: 0,
     target: SAVED_TARGET,

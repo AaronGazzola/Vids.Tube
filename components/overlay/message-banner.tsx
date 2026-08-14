@@ -1,6 +1,6 @@
 "use client";
 
-import { Logo } from "@/components/logo";
+
 import { OverlayMessage } from "@/components/overlay/overlay-message";
 import {
   DEFAULT_MEMBER_MESSAGE,
@@ -10,26 +10,34 @@ import {
   OVERLAY_SURFACE_ALPHA,
 } from "@/lib/demo-overlay";
 import { cn } from "@/lib/utils";
+import { BannerIcon } from "@/components/overlay/banner-icon";
+import type { BannerMetricValues } from "@/lib/banner-metrics";
 import { useEffect, useState } from "react";
-import type { StripAlign, StripMessage } from "@/app/(app)/live/demo.types";
+import type { StripAlign, StripMessage , StripMetric } from "@/app/(app)/live/demo.types";
 
 const STRIP_WIDTH = 810;
 
-// One message on the strip. The member total sits beside the first message
-// only: the count is a landmark rather than a permanent fixture, and returning
-// to it is part of what makes the cycle read as a loop. Every later message
-// takes the full width.
-function MessageRow({
+// One message on the banner, with whatever number that message asks for beside
+// it. A message carrying no metric, or one whose number cannot be resolved,
+// takes the full width: a zero would be a claim, and off air there is no viewer
+// count to make.
+// Exported so the editor can drop its editable element where the drawn text
+// goes, which is what makes the banner the field rather than a picture of it.
+export function MessageBannerRow({
   text,
   align,
-  count,
+  metric,
+  value,
+  children,
   className,
   style,
   "data-testid": testId,
 }: {
-  text: string;
+  text?: string;
   align: StripAlign;
-  count: number | null;
+  metric?: StripMetric;
+  value: number | null;
+  children?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
   "data-testid"?: string;
@@ -45,28 +53,30 @@ function MessageRow({
       {/* Centring is within the line the message has to itself. Beside the
           member total that line is the space left over, not the whole strip,
           which is the trade for keeping the count where it is. */}
+      {children ?? (
       <OverlayMessage
-        text={text}
+        text={text ?? ""}
         data-testid="message-banner-text"
         className={cn(
           "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[32px] font-semibold leading-[1.15]",
           align === "center" && "text-center"
         )}
       />
+      )}
 
       {/* The mark carries the meaning a label used to: the site's own logo beside
           a figure says what is being counted without spending a word on it.
           Same size class as the sidebar, and pinned to the dark-mode letter in
           both themes — an overlay sits on a broadcast, not on a page, so it must
           not follow the owner's light or dark preference. */}
-      {count !== null && (
-        <div className="flex shrink-0 items-center gap-2.5 leading-none">
-          <Logo
-            solid
-            className="h-auto w-9 shrink-0 text-black dark:text-black"
-          />
+      {metric && value !== null && (
+        <div
+          className="flex shrink-0 items-center gap-2.5 leading-none"
+          data-testid="message-banner-metric"
+        >
+          <BannerIcon name={metric.icon} color={metric.color} />
           <span className="text-[38px] font-bold tabular-nums tracking-tight">
-            {count.toLocaleString("en-US")}
+            {value.toLocaleString("en-US")}
           </span>
         </div>
       )}
@@ -79,11 +89,17 @@ function MessageRow({
 export function MessageBannerPreview({
   text,
   align,
-  count,
+  metric,
+  value,
+  children,
 }: {
   text: string;
   align: StripAlign;
-  count: number | null;
+  metric?: StripMetric;
+  value: number | null;
+  // The editor passes its own editable element in place of the drawn text, so
+  // the surface being typed into is this one rather than a copy of it.
+  children?: React.ReactNode;
 }) {
   return (
     <div
@@ -96,7 +112,9 @@ export function MessageBannerPreview({
       className="overlay-surface rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
     >
       <div className="overflow-hidden" style={{ height: OVERLAY_MESSAGE_ROW_H }}>
-        <MessageRow text={text} align={align} count={count} />
+        {children ?? (
+          <MessageBannerRow text={text} align={align} metric={metric} value={value} />
+        )}
       </div>
     </div>
   );
@@ -114,12 +132,17 @@ export const MESSAGE_BANNER_HEIGHT = OVERLAY_MESSAGE_ROW_H + 26;
 // solid panel however far the opacity is wound down — it defeated the control
 // rather than obeying it. The backing is black alone, scaled by the slider.
 export function MessageBanner({
-  count,
+  metrics,
   messages,
 }: {
-  count: number;
+  metrics: BannerMetricValues;
   messages?: StripMessage[];
 }) {
+  // A metric the message did not ask for, or one with no number behind it right
+  // now, draws nothing at all.
+  const valueFor = (m: StripMessage) =>
+    m.metric ? metrics[m.metric.kind] ?? null : null;
+
   // A message added in Settings but not yet written is not a blank slot in the
   // cycle: a strip that goes empty for a dwell is a strip that looks broken.
   const written = (messages ?? []).filter((m) => m.text.trim() !== "");
@@ -176,11 +199,12 @@ export function MessageBanner({
         data-testid="message-banner-window"
       >
         {leaving !== null && (
-          <MessageRow
+          <MessageBannerRow
             key={`out-${cycle.tick}`}
             text={list[leaving].text}
             align={list[leaving].align}
-            count={leaving === 0 ? count : null}
+            metric={list[leaving].metric}
+            value={valueFor(list[leaving])}
             className="absolute inset-x-0 top-0"
             data-testid="message-banner-leaving"
             style={{
@@ -188,11 +212,12 @@ export function MessageBanner({
             }}
           />
         )}
-        <MessageRow
+        <MessageBannerRow
           key={`in-${cycle.tick}`}
           text={list[showing].text}
           align={list[showing].align}
-          count={showing === 0 ? count : null}
+          metric={list[showing].metric}
+          value={valueFor(list[showing])}
           className="absolute inset-x-0 top-0"
           data-testid="message-banner-showing"
           style={

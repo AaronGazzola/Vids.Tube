@@ -21,7 +21,16 @@ function values(overrides: Partial<OverlayStageValues> = {}): OverlayStageValues
     feedVisible: true,
     feedSlot: <div data-testid="feed">a real highlight</div>,
     feedSlotFilled: true,
-    memberCount: 143,
+    bannerMetrics: {
+      totalSubs: 4820,
+      newSubsThisStream: 37,
+      likesThisStream: 214,
+      currentViewers: 63,
+      totalChatters: 512,
+      totalCommands: 1840,
+      members: 143,
+      newMembersThisStream: 9,
+    },
     goalMetric: () => METRIC,
     // Non-empty by default, so the identity check compares two populated
     // stages. Emptiness is a deliberate difference and is asserted separately.

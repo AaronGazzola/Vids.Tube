@@ -7,6 +7,7 @@ vi.mock("@/supabase/browser-client", () => ({ supabase: {} }));
 
 import { MessagesSection } from "@/app/(app)/live/settings-tab";
 import { useDemoLayoutStore } from "@/app/(app)/live/demo.stores";
+import type { StripMessage } from "@/app/(app)/live/demo.types";
 import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -15,13 +16,16 @@ import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
 let root: Root | null = null;
 let host: HTMLElement | null = null;
 
-const msg = (text: string, align: "left" | "center" = "left") => ({ text, align });
+const msg = (
+  text: string,
+  align: "left" | "center" = "left"
+): StripMessage => ({ text, align });
 // The draft is what the editor writes; the config is what a broadcast reads.
 const draft = () => useDemoLayoutStore.getState().draftMessages;
 const saved = () => useDemoLayoutStore.getState().config.messages;
 const messages = () => draft().map((m) => m.text);
 
-function mount(initial: { text: string; align: "left" | "center" }[]) {
+function mount(initial: StripMessage[]) {
   act(() => {
     useDemoLayoutStore.getState().setDraftMessages(initial);
   });
@@ -130,24 +134,6 @@ describe("a control wraps what the streamer selected", () => {
   });
 });
 
-describe("colour is picked rather than typed", () => {
-  it("writes the chosen colour into the token around the selection", () => {
-    mount([msg("say it now")]);
-    select(4, 6);
-    const picker = host!.querySelector<HTMLInputElement>(
-      '[aria-label="Colour for message 1"]'
-    )!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value"
-      )!.set!.call(picker, "#ff0055");
-      picker.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(messages()[0]).toBe("say {#ff0055|it} now");
-  });
-});
-
 describe("the visible length is capped, and formatting is free", () => {
   it("accepts a message whose markup makes the stored text longer than the cap", () => {
     mount([msg("")]);
@@ -243,12 +229,14 @@ describe("centring a message", () => {
     expect(draft()[0].text).toBe("say **it** now");
   });
 
-  it("shows the centring in the preview", () => {
+  // The editable surface is the banner, so centring shows on the field itself
+  // rather than on a drawn copy of the message.
+  it("centres the editable line on the banner", () => {
     mount([msg("one", "center")]);
-    const preview = host!.querySelector(
-      '.overlay-surface [data-testid="message-banner-text"]'
+    const field = host!.querySelector<HTMLElement>(
+      '.overlay-surface [aria-label="Message 1"]'
     )!;
-    expect(preview.className).toContain("text-center");
+    expect(field.style.textAlign).toBe("center");
   });
 });
 
@@ -288,24 +276,42 @@ describe("nothing reaches the overlay until the changes are saved", () => {
   });
 });
 
-describe("the message is drawn as the overlay will draw it", () => {
-  it("previews each message on the strip's own backing", () => {
+describe("the banner is the thing being edited", () => {
+  it("draws each message on the banner's own backing", () => {
     mount([msg("one"), msg("two")]);
     expect(host!.querySelectorAll(".overlay-surface")).toHaveLength(2);
   });
 
-  it("previews the formatting rather than the markup", () => {
+  it("shows formatting rather than markup, in the editable surface itself", () => {
     mount([msg("say **it** now")]);
-    const preview = host!.querySelector(".overlay-surface")!;
-    expect(preview.textContent).toContain("say it now");
-    expect(preview.textContent).not.toContain("**");
-    expect(preview.querySelector(".font-bold")?.textContent).toBe("it");
+    const banner = host!.querySelector(".overlay-surface")!;
+    const field = banner.querySelector('[aria-label="Message 1"]')!;
+    expect(field.textContent).toContain("say it now");
+    expect(field.textContent).not.toContain("**");
+    expect(field.querySelector("span[style*='font-weight']")?.textContent).toBe(
+      "it"
+    );
   });
 
-  it("shows the member count beside the first message only", () => {
-    mount([msg("one"), msg("two")]);
-    const previews = host!.querySelectorAll(".overlay-surface");
-    expect(previews[0].textContent).toContain("143");
-    expect(previews[1].textContent).not.toContain("143");
+  it("has no second copy of the message to compare against", () => {
+    mount([msg("one")]);
+    // One surface, and the editable field is inside it.
+    const surfaces = host!.querySelectorAll(".overlay-surface");
+    expect(surfaces).toHaveLength(1);
+    expect(surfaces[0].querySelector('[aria-label="Message 1"]')).not.toBeNull();
+  });
+
+  it("draws a number only on a message that asks for one", () => {
+    mount([
+      { ...msg("one"), metric: { kind: "members" as const, icon: "logo" as const, color: "#ffffff" } },
+      msg("two"),
+    ]);
+    const surfaces = host!.querySelectorAll(".overlay-surface");
+    expect(
+      surfaces[0].querySelector('[data-testid="message-banner-metric"]')
+    ).not.toBeNull();
+    expect(
+      surfaces[1].querySelector('[data-testid="message-banner-metric"]')
+    ).toBeNull();
   });
 });

@@ -110,8 +110,14 @@ describe("messages ride alongside the layout without disturbing it", () => {
 
   const FIRST = { text: "first thing", align: "left" as const };
   const SECOND = { text: "second thing", align: "center" as const };
+  // The default carries the member count, which is what the banner drew before
+  // metrics existed.
   const DEFAULT_MESSAGES = [
-    { text: "Chat to become a member at Vids.Tube!", align: "left" },
+    {
+      text: "Chat to become a member at Vids.Tube!",
+      align: "left",
+      metric: { kind: "members", icon: "logo", color: "#ffffff" },
+    },
   ];
 
   const withMessages = {

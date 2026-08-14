@@ -32,6 +32,7 @@ import {
   MESSAGE_BANNER_HEIGHT,
   MESSAGE_BANNER_WIDTH,
   MessageBannerPreview,
+  MessageBannerRow,
 } from "@/components/overlay/message-banner";
 import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
 import { parseOverlayMessage, visibleLength } from "@/lib/overlay-markup";
@@ -43,6 +44,7 @@ import {
   type RunMark,
 } from "@/lib/overlay-runs";
 import { MessageBannerField } from "./message-banner-field";
+import { ColourPicker } from "./colour-picker";
 import {
   AlignCenter,
   AlignLeft,
@@ -56,9 +58,17 @@ import {
   RefreshCw,
   Underline,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDemoLayoutStore } from "./demo.stores";
-import { DEMO_MEMBER_COUNT, type StripMessage } from "./demo.types";
+import {
+  BANNER_ICON_NAMES,
+  BANNER_METRIC_KINDS,
+  BANNER_METRIC_LABELS,
+  DEMO_MEMBER_COUNT,
+  type BannerIconName,
+  type BannerMetricKind,
+  type StripMessage,
+} from "./demo.types";
 import { toast } from "sonner";
 import {
   useBroadcastSettingsFor,
@@ -449,6 +459,20 @@ function ProjectsSection() {
 // real strip, scaled, so what is judged is the surface the message lands on.
 const MESSAGE_PREVIEW_SCALE = 0.42;
 
+// Stand-in figures while composing. The real numbers need a live broadcast, and
+// a metric is chosen for where it sits on the line rather than for tonight's
+// value, so a plausible figure is what the layout has to be judged against.
+const PREVIEW_METRIC_VALUES: Record<BannerMetricKind, number> = {
+  totalSubs: 4820,
+  newSubsThisStream: 37,
+  likesThisStream: 214,
+  currentViewers: 63,
+  totalChatters: 512,
+  totalCommands: 1840,
+  members: DEMO_MEMBER_COUNT,
+  newMembersThisStream: 9,
+};
+
 function MessageEditor({
   message,
   position,
@@ -491,29 +515,7 @@ function MessageEditor({
     );
   };
 
-  const colourRef = useRef<HTMLInputElement>(null);
-  const colourStateRef = useRef({ runs, selection });
-  useEffect(() => {
-    colourStateRef.current = { runs, selection };
-  });
-  // React's onChange for a colour input fires on every step of the drag, which
-  // would restyle for every shade passed through. The native change event fires
-  // once, when a colour is actually chosen.
-  useEffect(() => {
-    const el = colourRef.current;
-    if (!el) return;
-    const commitColour = () => {
-      const { runs: current, selection: sel } = colourStateRef.current;
-      onChange({
-        ...message,
-        text: serializeOverlayMessage(
-          applyColor(current, sel.start, sel.end, el.value)
-        ),
-      });
-    };
-    el.addEventListener('change', commitColour);
-    return () => el.removeEventListener('change', commitColour);
-  }, [message, onChange]);
+  const [textColour, setTextColour] = useState("#ffcc00");
 
   const markButton = (
     label: string,
@@ -542,13 +544,9 @@ function MessageEditor({
         <span className="w-5 shrink-0 text-xs text-muted-foreground">
           {position + 1}
         </span>
-        <MessageBannerField
-          value={value}
-          onChange={commit}
-          onSelectionChange={setSelection}
-          ariaLabel={`Message ${position + 1}`}
-          className="min-h-8 flex-1 rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
+        <span className="flex-1 text-xs text-muted-foreground">
+          Type into the banner below.
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-1.5 pl-7">
         {markButton("Bold", <Bold className="h-3.5 w-3.5" />, "bold")}
@@ -558,12 +556,17 @@ function MessageEditor({
           <Underline className="h-3.5 w-3.5" />,
           "underline"
         )}
-        <input
-          ref={colourRef}
-          type="color"
-          aria-label={`Colour for message ${position + 1}`}
-          defaultValue="#ffcc00"
-          className="h-7 w-7 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5"
+        <ColourPicker
+          value={textColour}
+          label={`Colour for message ${position + 1}`}
+          onChange={(colour) => {
+            setTextColour(colour);
+            commit(
+              serializeOverlayMessage(
+                applyColor(runs, selection.start, selection.end, colour)
+              )
+            );
+          }}
         />
         {/* Alignment belongs to the whole line rather than to a selection, so
             it toggles the message instead of wrapping anything. */}
@@ -624,6 +627,80 @@ function MessageEditor({
           Remove
         </Button>
       </div>
+      {/* The metric is set from here rather than typed into the banner: a
+          number pulled live is not something to type over. */}
+      <div className="flex flex-wrap items-center gap-2 pl-7 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            aria-label={`Show a metric on message ${position + 1}`}
+            checked={!!message.metric}
+            onChange={(e) =>
+              onChange({
+                ...message,
+                metric: e.target.checked
+                  ? { kind: "members", icon: "logo", color: "#ffffff" }
+                  : undefined,
+              })
+            }
+          />
+          Show a metric
+        </label>
+        {message.metric && (
+          <>
+            <select
+              aria-label={`Metric for message ${position + 1}`}
+              className="h-7 rounded-md border bg-background px-1.5"
+              value={message.metric.kind}
+              onChange={(e) =>
+                onChange({
+                  ...message,
+                  metric: {
+                    ...message.metric!,
+                    kind: e.target.value as BannerMetricKind,
+                  },
+                })
+              }
+            >
+              {BANNER_METRIC_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {BANNER_METRIC_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label={`Icon for message ${position + 1}`}
+              className="h-7 rounded-md border bg-background px-1.5 capitalize"
+              value={message.metric.icon}
+              onChange={(e) =>
+                onChange({
+                  ...message,
+                  metric: {
+                    ...message.metric!,
+                    icon: e.target.value as BannerIconName,
+                  },
+                })
+              }
+            >
+              {BANNER_ICON_NAMES.map((icon) => (
+                <option key={icon} value={icon}>
+                  {icon === "logo" ? "Vids.Tube logo" : icon}
+                </option>
+              ))}
+            </select>
+            <ColourPicker
+              value={message.metric.color}
+              label={`Icon colour for message ${position + 1}`}
+              onChange={(colour) =>
+                onChange({
+                  ...message,
+                  metric: { ...message.metric!, color: colour },
+                })
+              }
+            />
+          </>
+        )}
+      </div>
       {refused && (
         <p className="pl-7 text-xs text-destructive">
           Messages are limited to {OVERLAY_MESSAGE_MAX_VISIBLE} visible
@@ -631,8 +708,8 @@ function MessageEditor({
           count.
         </p>
       )}
-      {/* Drawn on the overlay's own backing: a colour that would be unreadable
-          on air is unreadable here, before it reaches a broadcast. */}
+      {/* The banner is the field. There is no copy of it to compare against,
+          because the thing being typed into is the thing that goes on air. */}
       <div
         className="ml-7 overflow-hidden rounded-md"
         style={{
@@ -650,8 +727,26 @@ function MessageEditor({
           <MessageBannerPreview
             text={value}
             align={message.align}
-            count={position === 0 ? DEMO_MEMBER_COUNT : null}
-          />
+            metric={message.metric}
+            value={message.metric ? PREVIEW_METRIC_VALUES[message.metric.kind] : null}
+          >
+            <MessageBannerRow
+              align={message.align}
+              metric={message.metric}
+              value={
+                message.metric ? PREVIEW_METRIC_VALUES[message.metric.kind] : null
+              }
+            >
+              <MessageBannerField
+                value={value}
+                onChange={commit}
+                onSelectionChange={setSelection}
+                ariaLabel={`Message ${position + 1}`}
+                className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[32px] font-semibold leading-[1.15] outline-none"
+                style={message.align === "center" ? { textAlign: "center" } : undefined}
+              />
+            </MessageBannerRow>
+          </MessageBannerPreview>
         </div>
       </div>
     </li>

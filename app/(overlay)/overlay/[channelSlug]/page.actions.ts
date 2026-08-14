@@ -315,3 +315,65 @@ export async function markAskShownAction(id: string): Promise<void> {
     throw new Error("Failed to mark ask as shown");
   }
 }
+
+export type BannerCounts = {
+  totalChatters: number;
+  totalCommands: number;
+  newMembersThisStream: number | null;
+};
+
+// The three banner metrics that no other overlay needed.
+//
+// A chatter becomes a membership on their first message, so counting membership
+// rows counts everyone who has ever chatted here. That is deliberately wider
+// than the member count, which excludes bots and accounts with no YouTube
+// identity — the two numbers are meant to differ.
+export async function getBannerCountsAction(
+  channelSlug: string
+): Promise<BannerCounts> {
+  const { data: channel } = await supabaseAdmin
+    .from("channels")
+    .select("id")
+    .eq("slug", channelSlug)
+    .maybeSingle();
+  if (!channel) {
+    return { totalChatters: 0, totalCommands: 0, newMembersThisStream: null };
+  }
+
+  const { count: chatters } = await supabaseAdmin
+    .from("memberships")
+    .select("*", { count: "exact", head: true })
+    .eq("community_channel_id", channel.id);
+
+  const { count: commands } = await supabaseAdmin
+    .from("command_events")
+    .select("*", { count: "exact", head: true })
+    .eq("channel_id", channel.id);
+
+  // Null rather than zero off air: nobody has joined "this stream" when there
+  // is no stream, and zero would be a claim.
+  const { data: stream } = await supabaseAdmin
+    .from("streams")
+    .select("started_at")
+    .eq("channel_id", channel.id)
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let newMembers: number | null = null;
+  if (stream?.started_at) {
+    const { count } = await supabaseAdmin
+      .from("memberships")
+      .select("*", { count: "exact", head: true })
+      .eq("community_channel_id", channel.id)
+      .gte("first_seen_at", stream.started_at);
+    newMembers = count ?? 0;
+  }
+
+  return {
+    totalChatters: chatters ?? 0,
+    totalCommands: commands ?? 0,
+    newMembersThisStream: newMembers,
+  };
+}

@@ -14,6 +14,7 @@ import {
   OVERLAY_LADDER_MAX,
   type DemoOverlaySnapshot,
 } from "@/lib/demo-overlay";
+import { resolveBannerMetrics } from "@/lib/banner-metrics";
 import { DEFAULT_GOALS, idleProgress } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
 import { useSearchParams } from "next/navigation";
@@ -30,6 +31,7 @@ import {
 import {
   useDemoOverlaySnapshot,
   useLiveOverlayLayout,
+  useBannerCounts,
   useMemberCount,
   useOverlayChime,
   usePlayableAsk,
@@ -312,6 +314,7 @@ export default function OverlayFramePage({
   const { data: scores } = useCompetition(channelSlug, 5);
   const breakQuery = useBreakState(channelSlug);
   const { data: memberCount } = useMemberCount(channelSlug);
+  const { data: bannerCounts } = useBannerCounts(channelSlug);
 
   if (!layout.isSuccess || !layout.config) {
     return null;
@@ -378,7 +381,13 @@ export default function OverlayFramePage({
         feedVisible,
         feedSlot,
         feedSlotFilled: true,
-        memberCount: memberCount ?? 0,
+        bannerMetrics: resolveBannerMetrics({
+          goals: goalData,
+          memberCount,
+          totalChatters: bannerCounts?.totalChatters,
+          totalCommands: bannerCounts?.totalCommands,
+          newMembersThisStream: bannerCounts?.newMembersThisStream,
+        }),
         goalMetric,
         competitionEntries,
         breakSlot,

@@ -106,7 +106,7 @@ export function OverlayStage({
           {wrap(
             "messageBanner",
             <MessageBanner
-              count={values.memberCount}
+              metrics={values.bannerMetrics}
               messages={config.messages}
             />
           )}

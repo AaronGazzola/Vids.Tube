@@ -4,6 +4,7 @@ import { useBreakState } from "@/app/(overlay)/overlay/[channelSlug]/break/page.
 import { useCompetition } from "@/app/(overlay)/overlay/[channelSlug]/competition/page.hooks";
 import { useGoalProgress } from "@/app/(overlay)/overlay/[channelSlug]/goals/page.hooks";
 import {
+  useBannerCounts,
   useMemberCount,
   usePlayableAsk,
   usePlayableTts,
@@ -18,6 +19,7 @@ import type { CompetitionEntry } from "@/components/overlay/competition-ladder";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import type { OverlayStageValues } from "@/components/overlay/overlay-stage.types";
 import { TtsCard } from "@/components/overlay/tts-card";
+import { resolveBannerMetrics } from "@/lib/banner-metrics";
 import { OVERLAY_LADDER_MAX } from "@/lib/demo-overlay";
 import { DEFAULT_GOALS, idleProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
@@ -120,6 +122,7 @@ export function useOverlayComposerValues(
   const { data: scores } = useCompetition(channelSlug, 5);
   const breakQuery = useBreakState(channelSlug);
   const { data: memberCount } = useMemberCount(channelSlug);
+  const { data: bannerCounts } = useBannerCounts(channelSlug);
   const feedSlotFilled = useComposerFeedFilled(streamId);
 
   // Never null. An overlay with no value still has a place on the stage, and a
@@ -151,7 +154,13 @@ export function useOverlayComposerValues(
     feedVisible,
     feedSlot: streamId ? <ComposerFeedSlot streamId={streamId} /> : null,
     feedSlotFilled,
-    memberCount: memberCount ?? 0,
+    bannerMetrics: resolveBannerMetrics({
+      goals: goalData,
+      memberCount,
+      totalChatters: bannerCounts?.totalChatters,
+      totalCommands: bannerCounts?.totalCommands,
+      newMembersThisStream: bannerCounts?.newMembersThisStream,
+    }),
     goalMetric,
     competitionEntries,
     breakSlot: breakEndsAt ? (

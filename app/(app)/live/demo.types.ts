@@ -31,7 +31,64 @@ export type StripAlign = "left" | "center";
 // all, plus where it sits on its line. Alignment is a property of the line
 // rather than of a run, so it is stored beside the text rather than inside the
 // markup dialect.
-export type StripMessage = { text: string; align: StripAlign };
+// The counts a banner message may show. A kind naming "this stream" is scoped to
+// the live broadcast; one that does not is the channel's lifetime figure.
+export const BANNER_METRIC_KINDS = [
+  "totalSubs",
+  "newSubsThisStream",
+  "likesThisStream",
+  "currentViewers",
+  "totalChatters",
+  "totalCommands",
+  "members",
+  "newMembersThisStream",
+] as const;
+export type BannerMetricKind = (typeof BANNER_METRIC_KINDS)[number];
+
+export const BANNER_METRIC_LABELS: Record<BannerMetricKind, string> = {
+  totalSubs: "Total subs",
+  newSubsThisStream: "New subs this stream",
+  likesThisStream: "Likes this stream",
+  currentViewers: "Current viewers",
+  totalChatters: "Total unique chatters",
+  totalCommands: "Total chat commands",
+  members: "Members",
+  newMembersThisStream: "New members this stream",
+};
+
+// Stored as a name rather than as a drawing, so the set can change later without
+// another migration over every saved layout.
+export const BANNER_ICON_NAMES = [
+  "logo",
+  "subs",
+  "likes",
+  "viewers",
+  "heart",
+  "star",
+  "flame",
+  "trophy",
+  "bell",
+  "thumbsUp",
+  "users",
+  "eye",
+] as const;
+export type BannerIconName = (typeof BANNER_ICON_NAMES)[number];
+
+export type StripMetric = {
+  kind: BannerMetricKind;
+  icon: BannerIconName;
+  color: string;
+};
+
+// One message on the banner: the text the streamer wrote, markup and all, where
+// it sits on its line, and at most one number to show beside it. Alignment is a
+// property of the line rather than of a run, so it is stored beside the text
+// rather than inside the markup dialect.
+export type StripMessage = {
+  text: string;
+  align: StripAlign;
+  metric?: StripMetric;
+};
 
 export type DemoLayoutConfig = {
   version: number;
@@ -123,7 +180,16 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     game: 1,
   },
   feedSound: "chime",
-  messages: [{ text: DEFAULT_MEMBER_MESSAGE, align: "left" }],
+  // The default carries the member count, which is what the banner drew before
+  // metrics existed and what the migration gave every saved layout. A fresh
+  // channel must not be the only one starting without a number.
+  messages: [
+    {
+      text: DEFAULT_MEMBER_MESSAGE,
+      align: "left",
+      metric: { kind: "members", icon: "logo", color: "#ffffff" },
+    },
+  ],
 };
 
 // The counts the demo drives its goal bars toward. Real saved targets are layered
@@ -176,6 +242,21 @@ function isBox(value: unknown): value is DemoBox {
 // carried before it could cycle, so a layout saved before this change renders
 // exactly as it did and no version bump is needed. A bare string is read as a
 // left-aligned message, which is what a message was before alignment existed.
+// A metric naming a kind or an icon this build does not know is dropped rather
+// than taking its message down with it: the words still reach the broadcast.
+function readMetric(value: unknown): StripMetric | null {
+  if (typeof value !== "object" || value === null) return null;
+  const m = value as Partial<StripMetric>;
+  const kind = BANNER_METRIC_KINDS.find((k) => k === m.kind);
+  if (!kind) return null;
+  const icon = BANNER_ICON_NAMES.find((i) => i === m.icon) ?? "logo";
+  const color =
+    typeof m.color === "string" && /^#[0-9a-fA-F]{6}$/.test(m.color)
+      ? m.color.toLowerCase()
+      : "#ffffff";
+  return { kind, icon, color };
+}
+
 function readMessage(value: unknown): StripMessage | null {
   if (typeof value === "string") {
     return value.trim() ? { text: value, align: "left" } : null;
@@ -183,7 +264,12 @@ function readMessage(value: unknown): StripMessage | null {
   if (typeof value !== "object" || value === null) return null;
   const m = value as Partial<StripMessage>;
   if (typeof m.text !== "string" || !m.text.trim()) return null;
-  return { text: m.text, align: m.align === "center" ? "center" : "left" };
+  const metric = readMetric(m.metric);
+  return {
+    text: m.text,
+    align: m.align === "center" ? "center" : "left",
+    ...(metric ? { metric } : {}),
+  };
 }
 
 function readMessages(value: unknown): StripMessage[] {
