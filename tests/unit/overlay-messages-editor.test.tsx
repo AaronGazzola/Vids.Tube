@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/supabase/browser-client", () => ({ supabase: {} }));
 
 import { MessagesSection } from "@/app/(app)/live/settings-tab";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useDemoLayoutStore } from "@/app/(app)/live/demo.stores";
 import type { StripMessage } from "@/app/(app)/live/demo.types";
 import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
@@ -33,7 +34,15 @@ function mount(initial: StripMessage[]) {
   document.body.appendChild(host);
   root = createRoot(host);
   act(() => {
-    root!.render(<MessagesSection />);
+    // The section resolves the banner's real numbers, so it needs a client.
+    // Queries stay unresolved here, which is the point: an unresolved metric
+    // draws nothing, and these tests are about the messages rather than the
+    // numbers.
+    root!.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MessagesSection channelSlug="owner" />
+      </QueryClientProvider>
+    );
   });
 }
 
@@ -301,17 +310,29 @@ describe("the banner is the thing being edited", () => {
     expect(surfaces[0].querySelector('[aria-label="Message 1"]')).not.toBeNull();
   });
 
-  it("draws a number only on a message that asks for one", () => {
+  // The editor draws the real numbers, so with none resolved it draws none.
+  // A stand-in figure here would mean composing a layout against something that
+  // will never appear.
+  it("draws no number while there is none to draw", () => {
     mount([
-      { ...msg("one"), metric: { kind: "members" as const, icon: "logo" as const, color: "#ffffff" } },
-      msg("two"),
+      {
+        ...msg("one"),
+        metric: {
+          kind: "members" as const,
+          icon: "logo" as const,
+          color: "#ffffff",
+        },
+      },
     ]);
-    const surfaces = host!.querySelectorAll(".overlay-surface");
+    const surface = host!.querySelector(".overlay-surface")!;
     expect(
-      surfaces[0].querySelector('[data-testid="message-banner-metric"]')
-    ).not.toBeNull();
-    expect(
-      surfaces[1].querySelector('[data-testid="message-banner-metric"]')
+      surface.querySelector('[data-testid="message-banner-metric"]')
     ).toBeNull();
+    // The choice is still recorded, and its controls still show it.
+    expect(
+      host!.querySelector<HTMLInputElement>(
+        '[aria-label="Show a metric on message 1"]'
+      )!.checked
+    ).toBe(true);
   });
 });

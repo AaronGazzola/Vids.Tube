@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HexColorPicker } from "react-colorful";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 // Drawn in the page rather than by the operating system, and committed when the
 // picker settles rather than on every shade dragged through: the previous native
@@ -20,17 +20,16 @@ export function ColourPicker({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => {
-    if (!open) setDraft(value);
-  }, [open, value]);
-
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        // Closing is the settle: one change recorded, whatever the drag did.
-        if (!next && draft !== value) onChange(draft);
+        // Opening takes the current colour; closing is the settle, and records
+        // one change whatever the drag passed through. Both are done here
+        // rather than in an effect, which would set state during render.
+        if (next) setDraft(value);
+        else if (draft !== value) onChange(draft);
       }}
     >
       <PopoverTrigger asChild>

@@ -45,6 +45,8 @@ import {
 } from "@/lib/overlay-runs";
 import { MessageBannerField } from "./message-banner-field";
 import { ColourPicker } from "./colour-picker";
+import { useBannerMetricValues } from "./banner-metrics.hooks";
+import type { BannerMetricValues } from "@/lib/banner-metrics";
 import {
   AlignCenter,
   AlignLeft,
@@ -64,7 +66,6 @@ import {
   BANNER_ICON_NAMES,
   BANNER_METRIC_KINDS,
   BANNER_METRIC_LABELS,
-  DEMO_MEMBER_COUNT,
   type BannerIconName,
   type BannerMetricKind,
   type StripMessage,
@@ -459,24 +460,12 @@ function ProjectsSection() {
 // real strip, scaled, so what is judged is the surface the message lands on.
 const MESSAGE_PREVIEW_SCALE = 0.42;
 
-// Stand-in figures while composing. The real numbers need a live broadcast, and
-// a metric is chosen for where it sits on the line rather than for tonight's
-// value, so a plausible figure is what the layout has to be judged against.
-const PREVIEW_METRIC_VALUES: Record<BannerMetricKind, number> = {
-  totalSubs: 4820,
-  newSubsThisStream: 37,
-  likesThisStream: 214,
-  currentViewers: 63,
-  totalChatters: 512,
-  totalCommands: 1840,
-  members: DEMO_MEMBER_COUNT,
-  newMembersThisStream: 9,
-};
 
 function MessageEditor({
   message,
   position,
   total,
+  metricValues,
   onChange,
   onRemove,
   onMove,
@@ -484,6 +473,7 @@ function MessageEditor({
   message: StripMessage;
   position: number;
   total: number;
+  metricValues: BannerMetricValues;
   onChange: (next: StripMessage) => void;
   onRemove: () => void;
   onMove: (by: -1 | 1) => void;
@@ -728,13 +718,13 @@ function MessageEditor({
             text={value}
             align={message.align}
             metric={message.metric}
-            value={message.metric ? PREVIEW_METRIC_VALUES[message.metric.kind] : null}
+            value={message.metric ? metricValues[message.metric.kind] : null}
           >
             <MessageBannerRow
               align={message.align}
               metric={message.metric}
               value={
-                message.metric ? PREVIEW_METRIC_VALUES[message.metric.kind] : null
+                message.metric ? metricValues[message.metric.kind] : null
               }
             >
               <MessageBannerField
@@ -753,7 +743,8 @@ function MessageEditor({
   );
 }
 
-export function MessagesSection() {
+export function MessagesSection({ channelSlug }: { channelSlug: string }) {
+  const metricValues = useBannerMetricValues(channelSlug);
   // The draft, not the saved list: nothing typed here reaches the overlay or
   // the database until Save changes is pressed in the toolbar.
   const messages = useDemoLayoutStore((s) => s.draftMessages);
@@ -784,6 +775,7 @@ export function MessagesSection() {
             key={i}
             message={message}
             position={i}
+            metricValues={metricValues}
             total={messages.length}
             onChange={(next) => replace(i, next)}
             onRemove={() => setMessages(messages.filter((_, j) => j !== i))}
@@ -1390,7 +1382,7 @@ export function SettingsTab({
         />
       </Section>
 
-      <MessagesSection />
+      <MessagesSection channelSlug={channelSlug} />
 
       <ProjectsSection />
 
