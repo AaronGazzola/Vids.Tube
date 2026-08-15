@@ -23,6 +23,13 @@ let overlayToken: string | null = null;
 let streamId: string | null = null;
 let savedLayout: Json | null = null;
 const insertedEventIds: string[] = [];
+// The chat rows have to be tracked and removed too. They were not, and every run
+// left a real "!feed" in the owner's real stream: fourteen accumulated on a
+// scheduled stream before anyone noticed, showing in the activity panel and in
+// the stream's chat, indistinguishable at a glance from something a viewer had
+// typed. A command_event is invisible plumbing; a chat message is content on
+// somebody's channel, and this test writes to the production database.
+const insertedMessageIds: string[] = [];
 
 test.describe.configure({ mode: "serial" });
 
@@ -68,8 +75,14 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  // Events first: a command_event references the chat message it came from, so
+  // removing the message while the event still points at it would either fail or
+  // orphan the event, depending on which way the constraint runs.
   if (insertedEventIds.length > 0) {
     await admin.from("command_events").delete().in("id", insertedEventIds);
+  }
+  if (insertedMessageIds.length > 0) {
+    await admin.from("chat_messages").delete().in("id", insertedMessageIds);
   }
   if (savedLayout) {
     await admin.from("overlay_layouts").upsert(
@@ -96,6 +109,7 @@ async function feedFromChat(author: string) {
     .select("id")
     .maybeSingle();
   if (messageError) throw new Error(messageError.message);
+  insertedMessageIds.push(message!.id);
 
   const { data, error } = await admin
     .from("command_events")
