@@ -10,6 +10,13 @@ afterEach(() => {
 
 const PERMITTED = "https://game.example";
 const ENTRY = `${PERMITTED}/rig`;
+const INSTALLED = {
+  installId: "inst-1",
+  entryUrl: ENTRY,
+  token: "tok-1",
+  channelId: "chan-1",
+  settings: {},
+};
 
 describe("what the game window paints", () => {
   it("gives the layout editor an outline to position with nothing installed", () => {
@@ -43,7 +50,7 @@ describe("what the game window paints", () => {
     vi.stubEnv("NEXT_PUBLIC_GAME_EMBED_URL", ENTRY);
     const html = renderToStaticMarkup(
       <GameWindow
-        installation={{ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" }}
+        installation={INSTALLED}
         placeholder
       />
     );
@@ -56,11 +63,7 @@ describe("what the game window paints", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const html = renderToStaticMarkup(
       <GameWindow
-        installation={{
-          installId: "inst-1",
-          entryUrl: "https://elsewhere.example/rig",
-          token: "tok-1",
-        }}
+        installation={{ ...INSTALLED, entryUrl: "https://elsewhere.example/rig" }}
       />
     );
     expect(html).toBe("");
@@ -71,7 +74,7 @@ describe("what the game window paints", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const html = renderToStaticMarkup(
       <GameWindow
-        installation={{ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" }}
+        installation={INSTALLED}
       />
     );
     expect(html).toBe("");

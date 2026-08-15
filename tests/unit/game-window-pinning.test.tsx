@@ -11,6 +11,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const PERMITTED = "https://game.example";
 const ENTRY = `${PERMITTED}/rig`;
 
+const install = (
+  installId: string,
+  token: string,
+  entryUrl = ENTRY
+): OverlayInstallation => ({
+  installId,
+  entryUrl,
+  token,
+  channelId: "chan-1",
+  settings: {},
+});
+
 let root: Root | null = null;
 let host: HTMLElement | null = null;
 
@@ -41,23 +53,33 @@ afterEach(() => {
 // whatever the overlay was running, which for a game means losing its world.
 describe("what makes the framed address change", () => {
   it("holds the address across a re-minted token for the same installation", () => {
-    render({ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" });
+    render(install("inst-1", "tok-1"));
     const first = src();
     expect(first).toBe(`${ENTRY}?t=tok-1`);
 
-    render({ installId: "inst-1", entryUrl: ENTRY, token: "tok-2" });
+    render(install("inst-1", "tok-2"));
     expect(src()).toBe(first);
   });
 
   it("swaps the address when a different overlay is installed", () => {
-    render({ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" });
-    render({ installId: "inst-2", entryUrl: ENTRY, token: "tok-2" });
+    render(install("inst-1", "tok-1"));
+    render(install("inst-2", "tok-2"));
     expect(src()).toBe(`${ENTRY}?t=tok-2`);
   });
 
   it("swaps the address when the same installation moves to a new entry", () => {
-    render({ installId: "inst-1", entryUrl: ENTRY, token: "tok-1" });
-    render({ installId: "inst-1", entryUrl: `${ENTRY}/v2`, token: "tok-1" });
+    render(install("inst-1", "tok-1"));
+    render(install("inst-1", "tok-1", `${ENTRY}/v2`));
     expect(src()).toBe(`${ENTRY}/v2?t=tok-1`);
+  });
+
+  // The whole point of pushing settings over the message channel is that a
+  // change does not reload the frame. A changed address here would restart the
+  // overlay and defeat it.
+  it("holds the address when only the settings change", () => {
+    render(install("inst-1", "tok-1"));
+    const first = src();
+    render({ ...install("inst-1", "tok-1"), settings: { scale: 2 } });
+    expect(src()).toBe(first);
   });
 });

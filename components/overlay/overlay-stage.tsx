@@ -10,6 +10,7 @@ import { OverlayScaleProvider } from "@/components/overlay/overlay-scale-context
 import type { OverlayStageProps } from "@/components/overlay/overlay-stage.types";
 import {
   GOAL_METRIC_BOX,
+  OVERLAY_BASE_DIMS,
   OVERLAY_CANVAS_H,
   OVERLAY_CANVAS_W,
   OVERLAY_FEED_WIDTH,
@@ -155,7 +156,20 @@ export function OverlayStage({
 
       {visible.game && (
         <Positioned boxKey="game" box={boxes.game} opacity={config.boxOpacity.game}>
-          {wrap("game", <GameWindow installation={values.gameInstallation} />)}
+          {wrap(
+            "game",
+            <GameWindow
+              installation={values.gameInstallation}
+              // The stage is what knows the box, so it is the stage that tells
+              // the overlay how much room it has. The scale is the half a frame
+              // cannot measure for itself.
+              box={{
+                width: OVERLAY_BASE_DIMS.game.w,
+                height: OVERLAY_BASE_DIMS.game.h,
+                scale: boxes.game.scale,
+              }}
+            />
+          )}
         </Positioned>
       )}
 

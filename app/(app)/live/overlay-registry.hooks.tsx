@@ -72,6 +72,9 @@ export function useSaveOverlaySettings(overlayId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["overlay-settings", overlayId] });
+      // The installation carries the settings the frame is sent, so the owner's
+      // own surfaces see the change at the same moment the stream does.
+      queryClient.invalidateQueries({ queryKey: channelInstallationKey });
     },
     onError: overlayErrorToast("Couldn't save the settings"),
   });

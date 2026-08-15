@@ -103,6 +103,11 @@ other than the one its token names.
 The endpoint SHALL be reachable from the origin the framing policy permits, since the caller is a framed
 document on another origin.
 
+Settings SHALL additionally be delivered over the message channel, both when a framed overlay announces
+itself and whenever they change, so that a change the streamer saves reaches a running overlay without
+that overlay being reloaded. The endpoint SHALL remain available for an overlay that does not speak the
+protocol.
+
 #### Scenario: An overlay reads what the streamer configured
 
 - **GIVEN** an installation whose settings have been set by the channel owner
@@ -119,4 +124,10 @@ document on another origin.
 
 - **WHEN** a missing, malformed, expired or forged token is presented
 - **THEN** each is refused identically
+
+#### Scenario: A saved change reaches a running overlay
+
+- **GIVEN** a framed overlay that has announced itself
+- **WHEN** the channel owner saves a different value
+- **THEN** the new settings are sent to that frame without it being reloaded
 

@@ -74,11 +74,6 @@ export function OverlaySettingsPanel({ overlayId }: { overlayId: string }) {
         )}
       </div>
 
-      {/* A running browser source read its settings when it loaded. Saying so is
-          cheaper than a streamer wondering why the stream did not change. */}
-      <p className="text-[10px] leading-snug text-white/50">
-        A saved change reaches the stream when the browser source reloads.
-      </p>
     </div>
   );
 }

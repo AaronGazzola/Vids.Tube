@@ -3,7 +3,9 @@
 import { OverlayEmptyState } from "@/components/overlay/empty-placeholder";
 import { OVERLAY_BASE_DIMS } from "@/lib/demo-overlay";
 import { framedOverlayUrl, type OverlayInstallation } from "@/lib/overlay-frame";
-import { useState } from "react";
+import type { OverlayBoxSize } from "@/lib/overlay-messages";
+import { useOverlayConversation } from "@/components/overlay/use-overlay-conversation";
+import { useRef, useState } from "react";
 
 // The window hosting a framed overlay. What is framed comes from the overlay this channel installed, so
 // two streamers running the same overlay frame two different addresses. The ORIGIN is still build-time
@@ -16,12 +18,24 @@ import { useState } from "react";
 // be positioned, so the editor asks for an outline where the stream itself gets nothing.
 export function GameWindow({
   installation,
+  box = { width: OVERLAY_BASE_DIMS.game.w, height: OVERLAY_BASE_DIMS.game.h, scale: 1 },
   placeholder = false,
 }: {
   installation: OverlayInstallation | null | undefined;
+  box?: OverlayBoxSize;
   placeholder?: boolean;
 }) {
   const permittedOrigin = process.env.NEXT_PUBLIC_GAME_EMBED_URL ?? "";
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+
+  useOverlayConversation({
+    frameRef,
+    permittedOrigin,
+    channelId: installation?.channelId ?? null,
+    settings: installation?.settings ?? null,
+    box,
+  });
+
   // The address is pinned to the INSTALLATION, not to the token. The host re-mints
   // on every poll of the installation, and letting each fresh token reach `src`
   // would reload the frame every fifteen seconds and restart whatever it was
@@ -67,6 +81,7 @@ export function GameWindow({
   }
   return (
     <iframe
+      ref={frameRef}
       src={url}
       title=""
       aria-hidden
