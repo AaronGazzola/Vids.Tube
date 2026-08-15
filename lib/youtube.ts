@@ -5,6 +5,32 @@ import type {
 
 const API = "https://www.googleapis.com/youtube/v3";
 
+// A chat that has ended and a request that failed both arrive as a rejected
+// promise. Carrying the status and YouTube's own reason lets a caller tell them
+// apart without matching text in a message, which would break the first time
+// YouTube reworded it.
+export class YouTubeApiError extends Error {
+  readonly status: number;
+  readonly reason: string | null;
+
+  constructor(message: string, status: number, reason: string | null) {
+    super(message);
+    this.name = "YouTubeApiError";
+    this.status = status;
+    this.reason = reason;
+  }
+}
+
+function reasonFromBody(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body);
+    const reason = parsed?.error?.errors?.[0]?.reason;
+    return typeof reason === "string" ? reason : null;
+  } catch {
+    return null;
+  }
+}
+
 function key(): string {
   const k = process.env.YOUTUBE_API_KEY;
   if (!k) {
@@ -180,8 +206,11 @@ export async function fetchLiveChatPage(
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(
-      `YouTube liveChatMessages.list failed: ${res.status} ${await res.text()}`
+    const body = await res.text();
+    throw new YouTubeApiError(
+      `YouTube liveChatMessages.list failed: ${res.status} ${body}`,
+      res.status,
+      reasonFromBody(body)
     );
   }
   const data = await res.json();

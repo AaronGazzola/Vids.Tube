@@ -43,6 +43,7 @@ import { workerConfig } from "../config";
 import { supabaseAdmin } from "../supabase";
 
 const SCORE_INTERVAL_MS = 10_000;
+const POLLED_STAMP_INTERVAL_MS = 15_000;
 const TRANSCRIPT_WINDOW_SEGMENTS = 40;
 
 export type BufferedMessage = {
@@ -669,7 +670,30 @@ export async function runScoringJob(
     for (const prior of priorBotMessages ?? []) {
       noteRecentSend(prior.body, new Date(prior.created_at).getTime());
     }
-    for await (const m of pollYoutubeChat(liveChatId)) {
+    // Written from a successful read rather than from an arriving message: a
+    // chat with nobody speaking is not a fault and must not be reported as one.
+    // Throttled because the polling interval YouTube asks for can be a second,
+    // and a write per page would be a write per second for no extra truth.
+    let lastPolledWriteMs = 0;
+    const markPolled = () => {
+      const now = Date.now();
+      if (now - lastPolledWriteMs < POLLED_STAMP_INTERVAL_MS) {
+        return;
+      }
+      lastPolledWriteMs = now;
+      void supabaseAdmin
+        .from("streams")
+        .update({ youtube_chat_polled_at: new Date(now).toISOString() })
+        .eq("id", stream.id)
+        .then(({ error }) => {
+          if (error) console.error(`[chat:yt] capture stamp failed: ${error.message}`);
+        });
+    };
+
+    for await (const m of pollYoutubeChat(liveChatId, {
+      shouldStop: () => stopped,
+      onPage: markPolled,
+    })) {
       if (stopped) {
         return;
       }

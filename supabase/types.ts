@@ -455,6 +455,7 @@ export type Database = {
           author_avatar_url: string | null
           author_name: string | null
           body: string
+          captured_via: string
           created_at: string
           external_author_id: string | null
           external_message_id: string | null
@@ -470,6 +471,7 @@ export type Database = {
           author_avatar_url?: string | null
           author_name?: string | null
           body: string
+          captured_via?: string
           created_at?: string
           external_author_id?: string | null
           external_message_id?: string | null
@@ -485,6 +487,7 @@ export type Database = {
           author_avatar_url?: string | null
           author_name?: string | null
           body?: string
+          captured_via?: string
           created_at?: string
           external_author_id?: string | null
           external_message_id?: string | null
@@ -1618,6 +1621,7 @@ export type Database = {
           wrapup_done_at: string | null
           wrapup_requested_at: string | null
           youtube_channel_id: string | null
+          youtube_chat_polled_at: string | null
           youtube_video_id: string | null
         }
         Insert: {
@@ -1643,6 +1647,7 @@ export type Database = {
           wrapup_done_at?: string | null
           wrapup_requested_at?: string | null
           youtube_channel_id?: string | null
+          youtube_chat_polled_at?: string | null
           youtube_video_id?: string | null
         }
         Update: {
@@ -1668,6 +1673,7 @@ export type Database = {
           wrapup_done_at?: string | null
           wrapup_requested_at?: string | null
           youtube_channel_id?: string | null
+          youtube_chat_polled_at?: string | null
           youtube_video_id?: string | null
         }
         Relationships: [

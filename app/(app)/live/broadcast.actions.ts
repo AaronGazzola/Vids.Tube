@@ -8,7 +8,7 @@ import {
 } from "@/lib/broadcast-end";
 import { uploadToR2 } from "@/lib/r2";
 import { isLiveAndFresh, STALE_MS } from "@/lib/stream";
-import { isWorkerFresh } from "@/lib/worker-status";
+import { isChatCaptureFresh, isWorkerFresh } from "@/lib/worker-status";
 import { fetchSubs, fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
 import { createClient } from "@/supabase/server-client";
@@ -577,6 +577,11 @@ export type StreamSettings = {
   bridgeEnabled: boolean;
   greetReturning: boolean;
   workerRunning: boolean;
+  // Whether YouTube chat capture is still reading, for a live broadcast with a
+  // video attached; null when there is nothing to report. Kept apart from
+  // workerRunning on purpose: a running worker whose chat reader had died is the
+  // condition that went unnoticed on 9-Aug-2026.
+  chatCapture: "working" | "stalled" | null;
   thumbnailPath: string | null;
 };
 
@@ -624,7 +629,7 @@ export async function getStreamSettingsAction(
   const base = supabaseAdmin
     .from("streams")
     .select(
-      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat, disabled_commands, thumbnail_path"
+      "id, status, title, description, scheduled_start_at, youtube_video_id, waiting_room_chat, disabled_commands, thumbnail_path, youtube_chat_polled_at"
     )
     .eq("channel_id", channel.id);
   const { data: stream, error } = streamId
@@ -683,6 +688,7 @@ export async function getStreamSettingsAction(
       chatterEnrichment: true,
       disabledCommands: [],
       workerRunning,
+      chatCapture: null,
     };
   }
 
@@ -733,6 +739,12 @@ export async function getStreamSettingsAction(
     chatterEnrichment: channelSettings?.chatter_enrichment_mode !== "deferred",
     disabledCommands: stream.disabled_commands ?? [],
     workerRunning,
+    chatCapture:
+      stream.status === "live" && stream.youtube_video_id
+        ? isChatCaptureFresh(stream.youtube_chat_polled_at)
+          ? "working"
+          : "stalled"
+        : null,
   };
 }
 

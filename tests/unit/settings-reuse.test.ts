@@ -63,6 +63,7 @@ const PREVIOUS: StreamSettings = {
   bridgeEnabled: true,
   greetReturning: true,
   workerRunning: false,
+  chatCapture: null,
   thumbnailPath: "live-thumb/previous.jpg",
 };
 

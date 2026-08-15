@@ -653,6 +653,7 @@ export default function LivePage() {
                 thumbnailPath={broadcast?.thumbnail_path ?? null}
                 isPublic={isPublic}
                 workerRunning={settings.workerRunning}
+                chatCapture={settings.chatCapture}
               />
             )}
           </TabsContent>

@@ -1045,6 +1045,7 @@ export function SettingsTab({
   thumbnailPath,
   isPublic,
   workerRunning,
+  chatCapture,
 }: {
   form: SettingsForm;
   setForm: (f: SettingsForm) => void;
@@ -1052,6 +1053,7 @@ export function SettingsTab({
   thumbnailPath: string | null;
   isPublic: boolean;
   workerRunning: boolean;
+  chatCapture: "working" | "stalled" | null;
 }) {
   const urlInfo = useOverlayUrlInfo();
   const regenerateToken = useRegenerateOverlayToken();
@@ -1396,6 +1398,30 @@ export function SettingsTab({
           />
           <span className="text-sm">{workerRunning ? "Running" : "Stopped"}</span>
         </div>
+        {chatCapture && (
+          <div
+            className="flex items-center gap-2"
+            data-testid="chat-capture-indicator"
+            data-state={chatCapture}
+          >
+            <span
+              className={cn(
+                "h-2.5 w-2.5 rounded-full",
+                chatCapture === "working" ? "bg-green-500" : "bg-red-500"
+              )}
+            />
+            <span className="text-sm">
+              YouTube chat capture{" "}
+              {chatCapture === "working" ? "working" : "stalled"}
+            </span>
+          </div>
+        )}
+        {chatCapture === "stalled" && (
+          <p className="text-xs text-red-600">
+            No YouTube chat page has been read recently. Messages sent on YouTube
+            are not being stored. Restart the worker to resume capture.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           Transcription, chat scoring, moderation, and YouTube chat need the local
           worker. Start it with:

@@ -126,11 +126,36 @@ stay until there is a clean broadcast behind them.
 
 ---
 
+## 6. Chat capture (AZ-259)
+
+Shipped 15-Aug-2026: the YouTube chat reader now retries a failed page read
+instead of ending silently, and the Settings tab shows whether capture is alive.
+Neither can be proven without a broadcast, because neither has seen one.
+
+- Early in the broadcast, open the Settings tab of `/live` and confirm a second
+  indicator reads "YouTube chat capture working", below the worker indicator.
+- Glance at it again through the broadcast. Turning red means YouTube messages
+  have stopped being stored, and the fix on the night is to restart the worker.
+  That is the exact condition that went unnoticed for an hour on 9-Aug-2026, when
+  every other signal said the broadcast was healthy.
+- After the broadcast, and again after the replay has been merged, run
+  `npm run chat:completeness`. This is the first broadcast whose messages record
+  whether they arrived from live capture or from the replay, so it is the first
+  whose figures mean anything. Every earlier broadcast overstates live capture
+  and the report says so.
+- What good looks like: live capture close to the archive count, and no shortfall
+  flagged. A shortfall means the reader still stopped, and the worker log carries
+  the reason as `[chat:yt] page read failed`.
+
+---
+
 ## Known and not a regression
 
 - The game window browser test fails until the eco3d game is deployed. That is
   AZ-245.
-- Chat capture is known to lose messages mid-broadcast, and the post-broadcast
-  pass currently marks such broadcasts clean anyway. Deferred on 12-Aug-2026 and
-  being worked separately. If chat looks thin on the night, that is the known
-  fault rather than a new one.
+- The post-broadcast pass still runs about ten minutes after a broadcast, when
+  the YouTube replay does not exist yet, and still records such a broadcast as
+  clean. Moving the pass to a schedule on the always-on Mac is the next change.
+  Until then, `npm run repair` by hand a day later is what merges the replay.
+- The 8-Aug-2026 broadcast has 95 messages stored and its chat replay was never
+  fetched, so it has never been measurable. Confirmed still true on 15-Aug-2026.

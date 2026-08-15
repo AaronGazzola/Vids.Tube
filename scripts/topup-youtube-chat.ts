@@ -101,6 +101,7 @@ async function main() {
       external_message_id: m.messageId,
       body: m.body,
       created_at: m.publishedAt,
+      captured_via: "replay",
     }));
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error: insErr } = await admin.from("chat_messages").insert(rows.slice(i, i + BATCH));
