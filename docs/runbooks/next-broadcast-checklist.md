@@ -7,6 +7,23 @@ handovers, and this has to survive until there is a stream to run it against.
 Nine tickets and one OpenSpec change are waiting on a single broadcast. Working
 through this in order closes all of them.
 
+**Tickets chosen to build on stream**, in the order they demo best. Detail is on
+each ticket; this is here so the run sheet and the build list live together.
+
+- **AZ-261, highlights-only toggle on the Activity tab.** Small, visible, and it
+  pays off the moment the AI features a message while chat is watching. Best
+  single one to build live.
+- **AZ-262, goal overlays animate when a metric increments.** Purely visual, and
+  a new subscriber arriving during the broadcast is the demo.
+- **AZ-263, welcome messages in the overlay.** Chatters arriving are the trigger,
+  so the audience makes it happen.
+- **AZ-264, credits for a new member on first chat.** Worth doing, weakest on
+  camera: the effect is a number, and it needs a first-time chatter on cue. Its
+  amount is a decision to settle against the ticket pricing model first.
+
+Not for stream: **AZ-260**, the dev view for live video and chat UX, and
+**AZ-265**, trimming the waiting room off the 10-Aug-2026 recording.
+
 ---
 
 ## Before going live
@@ -149,13 +166,59 @@ Neither can be proven without a broadcast, because neither has seen one.
 
 ---
 
+## 7. The recording starts at go-live (AZ-265)
+
+The trim in `scripts/vm/mtx-finalize-vod.sh` cuts everything before go-live off
+the first segment. The installed copy is byte-identical to the repo copy, and no
+broadcast has run since it was deployed, so this is its first test.
+
+- Use a waiting room, long enough to be obvious. Note the wall-clock minute the
+  go-live button is pressed.
+- After the broadcast, confirm the published recording opens at go-live and not
+  in the waiting room, and that its duration matches the live window rather than
+  the whole session.
+- The 10-Aug-2026 recording carries 13 minutes of waiting room. That one predates
+  the deploy and is being repaired separately.
+
+---
+
+## 8. Scoring actually runs (AZ-259)
+
+Live chat scoring spawns the Claude CLI through `CLAUDE_BIN`. On 15-Aug-2026 that
+was set to `claude.cmd`, which no longer exists on the streaming PC, so every
+scoring batch failed. The 9-Aug-2026 broadcast scored nobody for this reason.
+
+- Before going live, confirm `CLAUDE_BIN` resolves. One sweep of
+  `npm run maintain` refuses to start and names it if it does not.
+- During the broadcast, confirm messages are being featured and the leaderboard
+  moves. Nothing scored after a busy stretch means the CLI is not spawning.
+
+---
+
+## 9. The broadcast settles itself (AZ-259)
+
+The live worker no longer settles a finished broadcast, so stopping it the moment
+the stream ends is now correct and loses nothing. The maintenance runner does it
+on a schedule instead.
+
+- Confirm the runner is installed on the always-on machine first. Until then
+  nothing settles a broadcast. See `docs/runbooks/maintenance-runner.md`.
+- Within an hour of the broadcast ending, the completion record should carry a
+  clean score phase: chat scored, memberships rebuilt, ledger checked.
+- The next day, roughly 20 hours on, the same broadcast should be settled with a
+  note saying the replay was merged.
+- Then run `npm run chat:completeness`. This is the first broadcast whose
+  messages record whether they arrived from live capture or from the replay, so
+  it is the first whose figures mean anything.
+
+---
+
 ## Known and not a regression
 
 - The game window browser test fails until the eco3d game is deployed. That is
   AZ-245.
-- The post-broadcast pass still runs about ten minutes after a broadcast, when
-  the YouTube replay does not exist yet, and still records such a broadcast as
-  clean. Moving the pass to a schedule on the always-on Mac is the next change.
-  Until then, `npm run repair` by hand a day later is what merges the replay.
-- The 8-Aug-2026 broadcast has 95 messages stored and its chat replay was never
-  fetched, so it has never been measurable. Confirmed still true on 15-Aug-2026.
+- The 8-Aug-2026 broadcast's chat replay no longer exists. The fetch succeeds and
+  returns zero messages, so the roughly half of that broadcast's chat live
+  capture missed is unrecoverable. Confirmed 15-Aug-2026.
+- The 8-Aug-2026 recording is 21 minutes shorter than its live window, because it
+  was swapped for the YouTube version. Not being repaired.
