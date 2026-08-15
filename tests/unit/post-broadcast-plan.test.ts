@@ -2,16 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   blockedBy,
   isClean,
+  phaseOwed,
   remainingSteps,
+  settleOutcome,
   shouldSkip,
   STEP_ORDER,
+  stepsForPhase,
   type StepOutcome,
 } from "@/lib/post-broadcast-plan";
 
-const ok = (step: StepOutcome["step"]): StepOutcome => ({ step, ok: true });
+const HOUR = 60 * 60 * 1000;
+
+const ok = (step: StepOutcome["step"]): StepOutcome => ({ step, status: "ok" });
 const failed = (step: StepOutcome["step"], error = "boom"): StepOutcome => ({
   step,
-  ok: false,
+  status: "failed",
   error,
 });
 
@@ -102,15 +107,82 @@ describe("isClean", () => {
 });
 
 describe("shouldSkip", () => {
-  it("skips a broadcast that already completed cleanly", () => {
-    expect(shouldSkip({ clean: true })).toBe(true);
+  it("skips a broadcast whose replay has been accounted for", () => {
+    expect(shouldSkip({ clean: true, settled: true })).toBe(true);
   });
 
-  it("retries a broadcast whose pass was not clean", () => {
-    expect(shouldSkip({ clean: false })).toBe(false);
+  it("does not skip a broadcast scored cleanly but still owed its replay", () => {
+    expect(shouldSkip({ clean: true, settled: false })).toBe(false);
   });
 
   it("runs a broadcast with no record at all", () => {
     expect(shouldSkip(null)).toBe(false);
+  });
+});
+
+describe("stepsForPhase", () => {
+  it("omits the chat log from scoring, since the replay does not exist yet", () => {
+    expect(stepsForPhase("score")).not.toContain("saveChatLog");
+  });
+
+  it("scores, rebuilds and checks the ledger on the night", () => {
+    expect(stepsForPhase("score")).toEqual([
+      "topUpChat",
+      "scoreChat",
+      "rebuildMemberships",
+      "checkLedger",
+    ]);
+  });
+
+  it("runs everything when settling", () => {
+    expect(stepsForPhase("settle")).toEqual(STEP_ORDER);
+  });
+});
+
+describe("phaseOwed", () => {
+  const NOW = Date.parse("2026-08-15T12:00:00Z");
+  const agoIso = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it("owes scoring when there is no record", () => {
+    expect(phaseOwed(null, agoIso(HOUR), NOW)).toBe("score");
+  });
+
+  it("owes scoring when the record is not clean", () => {
+    expect(phaseOwed({ clean: false, settled: false }, agoIso(HOUR), NOW)).toBe("score");
+  });
+
+  it("owes nothing two hours after a clean score, the replay not existing yet", () => {
+    expect(phaseOwed({ clean: true, settled: false }, agoIso(2 * HOUR), NOW)).toBeNull();
+  });
+
+  it("owes settling at 21 hours, inside the window the replay appears in", () => {
+    expect(phaseOwed({ clean: true, settled: false }, agoIso(21 * HOUR), NOW)).toBe(
+      "settle"
+    );
+  });
+
+  it("owes nothing once settled", () => {
+    expect(phaseOwed({ clean: true, settled: true }, agoIso(30 * HOUR), NOW)).toBeNull();
+  });
+});
+
+describe("settleOutcome", () => {
+  const NOW = Date.parse("2026-08-15T12:00:00Z");
+  const agoIso = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it("is merged when the replay held messages", () => {
+    expect(settleOutcome(13, agoIso(21 * HOUR), NOW)).toBe("merged");
+  });
+
+  it("retries when the replay held nothing and the broadcast is recent", () => {
+    expect(settleOutcome(0, agoIso(2 * 24 * HOUR), NOW)).toBe("retry");
+  });
+
+  it("expires when nothing has come back after seven days", () => {
+    expect(settleOutcome(0, agoIso(8 * 24 * HOUR), NOW)).toBe("expired");
+  });
+
+  it("counts an empty replay as merged never, however old, if it held messages", () => {
+    expect(settleOutcome(1, agoIso(30 * 24 * HOUR), NOW)).toBe("merged");
   });
 });

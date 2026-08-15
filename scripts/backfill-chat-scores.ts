@@ -1,3 +1,4 @@
+import { printStepResult } from "../lib/step-result";
 import { createClient } from "@supabase/supabase-js";
 import {
   batchMessages,
@@ -350,6 +351,7 @@ async function main() {
   );
   console.log(`messages ${messages}, model calls ${APPLY ? batches : 0} (${batches} batches)`);
   if (!APPLY) console.log("dry run — add --apply to write.");
+  printStepResult({ scored: messages, failed: tally.failed ?? 0, batches });
 }
 
 main().catch((e) => {

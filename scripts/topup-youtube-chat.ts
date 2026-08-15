@@ -1,3 +1,4 @@
+import { printStepResult } from "../lib/step-result";
 import { createClient } from "@supabase/supabase-js";
 import { selectMissing, type CandidateMessage, type StoredMessage } from "../lib/chat-dedup";
 import type { Database } from "../supabase/types";
@@ -76,10 +77,12 @@ async function main() {
 
   let totalMissing = 0;
   let totalInserted = 0;
+  let totalArchived = 0;
   const gaps: string[] = [];
 
   for (const s of streams ?? []) {
     const archived = await archivedFor(s.youtube_video_id!);
+    totalArchived += archived.length;
     if (!archived.length) continue;
     const stored = await storedFor(s.id);
     const { missing, matchedById, matchedByBody } = selectMissing(archived, stored);
@@ -113,6 +116,7 @@ async function main() {
   console.log(`broadcasts checked: ${streams?.length ?? 0}`);
   if (!gaps.length) {
     console.log("no gaps found — every archived message is already stored");
+    printStepResult({ missing: 0, inserted: 0, archived: totalArchived });
     return;
   }
   console.log(`broadcasts with a gap: ${gaps.length}`);
@@ -120,9 +124,15 @@ async function main() {
   console.log(`\ntotal missing: ${totalMissing}`);
   if (!APPLY) {
     console.log("dry run — nothing changed. add --apply to fill the gaps.");
+    printStepResult({ missing: totalMissing, inserted: 0, archived: totalArchived });
     return;
   }
   console.log(`inserted: ${totalInserted}`);
+  printStepResult({
+    missing: totalMissing,
+    inserted: totalInserted,
+    archived: totalArchived,
+  });
 }
 
 main().catch((e) => {

@@ -1,8 +1,5 @@
-# post-broadcast-pass Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change automatic-post-broadcast-run. Update Purpose after archive.
-## Requirements
 ### Requirement: A finished broadcast is completed without a manual step
 
 When a broadcast has ended, the system SHALL settle it in two phases, neither requiring a person
@@ -37,20 +34,6 @@ Neither phase SHALL run from the live worker.
 - **THEN** the chat log is saved before the top-up compares against it, the top-up completes
   before scoring reads the chat, and scoring completes before memberships are rebuilt
 
-### Requirement: A broadcast that ended unattended is caught up
-
-The system SHALL identify any ended broadcast carrying no completion record and run the pass over it when a worker next starts, rather than only handling broadcasts that end while a worker is running.
-
-#### Scenario: A broadcast that ended while nothing was running
-
-- **WHEN** a worker starts and an ended broadcast has no completion record
-- **THEN** the pass runs over that broadcast
-
-#### Scenario: Ending out of order is still caught
-
-- **WHEN** a broadcast is marked ended hours after it actually stopped, so a newer broadcast was completed first
-- **THEN** the older broadcast is still caught up, because the pass looks for a missing record rather than for recency
-
 ### Requirement: The pass records what each step did
 
 The system SHALL store, per broadcast, when each phase last ran, what each step reported, and any
@@ -76,20 +59,6 @@ unrelated broadcasts stored against whichever one triggered it.
 - **WHEN** a step is backed by a script capable of working across many broadcasts
 - **THEN** it is run for this broadcast alone, and the figure stored against the record is that
   broadcast's
-
-### Requirement: Running the pass again changes nothing
-
-The pass SHALL be safe to run repeatedly. A broadcast already carrying a clean completion record SHALL be skipped, and each individual step SHALL be idempotent so a re-run after a partial failure cannot double-count.
-
-#### Scenario: A second run is a no-op
-
-- **WHEN** the pass runs over a broadcast that already completed cleanly
-- **THEN** nothing is written and the broadcast is reported as already done
-
-#### Scenario: A partial failure can be re-run
-
-- **WHEN** the pass failed at scoring and is run again
-- **THEN** the earlier steps do not duplicate their work and scoring is attempted afresh
 
 ### Requirement: A failing step does not silently stop the rest
 
@@ -127,4 +96,3 @@ it did has not been shown to have worked.
 
 - **WHEN** a step's output carries no statement of what it did
 - **THEN** it is recorded as unknown and the phase is not recorded as clean
-

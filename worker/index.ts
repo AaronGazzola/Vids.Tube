@@ -4,9 +4,7 @@ import {
   nightbotConfigured,
   nightbotTokenDaysRemaining,
 } from "./lib/nightbot-token";
-import { runPostBroadcastPass } from "./lib/post-broadcast";
 import { runScoringJob } from "./jobs/score";
-import { supabaseAdmin } from "./supabase";
 import { runTranscriptionJob } from "./jobs/transcribe";
 import {
   type EligibleStream,
@@ -73,20 +71,11 @@ async function tick(): Promise<void> {
   } finally {
     await releaseLock(stream.id);
     console.error(`stopped engaging stream ${stream.id}`);
-    // Engagement ends when the broadcast does, so this is the moment the
-    // broadcast can be turned into complete community data.
-    try {
-      const { data: fresh } = await supabaseAdmin
-        .from("streams")
-        .select("status")
-        .eq("id", stream.id)
-        .maybeSingle();
-      if (fresh?.status === "ended") {
-        await runPostBroadcastPass(stream.id);
-      }
-    } catch (e) {
-      console.error("post-broadcast pass failed:", e);
-    }
+    // Nothing else happens here. Settling a finished broadcast used to run at
+    // this point, ten minutes after the broadcast ended and a day before its
+    // chat replay exists, and only when the worker happened to still be alive.
+    // It belongs to the maintenance runner now, so stopping this process the
+    // moment a broadcast ends loses nothing.
   }
 }
 
@@ -109,9 +98,10 @@ async function primeNightbotToken(): Promise<void> {
 async function main(): Promise<void> {
   console.error("worker started; polling for public streams");
   await primeNightbotToken();
-  // This worker only engages live broadcasts. Repairing a finished one is
-  // minutes of serial work that writes the same membership rows a live
-  // broadcast writes, so it runs as its own command (`npm run repair`).
+  // This worker only engages live broadcasts. Settling a finished one runs from
+  // the maintenance runner (`npm run maintain`), scheduled on an always-on
+  // machine, because the chat replay it needs does not exist for a day and this
+  // process is stopped the moment a broadcast ends.
   for (;;) {
     try {
       await tick();

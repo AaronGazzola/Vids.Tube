@@ -1,10 +1,14 @@
-// Runs the post-broadcast pass. This is the only thing that runs it: the live
-// worker engages broadcasts and nothing else, because repairing rewrites the
-// same membership rows a live broadcast writes.
+// The manual override for the maintenance runner.
 //
-// Run it after a broadcast ends. The Settings tab of /live shows how many
-// broadcasts are waiting.
-import { catchUpEndedBroadcasts, runPostBroadcastPass } from "../worker/lib/post-broadcast";
+// The runner (`npm run maintain`) does this on a schedule. This is for running a
+// phase by hand: while the runner is being installed, or to force a broadcast
+// through a phase it is not yet due.
+import {
+  catchUpEndedBroadcasts,
+  outstandingBroadcasts,
+  runPostBroadcastPass,
+} from "../worker/lib/post-broadcast";
+import type { Phase } from "../lib/post-broadcast-plan";
 
 const argv = process.argv.slice(2);
 const flag = (f: string) => {
@@ -13,16 +17,26 @@ const flag = (f: string) => {
 };
 
 async function main() {
+  const phaseArg = flag("--phase");
+  if (phaseArg && phaseArg !== "score" && phaseArg !== "settle") {
+    throw new Error("--phase must be score or settle");
+  }
+  const phase = (phaseArg ?? undefined) as Phase | undefined;
+
   const streamId = flag("--stream");
   if (streamId) {
-    const res = await runPostBroadcastPass(streamId);
+    const res = await runPostBroadcastPass(streamId, phase);
     if (!res.ran) {
-      console.log("already repaired; nothing to do");
+      console.log("nothing owing for this broadcast; pass --phase to force one");
       return;
     }
-    console.log(res.clean ? "repaired clean" : "repaired with failures");
+    console.log(`${res.phase} phase ${res.clean ? "clean" : "with failures"}`);
     for (const o of res.outcomes) {
-      console.log(`  ${o.step}: ${o.ok ? "ok" : `failed — ${o.error}`}`);
+      console.log(
+        `  ${o.step}: ${o.status}${o.result ? ` ${JSON.stringify(o.result)}` : ""}${
+          o.error ? ` — ${o.error}` : ""
+        }`
+      );
     }
     return;
   }
@@ -32,8 +46,12 @@ async function main() {
   if (!Number.isFinite(limit) || limit < 1) {
     throw new Error("--limit must be a positive number");
   }
-  const ran = await catchUpEndedBroadcasts(limit);
-  console.log(ran ? `repaired ${ran} broadcast(s)` : "nothing outstanding");
+
+  const owed = await outstandingBroadcasts();
+  console.log(`${owed.length} broadcast(s) owing work`);
+  const { ran, remaining } = await catchUpEndedBroadcasts(limit);
+  console.log(ran ? `settled ${ran} broadcast(s)` : "nothing outstanding");
+  if (remaining) console.log(`${remaining} left`);
 }
 
 main().catch((e) => {

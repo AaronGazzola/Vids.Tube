@@ -38,6 +38,10 @@ SHALL gate jobs by status: chat scoring, YouTube-chat polling, and moderation ru
 whenever the stream is public and their settings are enabled; the transcription job
 runs only while `status = 'live'`. The per-stream lock is reused unchanged.
 
+The dispatcher SHALL do nothing with a broadcast once engagement ends beyond releasing its lock.
+Settling a finished broadcast SHALL NOT run from the live worker, so the worker can be stopped
+the moment a broadcast ends without losing work that was about to happen.
+
 #### Scenario: Scheduled waiting room is moderated and scored
 
 - **WHEN** the worker polls and the channel's active stream is a dated `scheduled`
@@ -55,6 +59,12 @@ runs only while `status = 'live'`. The per-stream lock is reused unchanged.
 - **WHEN** the channel's active stream is `draft`, or an ad-hoc `preview`
   (`created_in_ui = false`, no datetime)
 - **THEN** the dispatcher engages no jobs for it
+
+#### Scenario: Stopping the worker after a broadcast loses nothing
+
+- **WHEN** a broadcast ends and the worker process is stopped immediately
+- **THEN** no post-broadcast work was pending in that process, and the broadcast is settled later
+  by the maintenance runner
 
 ### Requirement: Doctor preflight check
 

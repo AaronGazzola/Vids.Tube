@@ -1,3 +1,4 @@
+import { printStepResult } from "../lib/step-result";
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "fs";
 import type { Database } from "../supabase/types";
@@ -144,6 +145,7 @@ async function main() {
   const totalMessages = after.reduce((a, r) => a + r.message_count, 0);
   const totalAttended = after.reduce((a, r) => a + r.streams_attended, 0);
   console.log(`\ntotals: ${totalMessages} messages, ${totalAttended} broadcast attendances`);
+  printStepResult({ rebuilt: ok, failed: failed.length });
 }
 
 main().catch((e) => {

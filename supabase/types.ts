@@ -198,6 +198,9 @@ export type Database = {
           clean: boolean
           created_at: string
           finished_at: string | null
+          settle_note: string | null
+          settled: boolean
+          settled_at: string | null
           started_at: string
           steps: Json
           stream_id: string
@@ -208,6 +211,9 @@ export type Database = {
           clean?: boolean
           created_at?: string
           finished_at?: string | null
+          settle_note?: string | null
+          settled?: boolean
+          settled_at?: string | null
           started_at?: string
           steps?: Json
           stream_id: string
@@ -218,6 +224,9 @@ export type Database = {
           clean?: boolean
           created_at?: string
           finished_at?: string | null
+          settle_note?: string | null
+          settled?: boolean
+          settled_at?: string | null
           started_at?: string
           steps?: Json
           stream_id?: string

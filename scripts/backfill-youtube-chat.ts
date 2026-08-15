@@ -1,3 +1,4 @@
+import { printStepResult } from "../lib/step-result";
 import { createClient } from "@supabase/supabase-js";
 import { execFile } from "child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
@@ -18,6 +19,14 @@ const admin = createClient<Database>(
 const YTDLP = process.env.YTDLP_BIN ?? "yt-dlp";
 const FORCE = process.argv.includes("--force");
 const ONLY_EMPTY = process.argv.includes("--only-empty");
+// One broadcast at a time, so the result line describes the broadcast it is
+// stored against. Sweeping every video and storing the total against whichever
+// broadcast triggered the run is how a completion record came to claim 20
+// messages archived while that broadcast's archive held 13.
+const ONLY_VIDEO = (() => {
+  const i = process.argv.indexOf("--video");
+  return i >= 0 ? process.argv[i + 1] ?? null : null;
+})();
 const URL_FILE = join(process.cwd(), "data", "youtube-vod-urls.txt");
 const BATCH = 500;
 
@@ -236,6 +245,23 @@ async function backfillVideo(videoId: string): Promise<number> {
 }
 
 async function main() {
+  if (ONLY_VIDEO) {
+    let archived = 0;
+    try {
+      archived = await backfillVideo(ONLY_VIDEO);
+      console.log(`archived ${ONLY_VIDEO}: ${archived} messages`);
+    } catch (e) {
+      console.error(`${ONLY_VIDEO}: ${(e as Error).message.slice(0, 200)}`);
+      printStepResult({ archived: 0, failed: true });
+      process.exit(1);
+    }
+    // Zero archived is not a failure. It means the replay is not downloadable
+    // yet, or never will be, and the caller decides which by how old the
+    // broadcast is.
+    printStepResult({ archived, failed: false });
+    return;
+  }
+
   const channelId = await resolveChannelId();
   const sources: string[][] = [];
   if (channelId) {

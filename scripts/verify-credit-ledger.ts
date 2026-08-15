@@ -1,3 +1,4 @@
+import { printStepResult } from "../lib/step-result";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/types";
 
@@ -86,9 +87,11 @@ async function main() {
     console.error(`\n${failures.length} failures:`);
     for (const f of failures.slice(0, 30)) console.error(`  ${f}`);
     if (failures.length > 30) console.error(`  ...and ${failures.length - 30} more`);
+    printStepResult({ ok: false, failures: failures.length });
     process.exit(1);
   }
   console.log("\nledger is consistent: one earning line per membership, every cached balance matches");
+  printStepResult({ ok: true, failures: 0 });
 }
 
 main().catch((e) => {
