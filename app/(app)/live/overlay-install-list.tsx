@@ -7,6 +7,7 @@ import {
   useInstallOverlay,
   useRemoveOverlay,
 } from "./overlay-registry.hooks";
+import { OverlaySettingsPanel } from "./overlay-settings-panel";
 
 // An overlay whose entry origin is not the one the Content-Security-Policy names
 // frames nothing at all, and silence on stream is the worst way to find that out.
@@ -62,6 +63,7 @@ export function OverlayInstallList() {
                   {installed ? "Remove" : "Install"}
                 </button>
               </div>
+              {installed && ok && <OverlaySettingsPanel overlayId={o.overlayId} />}
               {installed && !ok && (
                 <p
                   role="alert"

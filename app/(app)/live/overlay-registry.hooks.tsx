@@ -4,11 +4,14 @@ import { CustomToast } from "@/components/CustomToast";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { OverlaySettings } from "@/lib/overlay-settings";
 import {
   getChannelInstallationAction,
+  getOverlaySettingsAction,
   installOverlayAction,
   listChannelOverlaysAction,
   removeOverlayAction,
+  saveOverlaySettingsAction,
 } from "./overlay.actions";
 
 const channelOverlaysKey = ["channel-overlays"] as const;
@@ -49,6 +52,29 @@ function overlayErrorToast(title: string) {
       <CustomToast variant="error" title={title} message={error.message} />
     ));
   };
+}
+
+export function useOverlaySettings(overlayId: string | null) {
+  return useQuery({
+    queryKey: ["overlay-settings", overlayId],
+    queryFn: () => getOverlaySettingsAction(overlayId!),
+    enabled: Boolean(overlayId),
+  });
+}
+
+export function useSaveOverlaySettings(overlayId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: OverlaySettings) => {
+      const res = await saveOverlaySettingsAction(overlayId, values);
+      if ("error" in res) throw new Error(res.error);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["overlay-settings", overlayId] });
+    },
+    onError: overlayErrorToast("Couldn't save the settings"),
+  });
 }
 
 export function useInstallOverlay() {

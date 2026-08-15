@@ -240,6 +240,7 @@ export type Database = {
           enabled: boolean
           id: string
           overlay_id: string
+          settings: Json
         }
         Insert: {
           channel_id: string
@@ -247,6 +248,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           overlay_id: string
+          settings?: Json
         }
         Update: {
           channel_id?: string
@@ -254,6 +256,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           overlay_id?: string
+          settings?: Json
         }
         Relationships: [
           {
@@ -1174,6 +1177,7 @@ export type Database = {
           id: string
           name: string
           owner_user_id: string | null
+          settings_fields: Json
           slug: string
           status: string
           updated_at: string
@@ -1184,6 +1188,7 @@ export type Database = {
           id?: string
           name: string
           owner_user_id?: string | null
+          settings_fields?: Json
           slug: string
           status?: string
           updated_at?: string
@@ -1194,6 +1199,7 @@ export type Database = {
           id?: string
           name?: string
           owner_user_id?: string | null
+          settings_fields?: Json
           slug?: string
           status?: string
           updated_at?: string

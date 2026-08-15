@@ -7,6 +7,14 @@ import type {
 import { resolveAuthorIdentities } from "@/lib/author-identity";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { installationForChannel } from "@/lib/overlay-installation";
+import {
+  parseSettingsFields,
+  parseSettingsValues,
+  resolveSettings,
+  validateSettingsWrite,
+  type OverlaySettings,
+  type OverlaySettingsField,
+} from "@/lib/overlay-settings";
 import { authorFromRow } from "@/lib/featured-author";
 import { fetchSubs, fetchVideoData, parseVideoId } from "@/lib/youtube";
 import { supabaseAdmin } from "@/supabase/admin-client";
@@ -386,6 +394,82 @@ export async function getChannelInstallationAction(): Promise<OverlayInstallatio
     throw new Error(owned.error);
   }
   return installationForChannel(owned.data.channel.id);
+}
+
+export type OverlaySettingsView = {
+  fields: OverlaySettingsField[];
+  values: OverlaySettings;
+};
+
+export async function getOverlaySettingsAction(
+  overlayId: string
+): Promise<OverlaySettingsView> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    throw new Error(owned.error);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("channel_overlays")
+    .select("settings, overlays!inner (settings_fields)")
+    .eq("channel_id", owned.data.channel.id)
+    .eq("overlay_id", overlayId)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load overlay settings");
+  }
+  if (!data) {
+    return { fields: [], values: {} };
+  }
+
+  const fields = parseSettingsFields(data.overlays.settings_fields);
+  const stored = parseSettingsValues(data.settings);
+  return { fields, values: resolveSettings(fields, stored) };
+}
+
+export async function saveOverlaySettingsAction(
+  overlayId: string,
+  values: unknown
+): Promise<ActionResult<{ ok: true }>> {
+  const owned = await getOwnedChannel();
+  if ("error" in owned) {
+    return { error: owned.error };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("channel_overlays")
+    .select("id, settings, overlays!inner (settings_fields)")
+    .eq("channel_id", owned.data.channel.id)
+    .eq("overlay_id", overlayId)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to load overlay settings");
+  }
+  if (!data) {
+    return { error: "That overlay is not installed on your channel." };
+  }
+
+  const checked = validateSettingsWrite(
+    parseSettingsFields(data.overlays.settings_fields),
+    values,
+    parseSettingsValues(data.settings)
+  );
+  if (!checked.ok) {
+    return { error: checked.reason };
+  }
+
+  const { error: writeError } = await supabaseAdmin
+    .from("channel_overlays")
+    .update({ settings: checked.values })
+    .eq("id", data.id);
+  if (writeError) {
+    console.error(writeError);
+    throw new Error("Failed to save overlay settings");
+  }
+
+  return { data: { ok: true } };
 }
 
 export async function installOverlayAction(

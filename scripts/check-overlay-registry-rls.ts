@@ -130,6 +130,29 @@ async function main() {
     secretWriteError ? secretWriteError.message : "insert succeeded"
   );
 
+  // Settings live on channel_overlays, which is owner-only, so a signed-out
+  // client must not be able to read or rewrite what a streamer configured.
+  const { data: settingsSeen } = await anon
+    .from("channel_overlays")
+    .select("settings")
+    .limit(1);
+  check(
+    "another channel's settings are not public",
+    (settingsSeen ?? []).length === 0,
+    `${(settingsSeen ?? []).length} rows visible signed out`
+  );
+
+  const { data: rewritten } = await anon
+    .from("channel_overlays")
+    .update({ settings: { forged: true } })
+    .neq("channel_id", "00000000-0000-4000-8000-000000000000")
+    .select("id");
+  check(
+    "a signed-out client cannot rewrite settings",
+    (rewritten ?? []).length === 0,
+    `${(rewritten ?? []).length} rows updated`
+  );
+
   await admin.from("overlays").delete().eq("id", probe.id);
 
   if (failed) {
