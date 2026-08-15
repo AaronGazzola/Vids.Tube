@@ -12,11 +12,36 @@ const admin = createClient<Database>(
 // The first registry row. Its entry address is whatever the deployment already
 // framed, so this migrates one build-time constant into one row rather than
 // inventing an address, and a hardcoded address never enters version control.
+// The configured value is a link copied out of the studio, so it carries whatever
+// the studio was showing at the time: an encoded sim configuration the game
+// ignores and logs an error about on every single load, an inspect-controls flag
+// that has no business on a stream, and a tab name. Only the rig and its leg
+// weight mean anything to the overlay.
+//
+// Normalised here rather than by editing the row, or the next seed puts the stale
+// value straight back.
+function normaliseEntryUrl(raw: string): string {
+  const url = new URL(raw);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const kept = new URLSearchParams();
+  const rig = hash.get("rig");
+  if (rig) kept.set("rig", rig);
+  const legWeight = hash.get("legw");
+  if (legWeight) kept.set("legw", legWeight);
+  url.hash = kept.toString() ? `#${kept}` : "";
+  url.search = "";
+  return url.toString();
+}
+
 async function main() {
-  const entryUrl = process.env.NEXT_PUBLIC_GAME_EMBED_URL;
-  if (!entryUrl) {
+  const configured = process.env.NEXT_PUBLIC_GAME_EMBED_URL;
+  if (!configured) {
     console.error("NEXT_PUBLIC_GAME_EMBED_URL is not set; nothing to seed");
     process.exit(1);
+  }
+  const entryUrl = normaliseEntryUrl(configured);
+  if (entryUrl !== configured) {
+    console.warn("entry address normalised: dropped everything but the rig and leg weight");
   }
 
   const { data: overlay, error } = await admin
