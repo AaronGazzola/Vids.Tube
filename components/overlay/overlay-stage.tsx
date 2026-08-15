@@ -160,6 +160,7 @@ export function OverlayStage({
             "game",
             <GameWindow
               installation={values.gameInstallation}
+              events={values.gameEvents}
               // The stage is what knows the box, so it is the stage that tells
               // the overlay how much room it has. The scale is the half a frame
               // cannot measure for itself.

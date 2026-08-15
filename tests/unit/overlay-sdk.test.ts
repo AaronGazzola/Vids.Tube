@@ -94,6 +94,46 @@ describe("what the SDK hears", () => {
   });
 });
 
+describe("events", () => {
+  const feed = {
+    id: "e1",
+    keyword: "feed",
+    args: null,
+    at: "2026-08-15T00:00:00.000Z",
+    actor: "opaque-actor",
+    actorName: "Bob",
+  };
+
+  it("delivers a command run for this overlay", () => {
+    const overlay = connectOverlay();
+    const seen: unknown[] = [];
+    overlay.onEvent((event: unknown) => seen.push(event));
+    deliver(hello());
+    deliver({ ns: NS, v: 1, type: "event", event: feed });
+    expect(seen).toEqual([feed]);
+  });
+
+  // An event is a thing that happened. A listener attached afterwards has
+  // genuinely missed it, and pretending otherwise would replay a chatter's
+  // action at a moment nobody chose.
+  it("does not replay an event to a late subscriber", () => {
+    const overlay = connectOverlay();
+    deliver(hello());
+    deliver({ ns: NS, v: 1, type: "event", event: feed });
+    const seen: unknown[] = [];
+    overlay.onEvent((event: unknown) => seen.push(event));
+    expect(seen).toEqual([]);
+  });
+
+  it("ignores an event message carrying no event", () => {
+    const overlay = connectOverlay();
+    const seen: unknown[] = [];
+    overlay.onEvent((event: unknown) => seen.push(event));
+    deliver({ ns: NS, v: 1, type: "event" });
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("what the SDK refuses", () => {
   it("ignores a message that did not come from the parent", () => {
     const overlay = connectOverlay();

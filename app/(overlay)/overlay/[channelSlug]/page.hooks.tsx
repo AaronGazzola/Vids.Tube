@@ -20,6 +20,7 @@ import {
   type DemoOverlaySnapshot,
 } from "@/lib/demo-overlay";
 import { vidstubeAuthor, youtubeAuthor } from "@/lib/featured-author";
+import type { OverlayEvent } from "@/lib/overlay-events";
 import { playOverlayChime } from "@/lib/overlay-chime";
 import { supabase } from "@/supabase/browser-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,53 @@ export function useInstalledOverlay(channelSlug: string, token: string) {
     queryFn: () => getInstalledOverlayAction(channelSlug, token),
     refetchInterval: 15_000,
   });
+}
+
+// Executed commands belonging to the installed overlay, polled with a cursor.
+//
+// The cursor lives here, in memory, so a reload starts from the moment of the
+// reload. A durable cursor would survive that, and would also mean a browser
+// source restarting after an hour delivers an hour of commands at once. Neither
+// is obviously right; this is the one that cannot flood the overlay.
+const OVERLAY_EVENT_POLL_MS = 2_000;
+
+export function useOverlayEvents(token: string | null) {
+  const [events, setEvents] = useState<OverlayEvent[]>([]);
+  const since = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      const url = since.current
+        ? `/api/overlay/events?since=${encodeURIComponent(since.current)}`
+        : "/api/overlay/events";
+      const response = await fetch(url, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        console.error("overlay events refused", response.status);
+        return;
+      }
+      const body = (await response.json()) as { events: OverlayEvent[] };
+      if (cancelled || body.events.length === 0) return;
+      since.current = body.events[body.events.length - 1].at;
+      setEvents(body.events);
+    };
+
+    poll().catch((error) => console.error(error));
+    const id = setInterval(
+      () => poll().catch((error) => console.error(error)),
+      OVERLAY_EVENT_POLL_MS
+    );
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token]);
+
+  return events;
 }
 
 // The saved layout drives the whole overlay frame. The 15s poll is the

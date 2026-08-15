@@ -42,6 +42,9 @@ identified.
 An installation SHALL carry an enabled flag, so an installed overlay can be silenced without being
 removed.
 
+Installing an overlay SHALL register the chat commands it declares on that channel, and removing it SHALL
+withdraw them.
+
 Deleting a channel or an overlay SHALL delete its installations.
 
 #### Scenario: Two channels install the same overlay
@@ -59,6 +62,11 @@ Deleting a channel or an overlay SHALL delete its installations.
 
 - **WHEN** the overlay's name or entry address is changed in the registry
 - **THEN** every installation keeps its id
+
+#### Scenario: Installing and removing carries the commands with it
+
+- **WHEN** a channel installs an overlay declaring commands and later removes it
+- **THEN** those commands appear in the channel's registry while installed and are gone afterwards
 
 ### Requirement: Only an overlay whose entry origin is the permitted origin is framed
 

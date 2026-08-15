@@ -3,6 +3,7 @@
 import { OverlayEmptyState } from "@/components/overlay/empty-placeholder";
 import { OVERLAY_BASE_DIMS } from "@/lib/demo-overlay";
 import { framedOverlayUrl, type OverlayInstallation } from "@/lib/overlay-frame";
+import type { OverlayEvent } from "@/lib/overlay-events";
 import type { OverlayBoxSize } from "@/lib/overlay-messages";
 import { useOverlayConversation } from "@/components/overlay/use-overlay-conversation";
 import { useRef, useState } from "react";
@@ -19,10 +20,12 @@ import { useRef, useState } from "react";
 export function GameWindow({
   installation,
   box = { width: OVERLAY_BASE_DIMS.game.w, height: OVERLAY_BASE_DIMS.game.h, scale: 1 },
+  events,
   placeholder = false,
 }: {
   installation: OverlayInstallation | null | undefined;
   box?: OverlayBoxSize;
+  events?: OverlayEvent[];
   placeholder?: boolean;
 }) {
   const permittedOrigin = process.env.NEXT_PUBLIC_GAME_EMBED_URL ?? "";
@@ -34,6 +37,7 @@ export function GameWindow({
     channelId: installation?.channelId ?? null,
     settings: installation?.settings ?? null,
     box,
+    events,
   });
 
   // The address is pinned to the INSTALLATION, not to the token. The host re-mints

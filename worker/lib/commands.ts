@@ -291,6 +291,17 @@ export async function processCommands(
       null
     );
 
+    // A command belonging to a framed overlay is delivered by the row just
+    // written: the overlay polls for its own executions and acts on them. There
+    // is deliberately no reply, and deliberately no handler — a handler map is
+    // what makes routing something somebody has to edit for each new game.
+    //
+    // Written explicitly rather than left to fall through the handler lookup
+    // below, which would also do nothing, but only by accident.
+    if (row.kind === "overlay") {
+      continue;
+    }
+
     let replyText: string | null = null;
     if (row.kind === "custom") {
       replyText = row.response?.trim() || null;

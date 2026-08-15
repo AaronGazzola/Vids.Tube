@@ -7,6 +7,7 @@ import {
   type OverlayBoxSize,
   type OverlayHostMessage,
 } from "@/lib/overlay-messages";
+import type { OverlayEvent } from "@/lib/overlay-events";
 import type { OverlaySettings } from "@/lib/overlay-settings";
 import { useEffect, useRef } from "react";
 
@@ -33,22 +34,28 @@ export function useOverlayConversation({
   channelId,
   settings,
   box,
+  events = [],
 }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>;
   permittedOrigin: string;
   channelId: string | null;
   settings: OverlaySettings | null;
   box: OverlayBoxSize;
+  events?: OverlayEvent[];
 }) {
   const ready = useRef(false);
   const sentSettings = useRef<string | null>(null);
   const sentBox = useRef<OverlayBoxSize | null>(null);
+  // By id rather than by timestamp, so an effect that re-runs cannot deliver a
+  // chatter's action twice. Pruned, because a stream runs for hours.
+  const sentEvents = useRef<Set<string>>(new Set());
 
   const origin = originOf(permittedOrigin);
   // Serialised so that a poll returning an equal object does not read as a
   // change and re-send. The route refetches every fifteen seconds.
   const settingsKey = JSON.stringify(settings ?? null);
   const boxKey = `${box.width}|${box.height}|${box.scale}`;
+  const eventsKey = events.map((e) => e.id).join(",");
 
   useEffect(() => {
     if (!origin || !channelId) return;
@@ -73,6 +80,9 @@ export function useOverlayConversation({
       ready.current = true;
       sentSettings.current = settingsKey;
       sentBox.current = box;
+      // Anything that happened before the frame was listening stays unsent. The
+      // announcement begins the conversation; it does not replay it.
+      for (const event of events) sentEvents.current.add(event.id);
       post({
         type: "hello",
         channel: channelId,
@@ -95,11 +105,21 @@ export function useOverlayConversation({
         sentBox.current = box;
         post({ type: "box", box });
       }
+      for (const event of events) {
+        if (sentEvents.current.has(event.id)) continue;
+        sentEvents.current.add(event.id);
+        post({ type: "event", event });
+      }
+      if (sentEvents.current.size > 500) {
+        sentEvents.current = new Set(
+          [...sentEvents.current].slice(-250)
+        );
+      }
     }
 
     return () => window.removeEventListener("message", onMessage);
     // `settings` and `box` are carried by the keys below; listing the objects
     // themselves would resubscribe on every poll for no change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origin, channelId, settingsKey, boxKey, frameRef]);
+  }, [origin, channelId, settingsKey, boxKey, eventsKey, frameRef]);
 }

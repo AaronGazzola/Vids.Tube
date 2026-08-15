@@ -396,6 +396,7 @@ export type Database = {
           keyword: string
           kind: string
           max_per_stream: number | null
+          overlay_id: string | null
           response: string | null
           sort_order: number
           updated_at: string
@@ -411,6 +412,7 @@ export type Database = {
           keyword: string
           kind: string
           max_per_stream?: number | null
+          overlay_id?: string | null
           response?: string | null
           sort_order?: number
           updated_at?: string
@@ -426,6 +428,7 @@ export type Database = {
           keyword?: string
           kind?: string
           max_per_stream?: number | null
+          overlay_id?: string | null
           response?: string | null
           sort_order?: number
           updated_at?: string
@@ -436,6 +439,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_commands_overlay_id_fkey"
+            columns: ["overlay_id"]
+            isOneToOne: false
+            referencedRelation: "overlays"
             referencedColumns: ["id"]
           },
         ]
@@ -1172,6 +1182,7 @@ export type Database = {
       }
       overlays: {
         Row: {
+          commands: Json
           created_at: string
           entry_url: string
           id: string
@@ -1183,6 +1194,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commands?: Json
           created_at?: string
           entry_url: string
           id?: string
@@ -1194,6 +1206,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commands?: Json
           created_at?: string
           entry_url?: string
           id?: string

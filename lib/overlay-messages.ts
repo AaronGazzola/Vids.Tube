@@ -1,3 +1,4 @@
+import type { OverlayEvent } from "@/lib/overlay-events";
 import type { OverlaySettings } from "@/lib/overlay-settings";
 
 // A page receives every frame's messages on the same listener, so the namespace
@@ -28,11 +29,12 @@ export type OverlayHostMessage =
       box: OverlayBoxSize;
     }
   | { type: "settings"; settings: OverlaySettings }
-  | { type: "box"; box: OverlayBoxSize };
+  | { type: "box"; box: OverlayBoxSize }
+  | { type: "event"; event: OverlayEvent };
 
 export type OverlayMessage = OverlayFrameMessage | OverlayHostMessage;
 
-const HOST_TYPES = new Set(["hello", "settings", "box"]);
+const HOST_TYPES = new Set(["hello", "settings", "box", "event"]);
 const FRAME_TYPES = new Set(["ready"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

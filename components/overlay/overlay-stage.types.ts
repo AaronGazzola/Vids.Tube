@@ -3,6 +3,7 @@ import type { GoalMetric, MetricProgress } from "@/app/layout.types";
 import type { CompetitionEntry } from "@/components/overlay/competition-ladder";
 import type { BannerMetricValues } from "@/lib/banner-metrics";
 import type { OverlayBox } from "@/lib/demo-overlay";
+import type { OverlayEvent } from "@/lib/overlay-events";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import type { ReactNode } from "react";
 
@@ -23,6 +24,10 @@ export type OverlayStageValues = {
   // that nothing is installed. Collapsing them makes every page load report an
   // empty box that is merely a slow one.
   gameInstallation: OverlayInstallation | null | undefined;
+  // Executions of the installed overlay's own commands, most recently polled.
+  // Empty on every surface but the one the audience sees: the composer must not
+  // consume a chatter's action.
+  gameEvents?: OverlayEvent[];
 };
 
 export type OverlayStageProps = {

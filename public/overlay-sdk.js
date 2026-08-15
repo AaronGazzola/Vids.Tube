@@ -27,6 +27,13 @@
 //     { ..., type: "settings", settings: {...} }
 //     { ..., type: "box", box: { width, height, scale } }
 //
+//   And, for each chat command run for you:
+//     { ..., type: "event", event: { id, keyword, args, at, actor, actorName } }
+//
+//   `actor` is opaque and is yours alone: the same person is a different actor in
+//   another overlay, and on another channel. Key a player to it. `actorName` is
+//   for the on-screen moment and is neither stable nor unique — never key to it.
+//
 // Everything the host holds is in `hello`, so you are never assembling state from
 // updates you may have joined halfway through.
 
@@ -42,7 +49,7 @@ function parse(data) {
 }
 
 export function connectOverlay() {
-  const listeners = { settings: [], box: [], hello: [] };
+  const listeners = { settings: [], box: [], hello: [], event: [] };
   const state = { channel: null, settings: {}, box: null };
 
   const emit = (name, value) => {
@@ -81,6 +88,12 @@ export function connectOverlay() {
     if (message.type === "box") {
       state.box = message.box || null;
       if (state.box) emit("box", state.box);
+      return;
+    }
+    // Not held in state and never replayed: an event is a thing that happened,
+    // and a listener attached later has genuinely missed it.
+    if (message.type === "event") {
+      if (message.event) emit("event", message.event);
     }
   });
 
@@ -112,6 +125,9 @@ export function connectOverlay() {
     onBox(listener) {
       listeners.box.push(listener);
       if (state.box) listener(state.box);
+    },
+    onEvent(listener) {
+      listeners.event.push(listener);
     },
   };
 }

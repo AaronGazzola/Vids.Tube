@@ -8,6 +8,10 @@ import { resolveAuthorIdentities } from "@/lib/author-identity";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { installationForChannel } from "@/lib/overlay-installation";
 import {
+  parseOverlayCommands,
+  type OverlayCommandDeclaration,
+} from "@/lib/overlay-commands";
+import {
   parseSettingsFields,
   parseSettingsValues,
   resolveSettings,
@@ -474,7 +478,7 @@ export async function saveOverlaySettingsAction(
 
 export async function installOverlayAction(
   overlayId: string
-): Promise<ActionResult<{ installId: string }>> {
+): Promise<ActionResult<{ installId: string; skipped: string[] }>> {
   const owned = await getOwnedChannel();
   if ("error" in owned) {
     return { error: owned.error };
@@ -483,7 +487,7 @@ export async function installOverlayAction(
 
   const { data: overlay, error } = await supabaseAdmin
     .from("overlays")
-    .select("id, status")
+    .select("id, status, commands")
     .eq("id", overlayId)
     .maybeSingle();
   if (error) {
@@ -510,7 +514,68 @@ export async function installOverlayAction(
     throw new Error("Failed to install overlay");
   }
 
-  return { data: { installId: data.id } };
+  const skipped = await registerOverlayCommands(
+    channel.id,
+    overlayId,
+    parseOverlayCommands(overlay.commands)
+  );
+
+  return { data: { installId: data.id, skipped } };
+}
+
+// An overlay's commands become ordinary rows in the streamer's registry, with the
+// same enable switch, cooldown and limit as every other command.
+//
+// A keyword the channel already uses is left exactly as it is. An overlay must
+// not be able to take !help away from the channel that owns it, and a silent
+// overwrite would be the worst possible way to find that out.
+async function registerOverlayCommands(
+  channelId: string,
+  overlayId: string,
+  commands: OverlayCommandDeclaration[]
+): Promise<string[]> {
+  if (commands.length === 0) {
+    return [];
+  }
+
+  const { data: existing, error } = await supabaseAdmin
+    .from("chat_commands")
+    .select("keyword")
+    .eq("channel_id", channelId)
+    .in(
+      "keyword",
+      commands.map((c) => c.keyword)
+    );
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to read the channel's commands");
+  }
+
+  const taken = new Set((existing ?? []).map((row) => row.keyword));
+  const free = commands.filter((c) => !taken.has(c.keyword));
+
+  if (free.length > 0) {
+    const { error: insertError } = await supabaseAdmin
+      .from("chat_commands")
+      .insert(
+        free.map((c, index) => ({
+          channel_id: channelId,
+          overlay_id: overlayId,
+          keyword: c.keyword,
+          kind: "overlay",
+          description: c.description,
+          cooldown_s: c.cooldown_s ?? 30,
+          max_per_stream: c.max_per_stream ?? null,
+          sort_order: 100 + index,
+        }))
+      );
+    if (insertError) {
+      console.error(insertError);
+      throw new Error("Failed to register the overlay's commands");
+    }
+  }
+
+  return commands.filter((c) => taken.has(c.keyword)).map((c) => c.keyword);
 }
 
 export async function removeOverlayAction(
@@ -521,6 +586,18 @@ export async function removeOverlayAction(
     return { error: owned.error };
   }
   const { channel } = owned.data;
+
+  // Commands first: a row left behind would execute for an overlay that is no
+  // longer there, and a chatter would be told nothing happened for no reason.
+  const { error: commandError } = await supabaseAdmin
+    .from("chat_commands")
+    .delete()
+    .eq("channel_id", channel.id)
+    .eq("overlay_id", overlayId);
+  if (commandError) {
+    console.error(commandError);
+    throw new Error("Failed to withdraw the overlay's commands");
+  }
 
   const { error } = await supabaseAdmin
     .from("channel_overlays")

@@ -32,6 +32,7 @@ import {
   useDemoOverlaySnapshot,
   useInstalledOverlay,
   useLiveOverlayLayout,
+  useOverlayEvents,
   useBannerCounts,
   useMemberCount,
   useOverlayChime,
@@ -306,6 +307,7 @@ export default function OverlayFramePage({
 
   const layout = useLiveOverlayLayout(channelSlug, token);
   const installation = useInstalledOverlay(channelSlug, token);
+  const gameEvents = useOverlayEvents(installation.data?.token ?? null);
   const demo = useDemoOverlaySnapshot(channelSlug);
   const { data: channel } = useChannel(channelSlug);
   const streamQuery = useLiveStream(channel?.id);
@@ -395,6 +397,7 @@ export default function OverlayFramePage({
         competitionEntries,
         breakSlot,
         gameInstallation: installation.data,
+        gameEvents,
       }}
     />
   );

@@ -25,6 +25,17 @@ describe("addressing a message to this protocol", () => {
       { type: "settings", settings: { scale: 1 } },
       { type: "box", box: BOX },
       { type: "hello", channel: "chan-1", settings: {}, box: BOX },
+      {
+        type: "event",
+        event: {
+          id: "e1",
+          keyword: "feed",
+          args: null,
+          at: "2026-08-15T00:00:00.000Z",
+          actor: "opaque",
+          actorName: "Bob",
+        },
+      },
     ];
     for (const message of messages) {
       expect(parseOverlayMessage(overlayMessage(message))).toMatchObject({

@@ -86,6 +86,19 @@ export function useInstallOverlay() {
     mutationFn: async (overlayId: string) => {
       const res = await installOverlayAction(overlayId);
       if ("error" in res) throw new Error(res.error);
+      // A command that silently did not appear is worse than one that never
+      // existed: the chatters would be typing it and nothing would happen.
+      if (res.data.skipped.length > 0) {
+        toast.custom(() => (
+          <CustomToast
+            variant="notification"
+            title="Some commands were already taken"
+            message={`Your channel already uses ${res.data.skipped
+              .map((k) => `!${k}`)
+              .join(", ")}, so ${res.data.skipped.length === 1 ? "it was" : "they were"} left alone.`}
+          />
+        ));
+      }
       return res.data;
     },
     onSuccess: invalidate,
