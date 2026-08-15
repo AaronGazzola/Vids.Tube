@@ -13,6 +13,9 @@ each ticket; this is here so the run sheet and the build list live together.
 - **AZ-261, highlights-only toggle on the Activity tab.** Small, visible, and it
   pays off the moment the AI features a message while chat is watching. Best
   single one to build live.
+- **AZ-266, message display timer and border toggle.** A global display time with
+  an optional per-message override, plus a switch for the banner border. Both
+  change the overlay while people are watching it.
 - **AZ-262, goal overlays animate when a metric increments.** Purely visual, and
   a new subscriber arriving during the broadcast is the demo.
 - **AZ-263, welcome messages in the overlay.** Chatters arriving are the trigger,
