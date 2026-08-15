@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { parseOverlayCommands } from "../lib/overlay-commands";
 import { newOverlaySecret } from "../lib/overlay-token";
 import type { Database } from "../supabase/types";
 
@@ -26,11 +27,31 @@ async function main() {
         name: "Dragon",
         entry_url: entryUrl,
         status: "published",
+        // The overlay's own declaration. Authored by its owner, which for this
+        // row is eco3d, and stored here because this is where the streamer's
+        // editor and the streamer's command registry read it. The host stores
+        // both and interprets neither.
+        settings_fields: [
+          {
+            key: "creatureName",
+            label: "Creature name",
+            type: "text",
+            default: "Dragon",
+            help: "What your chatters call it",
+          },
+        ],
+        commands: [
+          {
+            keyword: "feed",
+            description: "Feed the creature",
+            cooldown_s: 30,
+          },
+        ],
         updated_at: new Date().toISOString(),
       },
       { onConflict: "slug" }
     )
-    .select("id")
+    .select("id, commands")
     .maybeSingle();
   if (error || !overlay) {
     console.error(error);
@@ -85,6 +106,47 @@ async function main() {
     process.exit(1);
   }
 
+  // Installing through the Overlays tab registers an overlay's declared commands.
+  // Seeding has to do the same, or a row that was already installed before the
+  // declaration existed would never gain them. A keyword the channel already uses
+  // is left alone, exactly as the install action leaves it.
+  const declared = parseOverlayCommands(overlay.commands);
+  if (declared.length > 0) {
+    const { data: taken } = await admin
+      .from("chat_commands")
+      .select("keyword")
+      .eq("channel_id", channel.id)
+      .in(
+        "keyword",
+        declared.map((c) => c.keyword)
+      );
+    const used = new Set((taken ?? []).map((row) => row.keyword));
+    const free = declared.filter((c) => !used.has(c.keyword));
+    if (free.length > 0) {
+      const { error: commandError } = await admin.from("chat_commands").insert(
+        free.map((c, index) => ({
+          channel_id: channel.id,
+          overlay_id: overlay.id,
+          keyword: c.keyword,
+          kind: "overlay",
+          description: c.description,
+          cooldown_s: c.cooldown_s ?? 30,
+          max_per_stream: c.max_per_stream ?? null,
+          sort_order: 100 + index,
+        }))
+      );
+      if (commandError) {
+        console.error(commandError);
+        process.exit(1);
+      }
+    }
+  }
+
+  const { count: commandCount } = await admin
+    .from("chat_commands")
+    .select("id", { count: "exact", head: true })
+    .eq("overlay_id", overlay.id);
+
   const { count: overlayCount } = await admin
     .from("overlays")
     .select("id", { count: "exact", head: true });
@@ -96,7 +158,7 @@ async function main() {
     .select("overlay_id", { count: "exact", head: true });
 
   console.warn(
-    `registry rows: ${overlayCount ?? 0}, installations: ${installCount ?? 0}, secrets: ${secretCount ?? 0}`
+    `registry rows: ${overlayCount ?? 0}, installations: ${installCount ?? 0}, secrets: ${secretCount ?? 0}, commands: ${commandCount ?? 0}`
   );
 }
 

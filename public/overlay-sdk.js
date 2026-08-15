@@ -51,6 +51,7 @@ function parse(data) {
 export function connectOverlay() {
   const listeners = { settings: [], box: [], hello: [], event: [] };
   const state = { channel: null, settings: {}, box: null };
+  let answered = false;
 
   const emit = (name, value) => {
     for (const listener of listeners[name]) {
@@ -72,6 +73,7 @@ export function connectOverlay() {
     if (!message) return;
 
     if (message.type === "hello") {
+      answered = true;
       state.channel = message.channel;
       state.settings = message.settings || {};
       state.box = message.box || null;
@@ -100,7 +102,19 @@ export function connectOverlay() {
   // A wildcard target, and it has to be: an overlay does not know its host's
   // origin, and once overlays are proxied it will be told even less about it.
   // This message carries nothing worth protecting — it says only "I exist".
-  window.parent.postMessage({ ns: NS, v: VERSION, type: "ready" }, "*");
+  //
+  // Repeated until answered, because announcing once is a race the overlay always
+  // loses: a host attaches its listener when its own state is ready, and an
+  // announcement landing a moment earlier is heard by nobody and never repeated.
+  // The frame is then silent for the rest of the stream, and the only symptom is
+  // that chat appears to do nothing.
+  const announce = () =>
+    window.parent.postMessage({ ns: NS, v: VERSION, type: "ready" }, "*");
+  announce();
+  const retry = setInterval(() => {
+    if (answered) clearInterval(retry);
+    else announce();
+  }, 500);
 
   return {
     // The channel this overlay is serving, once the host has said. Null before
