@@ -97,7 +97,7 @@ export async function runTranscriptionJob(
   console.error(
     `[transcribe] segmenting audio from ${pullUrl} every ${CHUNK}s`
   );
-  const seg = startHlsAudioSegmenter(pullUrl, outPattern, CHUNK);
+  const seg = await startHlsAudioSegmenter(pullUrl, outPattern, CHUNK);
   let segExited = false;
   let segErr = "";
   seg.stderr?.on("data", (d: Buffer) => {

@@ -1,6 +1,12 @@
-import { promises as fs } from "fs";
 import { workerConfig } from "./config";
-import { exec } from "./lib/exec";
+import {
+  FFMPEG_CANDIDATES,
+  FFMPEG_PROBE,
+  findBinary,
+  findClaude,
+  resolveFile,
+  WHISPER_CANDIDATES,
+} from "./lib/resolve-bin";
 import { supabaseAdmin } from "./supabase";
 
 interface Check {
@@ -9,37 +15,59 @@ interface Check {
   detail: string;
 }
 
-async function checkBinary(
-  label: string,
-  bin: string,
-  args: string[]
-): Promise<Check> {
-  try {
-    await exec(bin, args, { timeout: 15_000 });
-    return { name: label, ok: true, detail: `${bin} reachable` };
-  } catch (e) {
-    return { name: label, ok: false, detail: (e as Error).message.split("\n")[0] };
-  }
-}
 
 async function main(): Promise<void> {
   const checks: Check[] = [];
 
-  const model = workerConfig.bin.whisperModel;
-  if (!model) {
-    checks.push({ name: "whisper-model", ok: false, detail: "WHISPER_MODEL not set" });
-  } else {
-    try {
-      await fs.access(model);
-      checks.push({ name: "whisper-model", ok: true, detail: model });
-    } catch {
-      checks.push({ name: "whisper-model", ok: false, detail: `missing file: ${model}` });
-    }
-  }
+  // Every one of these is resolved the way the job that uses it resolves it, so
+  // the doctor reports what the worker can actually do. Configured paths are
+  // absolute into one Windows user's home, and this machine broadcasts under a
+  // different account, so reporting the configured value would fail every check
+  // on one account and pass on the other while nothing was wrong.
+  const model = resolveFile(workerConfig.bin.whisperModel);
+  checks.push(
+    model
+      ? { name: "whisper-model", ok: true, detail: model }
+      : {
+          name: "whisper-model",
+          ok: false,
+          detail: workerConfig.bin.whisperModel
+            ? `not found: ${workerConfig.bin.whisperModel}, nor under this user's home`
+            : "WHISPER_MODEL not set",
+        }
+  );
 
-  checks.push(await checkBinary("whisper", workerConfig.bin.whisper, ["--help"]));
-  checks.push(await checkBinary("ffmpeg", workerConfig.bin.ffmpeg, ["-version"]));
-  checks.push(await checkBinary("claude", workerConfig.bin.claude, ["--version"]));
+  const whisperBin = await findBinary(
+    "whisper",
+    workerConfig.bin.whisper,
+    WHISPER_CANDIDATES
+  );
+  checks.push(
+    whisperBin
+      ? { name: "whisper", ok: true, detail: whisperBin }
+      : { name: "whisper", ok: false, detail: "not found in any known location" }
+  );
+
+  const ffmpegBin = await findBinary(
+    "ffmpeg",
+    workerConfig.bin.ffmpeg,
+    FFMPEG_CANDIDATES,
+    FFMPEG_PROBE
+  );
+  checks.push(
+    ffmpegBin
+      ? { name: "ffmpeg", ok: true, detail: ffmpegBin }
+      : { name: "ffmpeg", ok: false, detail: "not found in any known location" }
+  );
+  // Resolved rather than taken from configuration, so the doctor agrees with
+  // what scoring will actually spawn. A stale CLAUDE_BIN from another user
+  // account on this machine is not a fault worth reporting.
+  const claudeBin = await findClaude(workerConfig.bin.claude);
+  checks.push(
+    claudeBin
+      ? { name: "claude", ok: true, detail: claudeBin }
+      : { name: "claude", ok: false, detail: "not found in any known location" }
+  );
 
   try {
     const { error } = await supabaseAdmin.from("streams").select("id").limit(1);

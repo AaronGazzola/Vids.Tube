@@ -11,6 +11,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { workerConfig } from "./config";
 import { catchUpEndedBroadcasts, outstandingBroadcasts } from "./lib/post-broadcast";
+import { findClaude } from "./lib/resolve-bin";
 
 const execFileAsync = promisify(execFile);
 
@@ -39,10 +40,10 @@ async function preflight(): Promise<string[]> {
   if (!process.env.SUPABASE_SECRET_KEY) missing.push("SUPABASE_SECRET_KEY");
   if (!(await canRun(process.env.YTDLP_BIN ?? "yt-dlp")))
     missing.push("yt-dlp (needed to download a chat replay)");
-  if (!(await canRun(workerConfig.bin.claude)))
-    missing.push(
-      `${workerConfig.bin.claude} (needed to score chat; set CLAUDE_BIN if it is elsewhere)`
-    );
+  // Resolved the way scoring resolves it, so the preflight cannot pass on a
+  // machine that then fails inside a step and records that against a broadcast.
+  if (!(await findClaude(workerConfig.bin.claude)))
+    missing.push("the Claude CLI (needed to score chat), not found in any known location");
   return missing;
 }
 

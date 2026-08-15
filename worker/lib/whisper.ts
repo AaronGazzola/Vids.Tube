@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { workerConfig } from "../config";
 import { exec } from "./exec";
+import { resolveFile, resolveWhisper } from "./resolve-bin";
 
 export interface WhisperSegment {
   startSeconds: number;
@@ -12,9 +13,19 @@ export async function transcribeWavToJson(
   wavPath: string,
   outputBasename: string
 ): Promise<string> {
-  await exec(workerConfig.bin.whisper, [
+  // Resolved rather than taken from configuration: the configured paths are
+  // absolute into one Windows user's home, and the broadcast runs under a
+  // different account from the one that set them.
+  const bin = await resolveWhisper(workerConfig.bin.whisper);
+  const model = resolveFile(workerConfig.bin.whisperModel);
+  if (!model) {
+    throw new Error(
+      `whisper model not found at ${workerConfig.bin.whisperModel}, nor under this user's home`
+    );
+  }
+  await exec(bin, [
     "-m",
-    workerConfig.bin.whisperModel,
+    model,
     "-f",
     wavPath,
     "-oj",
