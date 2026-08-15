@@ -245,6 +245,20 @@ npm run email:build   # renders emails/*.tsx -> supabase/templates/*.html
 
 Template subject + `content_path` live in `config.toml` (`[auth.email.template.*]`) and deploy via the config sync system below — `npm run email:build` first, then `config:push`. SMTP (Resend) is configured in the Supabase Dashboard, not in this repo.
 
+# Runbooks
+
+Durable operational guides live in `docs/runbooks/`. Read the relevant one before
+changing anything it covers, and update it when the behaviour it describes changes.
+
+- **[docs/runbooks/maintenance-runner.md](docs/runbooks/maintenance-runner.md)** — the always-on machine that settles finished broadcasts. **Setting this repo up on a new machine to run maintenance starts here.** Turn it on with `npm run maintain:install`, once.
+- **[docs/runbooks/next-broadcast-checklist.md](docs/runbooks/next-broadcast-checklist.md)** — what to verify during the next live broadcast, and which tickets are chosen to build on stream.
+- **[docs/runbooks/live-streaming-vm.md](docs/runbooks/live-streaming-vm.md)** — the streaming machine: MediaMTX, the quality ladder, recording and VOD finalize.
+
+Two rules that keep costing time when forgotten:
+
+- **The live worker (`npm run worker`) engages broadcasts and nothing else.** It does not settle a finished one. Stopping it the moment a stream ends is correct and loses nothing.
+- **Tool paths are found, not configured.** `worker/lib/resolve-bin.ts` resolves the Claude CLI, ffmpeg and whisper by trying the configured value, the same path under the current user's home, then the usual install locations. Never edit a Doppler path to make a tool resolve: those values are shared across machines and user accounts, so fixing one account breaks another.
+
 # Supabase config sync
 
 The Management API is the real interface (the CLI and Dashboard are clients of it). `SUPABASE_ACCESS_TOKEN` lives in Doppler (`dev_personal` config) — it is an **account-wide** token, treat it like a root credential.
