@@ -1,5 +1,6 @@
 import type { Database } from "@/supabase/types";
 import { NextResponse } from "next/server";
+import { broadcastStartedAt } from "@/lib/broadcast-end";
 import {
   hasValidIngestSecret,
   resolveIngestChannel,
@@ -218,7 +219,11 @@ export async function POST(request: Request) {
   };
   if (streamEnded) {
     update.status = "ready";
-    update.published_at = new Date().toISOString();
+    // Dated by when the broadcast started, matching the importer, so the studio
+    // and the channel never disagree about which day a stream belongs to.
+    update.published_at = vodRow?.source_stream_id
+      ? await broadcastStartedAt(vodRow.source_stream_id)
+      : new Date().toISOString();
   }
 
   if (!pending.thumbnail_path) {

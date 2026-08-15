@@ -84,7 +84,12 @@ export async function reapStaleProcessingVods(channelId: string): Promise<void> 
     if (row.mp4_path) {
       const { error: publishError } = await supabaseAdmin
         .from("videos")
-        .update({ status: "ready", published_at: new Date().toISOString() })
+        .update({
+          status: "ready",
+          published_at: row.source_stream_id
+            ? await broadcastStartedAt(row.source_stream_id)
+            : row.created_at,
+        })
         .eq("id", row.id)
         .eq("status", "processing");
       if (publishError) {
@@ -107,6 +112,21 @@ export async function reapStaleProcessingVods(channelId: string): Promise<void> 
   }
 }
 
+// A recording is dated by when its broadcast started, not by when processing
+// happened to finish. The importer has always dated an imported VOD by its start
+// (`scripts/import-youtube-vods.ts`), so publishing at `now()` made live
+// recordings the odd ones out: the studio lists a broadcast by `started_at`
+// while the channel listed it by a timestamp minutes after it ended, which for a
+// stream ending after local midnight put the two pages on different days.
+export async function broadcastStartedAt(streamId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("streams")
+    .select("started_at, live_at")
+    .eq("id", streamId)
+    .maybeSingle();
+  return data?.started_at ?? data?.live_at ?? new Date().toISOString();
+}
+
 // On End, publish the VOD if its recording has already been finalized (mp4
 // present). If the finalize hasn't arrived yet, the recording hook publishes it
 // once it lands (it gates on the stream being ended).
@@ -127,7 +147,10 @@ export async function publishVodForStream(streamId: string): Promise<void> {
   }
   const { error: updateError } = await supabaseAdmin
     .from("videos")
-    .update({ status: "ready", published_at: new Date().toISOString() })
+    .update({
+      status: "ready",
+      published_at: await broadcastStartedAt(streamId),
+    })
     .eq("id", vod.id);
   if (updateError) {
     console.error(updateError);
