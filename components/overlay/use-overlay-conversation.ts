@@ -75,7 +75,19 @@ export function useOverlayConversation({
       if (!frame || event.source !== frame.contentWindow) return;
 
       const message = parseOverlayMessage(event.data);
-      if (!message || message.type !== "ready") return;
+      if (!message) return;
+
+      // Reported, not acted on. A frame that throws once is not necessarily a frame that stopped
+      // working, and hiding it would turn a stray rejection into a dead overlay for the rest of the
+      // stream. The frame renders nothing when it fails, so there is nothing left to hide.
+      if (message.type === "error") {
+        console.error(
+          `overlay frame error (${message.where}) on channel ${channelId}: ${message.message}`,
+          message.stack
+        );
+        return;
+      }
+      if (message.type !== "ready") return;
 
       ready.current = true;
       sentSettings.current = settingsKey;

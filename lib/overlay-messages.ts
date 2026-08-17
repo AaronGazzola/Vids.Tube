@@ -19,7 +19,12 @@ export type OverlayBoxSize = {
   scale: number;
 };
 
-export type OverlayFrameMessage = { type: "ready" };
+// An overlay that breaks is supposed to become invisible, which makes a broken overlay and an idle one
+// look identical from the stream. This is how the difference is told: the frame says what threw, and
+// where, before it goes quiet.
+export type OverlayFrameMessage =
+  | { type: "ready" }
+  | { type: "error"; where: string; message: string; stack: string };
 
 export type OverlayHostMessage =
   | {
@@ -35,7 +40,7 @@ export type OverlayHostMessage =
 export type OverlayMessage = OverlayFrameMessage | OverlayHostMessage;
 
 const HOST_TYPES = new Set(["hello", "settings", "box", "event"]);
-const FRAME_TYPES = new Set(["ready"]);
+const FRAME_TYPES = new Set(["ready", "error"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
