@@ -153,6 +153,20 @@ app/
 - Called actions exclusively from React Query hooks
 - Function naming: `featureNameAction` (e.g., `loginAction`, `getUserProfileAction`)
 
+## The service role key never touches user-facing code
+
+**The service role client (`supabaseAdmin`, `@/supabase/admin-client`) must not be used anywhere reachable by user interaction. No Server Action, no Route Handler serving the app, no client component, no hook.** It belongs to the worker, to `scripts/`, and to migrations.
+
+A Server Action is a public HTTP endpoint. Anyone can call it with any arguments, so row-level security is the only real authorization boundary the app has. Reaching for the service role switches that boundary off and replaces it with whatever checks happen to be written in that one function — checks the next caller will not know to repeat, and which no policy will enforce on their behalf.
+
+- **Authorization belongs in a policy, not in TypeScript.** If an action needs data the RLS-bound client cannot see, the missing piece is a policy. Write the policy.
+- Scope the policy to the narrowest true condition rather than opening the table. `stream_greetings` is readable while its broadcast is live and closed the moment it ends — that is the shape to copy.
+- **The one legitimate exception is verifying a secret**, such as the overlay `?token=`, because comparing a stored secret is something RLS cannot express. Keep the exception to the comparison itself: verify the token with the service role, then read the data with the ordinary client.
+- An action that writes on behalf of nobody (an overlay marking a card as shown) is not an exception. It still needs to prove it may write, and the proof belongs in a policy.
+- Never "temporarily" use the service role to get past a policy error while developing. That is how every one of these gets written.
+
+**Known debt:** this rule is newer than most of the code. Around 170 service-role call sites remain across the action files, and they are being migrated, not grandfathered. Do not add to them.
+
 ## Error handling in actions
 
 Next.js strips thrown Server Action error messages in production (the client only gets a generic 500 + digest). So errors are split by kind:

@@ -166,9 +166,15 @@ multi-streamer increase.
 Shipped ahead of V2, because the members strip and the greeting needed real
 numbers behind them: the XP/Credits/Level ledger on memberships, the recompute
 that keeps the ledger honest, the level curve recalibrated to reward quality
-over volume, the streak flat bonus counting the broadcast currently on air,
-`credit_cost` on the command registry, and `!tts` as the first sink. The
-earn-then-spend path has never run during a live broadcast (AZ-219).
+over volume, and the streak flat bonus counting the broadcast currently on air.
+
+`credit_cost` on the command registry and `!tts` as the first sink were listed
+here as shipped from 2026-08-02 and had not been: the ledger's `spend_credits`
+existed but nothing called it, no `credit_cost` column existed, and every one of
+the 147 ledger lines in production was an earning. Both landed 2026-08-16, with
+`!tts` priced at one credit and a five-credit grant on joining, so an arriving
+chatter can be heard five times before earning anything. The earn-then-spend
+path has never run during a live broadcast (AZ-219).
 
 Not yet built: bingo end-to-end (Settings authoring with AI-suggested squares →
 Activity mini-card + approval → overlay mark-off animation → `!bingo`);
