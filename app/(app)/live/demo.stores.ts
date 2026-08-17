@@ -1,6 +1,8 @@
 "use client";
 
+import type { GoalMetric } from "@/app/layout.types";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
+import { useEffect, useRef } from "react";
 import { create } from "zustand";
 import {
   DEFAULT_DEMO_LAYOUT,
@@ -46,6 +48,14 @@ type LayoutState = {
   setMobileChrome: (v: boolean) => void;
   setBoxOpacity: (key: DemoBoxKey, v: number) => void;
   setFeedSound: (v: OverlayFeedSound) => void;
+  setBannerDwellMs: (v: number) => void;
+  setBannerBorder: (v: boolean) => void;
+  setGoalAnimate: (metric: GoalMetric, v: boolean) => void;
+  setGoalRiseMessage: (metric: GoalMetric, message: string) => void;
+  // A rise the streamer asked to see. Ephemeral and one-shot: a counter that the
+  // stage watches, rather than a flag it would have to clear afterwards.
+  goalRiseDemo: { metric: GoalMetric; nonce: number } | null;
+  demoGoalRise: (metric: GoalMetric) => void;
   // Messages are edited as a draft and only enter the config on Save changes.
   // Everything that reaches the overlay reads the config, so a half-typed
   // sentence never goes on air and the layout autosave never sees a keystroke.
@@ -105,6 +115,36 @@ export const useDemoLayoutStore = create<LayoutState>((set) => ({
       },
     })),
   setFeedSound: (v) => set((s) => ({ config: { ...s.config, feedSound: v } })),
+  // Both go straight into the config, like every other overlay control: their
+  // whole point is that the streamer sees the effect on the broadcast at once.
+  // The editor is what withholds a half-typed number, by only calling this with
+  // a value the banner can actually honour.
+  setBannerDwellMs: (v) =>
+    set((s) => ({ config: { ...s.config, bannerDwellMs: v } })),
+  setBannerBorder: (v) =>
+    set((s) => ({ config: { ...s.config, bannerBorder: v } })),
+  setGoalAnimate: (metric, v) =>
+    set((s) => ({
+      config: {
+        ...s.config,
+        goalAnimate: { ...s.config.goalAnimate, [metric]: v },
+      },
+    })),
+  setGoalRiseMessage: (metric, message) =>
+    set((s) => ({
+      config: {
+        ...s.config,
+        goalRiseMessages: { ...s.config.goalRiseMessages, [metric]: message },
+      },
+    })),
+  goalRiseDemo: null,
+  demoGoalRise: (metric) =>
+    set((s) => ({
+      goalRiseDemo: {
+        metric,
+        nonce: (s.goalRiseDemo?.nonce ?? 0) + 1,
+      },
+    })),
   draftMessages: DEFAULT_DEMO_LAYOUT.messages,
   setDraftMessages: (draftMessages) => set({ draftMessages }),
   // Committing puts the draft into the config, and from there the debounced
@@ -840,3 +880,26 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
       };
     }),
 }));
+
+// Bridges the Overlays panel's demo buttons to whichever stage is on screen.
+// The stage cannot subscribe to a click, and the panel cannot reach into the
+// stage, so a counter in the store is what carries the request across. Watched
+// by nonce rather than by value, so demoing the same goal twice fires twice.
+export function useGoalRiseDemo(
+  fire: (metric: GoalMetric, total: number) => void,
+  totals: Partial<Record<GoalMetric, number | null>>
+): void {
+  const request = useDemoLayoutStore((s) => s.goalRiseDemo);
+  const nonce = request?.nonce ?? 0;
+  const metric = request?.metric ?? null;
+  const seen = useRef(0);
+
+  useEffect(() => {
+    if (!metric || nonce === seen.current) return;
+    seen.current = nonce;
+    fire(metric, totals[metric] ?? 0);
+    // `fire` and `totals` are read at the moment the request arrives; listing
+    // them would re-fire whenever a poll changed a number.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonce, metric]);
+}

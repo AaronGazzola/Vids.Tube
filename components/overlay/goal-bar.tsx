@@ -1,5 +1,7 @@
+"use client";
+
 import type { GoalMetric, MetricProgress } from "@/app/layout.types";
-import { OVERLAY_SURFACE_ALPHA } from "@/lib/demo-overlay";
+import { goalDiameter, OVERLAY_SURFACE_ALPHA } from "@/lib/demo-overlay";
 
 function fmt(n: number) {
   return n.toLocaleString();
@@ -21,7 +23,7 @@ const ICONS: Record<GoalMetric, { body: string; stroke?: boolean }> = {
   },
 };
 
-function Icon({
+export function GoalIcon({
   metric,
   className = "h-5 w-5",
   size,
@@ -49,16 +51,23 @@ function Icon({
   );
 }
 
+const RISE_MS = 900;
+
 export function GoalBar({
   metric,
   data,
   height = 320,
+  pulseToken = 0,
 }: {
   metric: GoalMetric;
   data: MetricProgress;
   height?: number;
+  // Changes when the goal should pulse. Decided by the stage rather than here,
+  // because the pulse has to land with the incoming animation rather than at the
+  // moment the number changed, and only the stage knows when the flight ends.
+  pulseToken?: number;
 }) {
-  const d = Math.max(48, Math.round(height * 0.2));
+  const d = goalDiameter(height);
   const stroke = Math.max(5, Math.round(d * 0.09));
   const r = (d - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -135,11 +144,28 @@ export function GoalBar({
           <div className="rainbow-ring absolute inset-0" />
         </div>
       )}
+      {/* Keyed on the token so a second pulse restarts the animation rather than
+          being swallowed by the first still running. Nothing is drawn at all
+          until one has been asked for, so first paint is silent. Absolutely
+          positioned and non-interactive: the overlay occupies the same space
+          throughout, and nothing beside it moves. */}
+      {pulseToken > 0 && (
+        <span
+          key={pulseToken}
+          aria-hidden
+          className="pointer-events-none absolute rounded-full border-white"
+          style={{
+            inset: 0,
+            borderWidth: stroke,
+            animation: `overlay-goal-rise ${RISE_MS}ms ease-out forwards`,
+          }}
+        />
+      )}
       <div
         className="absolute flex flex-col items-center justify-center leading-none"
         style={{ inset: stroke + 4 }}
       >
-        <Icon metric={metric} size={inner * 0.5} />
+        <GoalIcon metric={metric} size={inner * 0.5} />
         <span
           className="font-bold tabular-nums"
           style={{ fontSize: inner * 0.32, lineHeight: 1 }}

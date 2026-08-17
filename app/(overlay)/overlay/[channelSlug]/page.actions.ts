@@ -4,8 +4,12 @@ import {
   mergeDemoLayout,
   type DemoLayoutConfig,
 } from "@/app/(app)/live/demo.types";
-import type { FeaturedMessageWithAuthor } from "@/app/layout.types";
+import type {
+  FeaturedAuthor,
+  FeaturedMessageWithAuthor,
+} from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import { channelAvatarUrl } from "@/lib/storage";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { installationForChannel } from "@/lib/overlay-installation";
 import { authorFromRow } from "@/lib/featured-author";
@@ -434,4 +438,60 @@ export async function getBannerCountsAction(
     commandsThisStream: commands,
     newMembersThisStream: newMembers,
   };
+}
+
+// A greeting the broadcast should show. Read through row-level security like
+// every other overlay read: `stream_greetings` is readable exactly while its
+// broadcast is live, so a finished broadcast's arrivals stay closed without this
+// action having to remember to check. The time bound below is a query bound, not
+// the security boundary.
+export type OverlayGreeting = {
+  channelId: string;
+  kind: "new" | "returning" | "batch";
+  greetedAt: string;
+  author: FeaturedAuthor;
+};
+
+const GREETING_WINDOW_MS = 5 * 60_000;
+
+export async function getRecentGreetingsAction(
+  streamId: string
+): Promise<OverlayGreeting[]> {
+  const supabase = await createClient();
+
+  const since = new Date(Date.now() - GREETING_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from("stream_greetings")
+    .select(
+      "channel_id, kind, greeted_at, channels!inner(name, handle, avatar_path, remote_avatar_path)"
+    )
+    .eq("stream_id", streamId)
+    .gte("greeted_at", since)
+    .order("greeted_at", { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch greetings");
+  }
+
+  return (data ?? []).map((row) => {
+    const channel = row.channels as unknown as {
+      name: string | null;
+      handle: string | null;
+      avatar_path: string | null;
+      remote_avatar_path: string | null;
+    };
+    return {
+      channelId: row.channel_id,
+      kind: row.kind as OverlayGreeting["kind"],
+      greetedAt: row.greeted_at,
+      author: {
+        name: channel.name ?? channel.handle ?? "viewer",
+        handle: channel.handle,
+        avatarUrl: channelAvatarUrl(channel),
+        avatarPath: null,
+      },
+    };
+  });
 }

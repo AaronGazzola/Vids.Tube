@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { DEFAULT_DEMO_LAYOUT } from "@/app/(app)/live/demo.types";
 import { OverlayStage } from "@/components/overlay/overlay-stage";
+import { WelcomeCard } from "@/components/overlay/welcome-card";
 import type { OverlayStageValues } from "@/components/overlay/overlay-stage.types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -113,5 +114,31 @@ describe("OverlayStage parity across surfaces", () => {
   it("carries the real member count onto both surfaces", () => {
     expect(render("obs")).toContain("143");
     expect(render("composer")).toContain("143");
+  });
+});
+
+describe("the welcome card draws the same on both surfaces", () => {
+  const WELCOME = {
+    feedSlot: (
+      <WelcomeCard
+        kind="new"
+        authors={[
+          { name: "Ava", handle: "ava", avatarUrl: null, avatarPath: null },
+        ]}
+        onDone={() => {}}
+      />
+    ),
+  };
+
+  it("draws it identically wherever the feed slot is drawn", () => {
+    expect(body(render("obs", WELCOME))).toBe(
+      body(render("composer", WELCOME))
+    );
+  });
+
+  it("names the new member on the audience surface", () => {
+    const drawn = body(render("obs", WELCOME));
+    expect(drawn).toContain("New member");
+    expect(drawn).toContain("@ava");
   });
 });

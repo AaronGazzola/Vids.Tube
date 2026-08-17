@@ -2,9 +2,9 @@
 
 
 import { OverlayMessage } from "@/components/overlay/overlay-message";
+import { resolveDwell } from "@/lib/banner-dwell";
 import {
   DEFAULT_MEMBER_MESSAGE,
-  OVERLAY_MESSAGE_DWELL_MS,
   OVERLAY_MESSAGE_ROW_H,
   OVERLAY_MESSAGE_TRANSITION_MS,
   OVERLAY_SURFACE_ALPHA,
@@ -89,17 +89,30 @@ export function MessageBannerRow({
 
 // The strip's own backing and type, drawn once and statically, so the editor
 // judges a message on the surface it will appear on rather than on a form.
+// The banner's own frame and backing. Turned off, the words sit on the
+// broadcast with nothing drawn behind them; the width and padding are kept
+// either way, so a box positioned against a live picture does not move when the
+// border is switched.
+function bannerSurfaceClass(border: boolean): string {
+  return cn(
+    "w-full px-6 py-3 text-white",
+    border && "overlay-surface rounded-2xl border border-white shadow-lg"
+  );
+}
+
 export function MessageBannerPreview({
   text,
   align,
   metric,
   value,
+  border = true,
   children,
 }: {
   text: string;
   align: StripAlign;
   metric?: StripMetric;
   value: number | null;
+  border?: boolean;
   // The editor passes its own editable element in place of the drawn text, so
   // the surface being typed into is this one rather than a copy of it.
   children?: React.ReactNode;
@@ -112,7 +125,7 @@ export function MessageBannerPreview({
           "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.messageBanner,
         } as React.CSSProperties
       }
-      className="overlay-surface rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
+      className={bannerSurfaceClass(border)}
     >
       <div className="overflow-hidden" style={{ height: OVERLAY_MESSAGE_ROW_H }}>
         {children ?? (
@@ -137,9 +150,13 @@ export const MESSAGE_BANNER_HEIGHT = OVERLAY_MESSAGE_ROW_H + 26;
 export function MessageBanner({
   metrics,
   messages,
+  dwellMs,
+  border = true,
 }: {
   metrics: BannerMetricValues;
   messages?: StripMessage[];
+  dwellMs?: number;
+  border?: boolean;
 }) {
   // A metric the message did not ask for, or one with no number behind it right
   // now, draws nothing at all.
@@ -164,21 +181,26 @@ export function MessageBanner({
   // read through its length so deleting a message stops the timer too.
   const messageCount = list.length;
   const cycles = messageCount > 1;
+  // A timeout rather than an interval: each message holds for its own time, and
+  // an interval can only express one duration for the whole cycle. Scheduled
+  // from whichever message is showing, and rescheduled on every advance.
+  const showingIndex = cycle.index < list.length ? cycle.index : 0;
+  const holdMs = resolveDwell(list[showingIndex], dwellMs);
   useEffect(() => {
     if (!cycles) return;
-    const timer = setInterval(() => {
+    const timer = setTimeout(() => {
       setCycle((c) => ({
         index: (c.index + 1) % messageCount,
         leaving: c.index,
         tick: c.tick + 1,
       }));
-    }, OVERLAY_MESSAGE_DWELL_MS);
-    return () => clearInterval(timer);
-  }, [cycles, messageCount]);
+    }, holdMs);
+    return () => clearTimeout(timer);
+  }, [cycles, messageCount, holdMs, cycle.tick]);
 
   // An edit that shortens the list must not leave the strip pointing past its
   // end, which would blank the strip on air until the next advance.
-  const showing = cycle.index < list.length ? cycle.index : 0;
+  const showing = showingIndex;
   const leaving =
     cycles && cycle.leaving !== null && cycle.leaving < list.length
       ? cycle.leaving
@@ -192,7 +214,7 @@ export function MessageBanner({
           "--overlay-surface-alpha": OVERLAY_SURFACE_ALPHA.messageBanner,
         } as React.CSSProperties
       }
-      className="overlay-surface rounded-2xl border border-white px-6 py-3 text-white shadow-lg"
+      className={bannerSurfaceClass(border)}
     >
       {/* A fixed-height window: the strip's height never depends on which
           message is showing, or on one being mid-flight. */}

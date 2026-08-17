@@ -32,6 +32,7 @@ import {
   getMemberCountAction,
   getOverlayLayoutAction,
   getPlayableAskAction,
+  getRecentGreetingsAction,
   getPlayableTtsAction,
   getPromotedMessagesAction,
   getStreamStandingsAction,
@@ -304,5 +305,16 @@ export function useBannerCounts(channelSlug: string, enabled = true) {
     queryFn: () => getBannerCountsAction(channelSlug),
     refetchInterval: 10_000,
     enabled,
+  });
+}
+
+// Same cadence as the rest of the feed, so an arrival reaches the broadcast as
+// quickly as a highlight does.
+export function useRecentGreetings(streamId: string | null) {
+  return useQuery({
+    queryKey: ["greetings", streamId],
+    queryFn: () => getRecentGreetingsAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 2000,
   });
 }

@@ -5,7 +5,7 @@ export function SpeechBubble({
   pointer,
   children,
 }: {
-  pointer: "left" | "right";
+  pointer: "left" | "right" | "top";
   children: React.ReactNode;
 }) {
   return (
@@ -18,7 +18,25 @@ export function SpeechBubble({
         } as React.CSSProperties
       }
     >
-      {pointer === "left" ? (
+      {pointer === "top" ? (
+        // Centred on the top edge, for the card that stacks its avatar above the
+        // message rather than beside it.
+        <svg
+          aria-hidden
+          className="absolute -top-2 left-1/2 -translate-x-1/2 overflow-visible"
+          width="14"
+          height="8"
+          viewBox="0 0 14 8"
+        >
+          <polygon points="0,8 7,0 14,8" fill="black" />
+          <polyline
+            points="0,8 7,0 14,8"
+            fill="none"
+            stroke="white"
+            strokeWidth="1"
+          />
+        </svg>
+      ) : pointer === "left" ? (
         <svg
           aria-hidden
           className="absolute -left-2 top-3.5 overflow-visible"

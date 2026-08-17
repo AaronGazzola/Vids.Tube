@@ -1,7 +1,14 @@
 "use client";
 
 import type { DemoBoxKey } from "@/app/(app)/live/demo.types";
-import { GOAL_METRICS } from "@/app/layout.types";
+import { GOAL_METRICS, type GoalMetric } from "@/app/layout.types";
+import {
+  GoalRiseFlyer,
+  riseBadge,
+} from "@/components/overlay/goal-rise-flyer";
+import { goalFlightDelta } from "@/lib/goal-flight";
+import { useGoalFlights } from "@/lib/goal-flights";
+import { useGoalRiseDemo } from "@/app/(app)/live/demo.stores";
 import { CompetitionLadder } from "@/components/overlay/competition-ladder";
 import { GameWindow } from "@/components/overlay/game-window";
 import { GoalBar } from "@/components/overlay/goal-bar";
@@ -11,6 +18,7 @@ import type { OverlayStageProps } from "@/components/overlay/overlay-stage.types
 import {
   GOAL_METRIC_BOX,
   OVERLAY_BASE_DIMS,
+  OVERLAY_CANVAS_CENTRE,
   OVERLAY_CANVAS_H,
   OVERLAY_CANVAS_W,
   OVERLAY_FEED_WIDTH,
@@ -43,12 +51,17 @@ function Positioned({
           // whole: fading the element took the text with it, so a subtle overlay
           // was also an unreadable one.
           "--overlay-bg-opacity": opacity,
-          transform: `scale(${box.scale})`,
+          // A box carrying its own width and height is already the size it
+          // asked for, so scaling it again would compound the two.
+          transform:
+            box.w !== undefined ? undefined : `scale(${box.scale})`,
           transformOrigin: "top left",
         } as React.CSSProperties
       }
     >
-      <OverlayScaleProvider scale={box.scale}>{children}</OverlayScaleProvider>
+      <OverlayScaleProvider scale={box.w !== undefined ? 1 : box.scale}>
+        {children}
+      </OverlayScaleProvider>
     </div>
   );
 }
@@ -82,6 +95,29 @@ export function OverlayStage({
   const renderEmpty = surface === "composer";
   const showFeedPlaceholder = renderEmpty && resizeMode && !values.feedSlotFilled;
 
+  // Announcements are suppressed entirely while a layout is being arranged:
+  // dragging a box past a poll would otherwise fly things across the composer.
+  const goalValues = Object.fromEntries(
+    GOAL_METRICS.map((m) => [m, values.goalMetric(m)?.current ?? null])
+  ) as Record<GoalMetric, number | null>;
+  const goalEnabled = Object.fromEntries(
+    GOAL_METRICS.map((m) => [
+      m,
+      !resizeMode && config.goalAnimate[m] !== false,
+    ])
+  ) as Record<GoalMetric, boolean>;
+  // The viewers goal announces a crossing rather than every tick, so the flight
+  // decision needs the target as well as the count.
+  const goalTargets = Object.fromEntries(
+    GOAL_METRICS.map((m) => [m, values.goalMetric(m)?.target ?? null])
+  ) as Record<GoalMetric, number | null>;
+  const { flights, pulse, land, demo } = useGoalFlights(
+    goalValues,
+    goalEnabled,
+    goalTargets
+  );
+  useGoalRiseDemo(demo, goalValues);
+
   return (
     <div
       className={
@@ -109,6 +145,8 @@ export function OverlayStage({
             <MessageBanner
               metrics={values.bannerMetrics}
               messages={config.messages}
+              dwellMs={config.bannerDwellMs}
+              border={config.bannerBorder}
             />
           )}
         </Positioned>
@@ -131,9 +169,31 @@ export function OverlayStage({
                 metric={metric}
                 data={data}
                 height={OVERLAY_GOAL_HEIGHT}
+                pulseToken={pulse[metric]}
               />
             )}
           </Positioned>
+        );
+      })}
+
+      {/* Announcements are drawn by the stage rather than by the goal, because
+          only the stage knows both ends of the journey: the middle of the
+          broadcast, and wherever the streamer put that goal's box. */}
+      {flights.map((flight) => {
+        const box = boxes[GOAL_METRIC_BOX[flight.metric]];
+        const { dx, dy } = goalFlightDelta(box, OVERLAY_GOAL_HEIGHT);
+        return (
+          <GoalRiseFlyer
+            key={flight.id}
+            metric={flight.metric}
+            message={config.goalRiseMessages[flight.metric] ?? ""}
+            badge={riseBadge(flight.metric, flight.delta, flight.total)}
+            cx={OVERLAY_CANVAS_CENTRE.x}
+            cy={OVERLAY_CANVAS_CENTRE.y}
+            dx={dx}
+            dy={dy}
+            onDone={() => land(flight.id, flight.metric)}
+          />
         );
       })}
 
@@ -164,9 +224,13 @@ export function OverlayStage({
               // The stage is what knows the box, so it is the stage that tells
               // the overlay how much room it has. The scale is the half a frame
               // cannot measure for itself.
+              //
+              // The game box carries its own width and height because it is the
+              // one overlay that resizes freely; the nominal dimensions are the
+              // fallback for a layout saved before it could.
               box={{
-                width: OVERLAY_BASE_DIMS.game.w,
-                height: OVERLAY_BASE_DIMS.game.h,
+                width: boxes.game.w ?? OVERLAY_BASE_DIMS.game.w,
+                height: boxes.game.h ?? OVERLAY_BASE_DIMS.game.h,
                 scale: boxes.game.scale,
               }}
             />

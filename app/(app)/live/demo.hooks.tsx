@@ -280,6 +280,25 @@ export function useDemoOverlayBroadcast(
           includeAnswer: a.includeAnswer,
           ...standingFor(a.viewerKey),
         })),
+      // One of each shape, from the viewers the demo already invented, so the
+      // streamer can see how a welcome reads before a real chatter triggers one.
+      welcomes: viewers.length
+        ? [
+            {
+              id: "demo-welcome-new",
+              kind: "new" as const,
+              authors: [authorFor(viewers[0].key)].filter((a) => a !== null),
+            },
+            {
+              id: "demo-welcome-batch",
+              kind: "batch" as const,
+              authors: viewers
+                .slice(1, 4)
+                .map((v) => authorFor(v.key))
+                .filter((a) => a !== null),
+            },
+          ]
+        : [],
     };
 
     // Debounced: box drags update the store many times per second.

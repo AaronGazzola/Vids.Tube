@@ -11,7 +11,12 @@ import {
 import { OverlayContainer } from "@/components/overlay/overlay-container";
 import { OverlayStage } from "@/components/overlay/overlay-stage";
 import { Switch } from "@/components/ui/switch";
-import { OVERLAY_CANVAS_H, OVERLAY_CANVAS_W } from "@/lib/demo-overlay";
+import type { GoalMetric } from "@/app/layout.types";
+import {
+  GOAL_METRIC_BOX,
+  OVERLAY_CANVAS_H,
+  OVERLAY_CANVAS_W,
+} from "@/lib/demo-overlay";
 import type { Counts } from "@/lib/goals";
 import { channelAssetUrl } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -34,6 +39,15 @@ import {
 import { OverlayInstallList } from "./overlay-install-list";
 import { useOverlayDemoValues } from "./overlays-demo";
 import { useOverlayComposerValues } from "./overlays-tab.hooks";
+
+// Which overlay keys are goals, so the panel can offer the animation controls
+// against the right rows. Inverted from the box mapping rather than written out
+// again, so a goal added later cannot be missed here.
+const GOAL_BOX_METRIC: Partial<Record<string, GoalMetric>> = Object.fromEntries(
+  (Object.entries(GOAL_METRIC_BOX) as [GoalMetric, string][]).map(
+    ([metric, box]) => [box, metric]
+  )
+);
 
 const GRADIENT =
   "linear-gradient(135deg, #ff6b6b 0%, #f9d423 25%, #1dd1a1 50%, #54a0ff 75%, #5f27cd 100%)";
@@ -60,6 +74,8 @@ export function OverlaysTab({
   const setPanelOpen = useDemoLayoutStore((s) => s.setPanelOpen);
   const persist = useDemoLayoutStore((s) => s.persist);
   const setPersist = useDemoLayoutStore((s) => s.setPersist);
+  const setGoalAnimate = useDemoLayoutStore((s) => s.setGoalAnimate);
+  const demoGoalRise = useDemoLayoutStore((s) => s.demoGoalRise);
   const resizeMode = useDemoLayoutStore((s) => s.resizeMode);
   const setResizeMode = useDemoLayoutStore((s) => s.setResizeMode);
   const demo = useDemoLayoutStore((s) => s.demo);
@@ -308,7 +324,34 @@ export function OverlaysTab({
                   </label>
                 </div>
               )}
-              {key !== "tts" && key !== "ask" && (
+              {/* A goal announces its rises across the broadcast. Switchable per
+                  goal, and demoable, because waiting for a real subscriber is a
+                  poor way to judge how it looks. */}
+              {GOAL_BOX_METRIC[key] && (
+                <div className="flex items-center justify-between gap-2 pl-2">
+                  <button
+                    onClick={() => demoGoalRise(GOAL_BOX_METRIC[key]!)}
+                    className="rounded bg-white/15 px-2 py-0.5 text-[10px] hover:bg-white/25"
+                    aria-label={`Demo the ${DEMO_OVERLAY_LABELS[key]} increment`}
+                  >
+                    Demo
+                  </button>
+                  <label className="flex items-center gap-1 text-[10px] text-white/80">
+                    <input
+                      type="checkbox"
+                      aria-label={`Animate ${DEMO_OVERLAY_LABELS[key]} increments`}
+                      checked={config.goalAnimate[GOAL_BOX_METRIC[key]!]}
+                      onChange={(e) =>
+                        setGoalAnimate(GOAL_BOX_METRIC[key]!, e.target.checked)
+                      }
+                    />
+                    animate
+                  </label>
+                </div>
+              )}
+              {/* The feed's card types share the highlight box, so they have no
+                  box of their own to fade. */}
+              {key !== "tts" && key !== "ask" && key !== "welcome" && (
                 <div className="flex items-center gap-1.5 pl-2">
                   <input
                     type="range"

@@ -257,9 +257,78 @@
   }
 }
 
+/* The reached-goal ring and the rank-one avatar ring turn.
+
+   Written 0%/100% rather than as the bare `to` this rule used to carry: the CSS
+   build drops from/to keyframes, so the rotation has never actually run and both
+   rings have always been still. Spelling out both stops is what makes it move
+   for the first time. */
 @keyframes rainbow-spin {
-  to {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
     transform: rotate(360deg);
+  }
+}
+
+/* A rise announced across the broadcast, then delivered to its goal overlay.
+
+   One timeline, three phases: grow from nothing at the centre, hold long enough
+   to be read, then travel and shrink to nothing as it arrives. The travel is
+   `--rise-dx`/`--rise-dy`, set inline per flight, so this one rule serves every
+   goal wherever the streamer has put it.
+
+   The element is positioned at the canvas origin and moved entirely by
+   transform, so the whole flight is composited and OBS captures a moving layer
+   rather than a relayout at the broadcast frame rate. `--rise-cx`/`--rise-cy`
+   carry the centre for the same reason.
+
+   0%/100% throughout, never from/to: the CSS build drops from/to keyframes and
+   the flight would silently never happen. */
+@keyframes overlay-goal-flight {
+  0% {
+    opacity: 0;
+    transform: translate(var(--rise-cx), var(--rise-cy)) translate(-50%, -50%)
+      scale(0);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(var(--rise-cx), var(--rise-cy)) translate(-50%, -50%)
+      scale(1.08);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(var(--rise-cx), var(--rise-cy)) translate(-50%, -50%)
+      scale(1);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(var(--rise-cx), var(--rise-cy)) translate(-50%, -50%)
+      scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--rise-cx), var(--rise-cy))
+      translate(var(--rise-dx), var(--rise-dy)) translate(-50%, -50%) scale(0);
+  }
+}
+
+/* A goal's number has risen: a ring expands out of the overlay and fades.
+   Transform and opacity only, so OBS captures a composited layer rather than a
+   relayout at the broadcast frame rate, and drawn in a layer of its own so the
+   space the overlay occupies never changes while it plays.
+
+   0%/100% rather than from/to, for the reason given above `overlay-message-out`:
+   the CSS build drops from/to keyframes and the animation silently never runs. */
+@keyframes overlay-goal-rise {
+  0% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
   }
 }
 

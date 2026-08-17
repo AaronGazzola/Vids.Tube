@@ -1,4 +1,10 @@
-import { DEFAULT_MEMBER_MESSAGE } from "@/lib/demo-overlay";
+import type { GoalMetric } from "@/app/layout.types";
+import {
+  DEFAULT_GOAL_RISE_MESSAGES,
+  DEFAULT_MEMBER_MESSAGE,
+  OVERLAY_BASE_DIMS,
+  OVERLAY_MESSAGE_DWELL_MS,
+} from "@/lib/demo-overlay";
 import type { Counts } from "@/lib/goals";
 
 export type DemoBoxKey =
@@ -10,10 +16,23 @@ export type DemoBoxKey =
   | "highlight"
   | "break"
   | "game";
-export type DemoOverlayKey = DemoBoxKey | "tts" | "ask";
+export type DemoOverlayKey = DemoBoxKey | "tts" | "ask" | "welcome";
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
-export type DemoBox = { x: number; y: number; scale: number };
+// `w` and `h` are canvas units and are carried only by a box that resizes
+// freely — today that is the game alone. A box without them is scaled uniformly
+// about its top-left, exactly as every box was before free resizing existed, so
+// a saved layout means what it always meant and needs no version bump.
+//
+// The game needs them because it is not a card whose pixels can be stretched: it
+// is a camera on a simulation, and it reframes on a genuine viewport change.
+export type DemoBox = {
+  x: number;
+  y: number;
+  scale: number;
+  w?: number;
+  h?: number;
+};
 
 // Bumped when the meaning of box coordinates changes; saved layouts from an
 // older version keep their toggles but fall back to the default boxes.
@@ -86,10 +105,15 @@ export type StripMetric = {
 // it sits on its line, and at most one number to show beside it. Alignment is a
 // property of the line rather than of a run, so it is stored beside the text
 // rather than inside the markup dialect.
+// `dwellMs` absent means "follow the banner's global time", and that is a
+// different thing from a time that happens to equal the global one: changing the
+// global moves the first and leaves the second where the streamer put it. Absent
+// is therefore stored as absent, never written out as the global's number.
 export type StripMessage = {
   text: string;
   align: StripAlign;
   metric?: StripMetric;
+  dwellMs?: number;
 };
 
 export type DemoLayoutConfig = {
@@ -106,6 +130,17 @@ export type DemoLayoutConfig = {
   // path. Edits are held as a draft in the store until Save changes, so a
   // half-typed sentence never reaches a broadcast.
   messages: StripMessage[];
+  // How long a message holds when it carries no time of its own, and whether the
+  // banner draws its frame. Required here rather than optional because the
+  // layout loader fills both from the defaults; a layout saved before either
+  // existed therefore means today's behaviour without a version bump.
+  bannerDwellMs: number;
+  bannerBorder: boolean;
+  // Per goal overlay: whether a rise is announced across the broadcast, and what
+  // the announcement says. Both keyed by metric rather than by box, because it
+  // is the meaning of the number that decides the wording.
+  goalAnimate: Record<GoalMetric, boolean>;
+  goalRiseMessages: Record<GoalMetric, string>;
 };
 
 export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
@@ -117,6 +152,7 @@ export const DEMO_OVERLAY_KEYS: DemoOverlayKey[] = [
   "highlight",
   "tts",
   "ask",
+  "welcome",
   "break",
   "game",
 ];
@@ -130,6 +166,7 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
   highlight: "Highlight",
   tts: "TTS card",
   ask: "!ask exchange",
+  welcome: "Welcome card",
   break: "Break timer",
   game: "Game",
 };
@@ -152,7 +189,10 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     break: { x: 220, y: 860, scale: 2 },
     // Right of the ladder and below the viewers goal, at scale 1: the band of
     // the canvas no other surface claims by default.
-    game: { x: 480, y: 600, scale: 1 },
+    // The only box carrying its own width and height, because it is the only one
+    // that resizes freely. The numbers are the size the game has always been
+    // framed at, so an overlay nobody resizes looks exactly as it did.
+    game: { x: 480, y: 600, scale: 1, w: 480, h: 320 },
   },
   visible: {
     messageBanner: true,
@@ -163,6 +203,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     highlight: true,
     tts: true,
     ask: true,
+    welcome: true,
     break: false,
     // Off by default: an existing channel's overlay must not gain a window on
     // deploy, and the window shows nothing at all unless a game is configured.
@@ -192,6 +233,10 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
       metric: { kind: "members", icon: "logo", color: "#ffffff" },
     },
   ],
+  bannerDwellMs: OVERLAY_MESSAGE_DWELL_MS,
+  bannerBorder: true,
+  goalAnimate: { subs: true, likes: true, viewers: true },
+  goalRiseMessages: { ...DEFAULT_GOAL_RISE_MESSAGES },
 };
 
 // The counts the demo drives its goal bars toward. Real saved targets are layered
@@ -235,9 +280,18 @@ const RESET_AT_VERSION: Record<number, DemoBoxKey[]> = {
 function isBox(value: unknown): value is DemoBox {
   if (typeof value !== "object" || value === null) return false;
   const b = value as Partial<DemoBox>;
-  return (
-    Number.isFinite(b.x) && Number.isFinite(b.y) && Number.isFinite(b.scale)
-  );
+  if (
+    !Number.isFinite(b.x) ||
+    !Number.isFinite(b.y) ||
+    !Number.isFinite(b.scale)
+  ) {
+    return false;
+  }
+  // Absent is valid and means "scaled uniformly". Present but unreadable is not:
+  // a saved width of NaN would size a frame to nothing on a live stream.
+  const sized = (n: unknown) =>
+    n === undefined || (Number.isFinite(n) && (n as number) > 0);
+  return sized(b.w) && sized(b.h);
 }
 
 // An absent, unreadable or empty message list becomes the sentence the strip
@@ -267,10 +321,15 @@ function readMessage(value: unknown): StripMessage | null {
   const m = value as Partial<StripMessage>;
   if (typeof m.text !== "string" || !m.text.trim()) return null;
   const metric = readMetric(m.metric);
+  // Spread only when present. Writing `dwellMs: undefined` would still create
+  // the key, and "carries no time of its own" has to survive a save-and-reload
+  // as an absent key rather than as a present undefined one.
+  const dwell = typeof m.dwellMs === "number" ? m.dwellMs : null;
   return {
     text: m.text,
     align: m.align === "center" ? "center" : "left",
     ...(metric ? { metric } : {}),
+    ...(dwell !== null ? { dwellMs: dwell } : {}),
   };
 }
 
@@ -306,6 +365,20 @@ export function mergeDemoLayout(
     boxes[key] =
       !reset.has(key) && isBox(value) ? value : DEFAULT_DEMO_LAYOUT.boxes[key];
   }
+  // A game box saved before it could be resized freely carries a scale and no
+  // size. Its scale is turned into a width and a height covering exactly the
+  // area it already occupied, so it looks identical and gains the free handles
+  // straight away rather than only after somebody drags it once. No version bump:
+  // the saved coordinates are not being reinterpreted, only expressed the way
+  // this box now expresses them.
+  if (boxes.game.w === undefined || boxes.game.h === undefined) {
+    boxes.game = {
+      ...boxes.game,
+      w: OVERLAY_BASE_DIMS.game.w * boxes.game.scale,
+      h: OVERLAY_BASE_DIMS.game.h * boxes.game.scale,
+      scale: 1,
+    };
+  }
 
   return {
     version: DEMO_LAYOUT_VERSION,
@@ -324,5 +397,17 @@ export function mergeDemoLayout(
     },
     feedSound: partial.feedSound ?? DEFAULT_DEMO_LAYOUT.feedSound,
     messages: readMessages(partial.messages),
+    // A layout saved before either setting existed carries neither, and takes
+    // today's behaviour: the six-second default and a drawn border.
+    bannerDwellMs: partial.bannerDwellMs ?? DEFAULT_DEMO_LAYOUT.bannerDwellMs,
+    bannerBorder: partial.bannerBorder ?? DEFAULT_DEMO_LAYOUT.bannerBorder,
+    goalAnimate: {
+      ...DEFAULT_DEMO_LAYOUT.goalAnimate,
+      ...(partial.goalAnimate ?? {}),
+    },
+    goalRiseMessages: {
+      ...DEFAULT_DEMO_LAYOUT.goalRiseMessages,
+      ...(partial.goalRiseMessages ?? {}),
+    },
   };
 }

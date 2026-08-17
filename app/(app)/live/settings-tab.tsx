@@ -34,7 +34,12 @@ import {
   MessageBannerPreview,
   MessageBannerRow,
 } from "@/components/overlay/message-banner";
-import { OVERLAY_MESSAGE_MAX_VISIBLE } from "@/lib/demo-overlay";
+import { GOAL_METRICS } from "@/app/layout.types";
+import {
+  OVERLAY_MESSAGE_DWELL_MAX_MS,
+  OVERLAY_MESSAGE_DWELL_MIN_MS,
+  OVERLAY_MESSAGE_MAX_VISIBLE,
+} from "@/lib/demo-overlay";
 import { parseOverlayMessage, visibleLength } from "@/lib/overlay-markup";
 import { serializeOverlayMessage } from "@/lib/overlay-markup-serialize";
 import {
@@ -466,6 +471,7 @@ function MessageEditor({
   position,
   total,
   metricValues,
+  border,
   onChange,
   onRemove,
   onMove,
@@ -474,6 +480,7 @@ function MessageEditor({
   position: number;
   total: number;
   metricValues: BannerMetricValues;
+  border: boolean;
   onChange: (next: StripMessage) => void;
   onRemove: () => void;
   onMove: (by: -1 | 1) => void;
@@ -617,6 +624,36 @@ function MessageEditor({
           Remove
         </Button>
       </div>
+      {/* Empty means "follow the banner's time", which is why the placeholder
+          says so rather than showing the global's number: a field pre-filled
+          with 6 would look identical to one deliberately set to 6, and changing
+          the global would then appear to do nothing. */}
+      <div className="flex flex-wrap items-center gap-2 pl-7 text-xs">
+        <label className="flex items-center gap-2">
+          Show for
+          <DisplayTimeInput
+            seconds={
+              message.dwellMs === undefined ? null : message.dwellMs / 1000
+            }
+            placeholder="default"
+            label={`Seconds message ${position + 1} shows for`}
+            onCommit={(ms) => onChange({ ...message, dwellMs: ms })}
+            onClear={() => {
+              // Deleted rather than set to undefined: "follows the banner's
+              // time" has to survive a save as an absent key.
+              const rest = { ...message };
+              delete rest.dwellMs;
+              onChange(rest);
+            }}
+          />
+          seconds
+        </label>
+        {message.dwellMs === undefined && (
+          <span className="text-muted-foreground">
+            follows the banner&apos;s time
+          </span>
+        )}
+      </div>
       {/* The metric is set from here rather than typed into the banner: a
           number pulled live is not something to type over. */}
       <div className="flex flex-wrap items-center gap-2 pl-7 text-xs">
@@ -719,6 +756,7 @@ function MessageEditor({
             align={message.align}
             metric={message.metric}
             value={message.metric ? metricValues[message.metric.kind] : null}
+            border={border}
           >
             <MessageBannerRow
               align={message.align}
@@ -743,8 +781,96 @@ function MessageEditor({
   );
 }
 
+// Seconds in, milliseconds out. The streamer thinks in seconds; everything
+// below the editor is in milliseconds because the timer is.
+function DisplayTimeInput({
+  seconds,
+  placeholder,
+  label,
+  onCommit,
+  onClear,
+}: {
+  seconds: number | null;
+  placeholder: string;
+  label: string;
+  onCommit: (ms: number) => void;
+  onClear?: () => void;
+}) {
+  // Typed locally and only handed on when it is a number the banner can honour,
+  // so a half-typed "1" on the way to "12" never reaches a live broadcast.
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? (seconds === null ? "" : String(seconds));
+
+  const commit = (raw: string) => {
+    setDraft(null);
+    if (!raw.trim()) {
+      onClear?.();
+      return;
+    }
+    const ms = Math.round(Number(raw) * 1000);
+    if (!Number.isFinite(ms)) return;
+    if (ms < OVERLAY_MESSAGE_DWELL_MIN_MS || ms > OVERLAY_MESSAGE_DWELL_MAX_MS) {
+      return;
+    }
+    onCommit(ms);
+  };
+
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={OVERLAY_MESSAGE_DWELL_MIN_MS / 1000}
+      max={OVERLAY_MESSAGE_DWELL_MAX_MS / 1000}
+      step="0.5"
+      aria-label={label}
+      placeholder={placeholder}
+      className="h-7 w-20 rounded-md border bg-background px-1.5 text-xs"
+      value={shown}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
+// What the overlay says when each goal's number goes up. Beside the targets,
+// because the target and the announcement are two halves of what a goal means.
+function GoalRiseMessages() {
+  const messages = useDemoLayoutStore((s) => s.config.goalRiseMessages);
+  const setMessage = useDemoLayoutStore((s) => s.setGoalRiseMessage);
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="text-xs text-muted-foreground">
+        Shown across the middle of the stream when the number goes up, before it
+        flies to the goal. Subs and likes show the increase; viewers show the
+        current total. Leave one empty for the icon and number alone.
+      </p>
+      {GOAL_METRICS.map((m) => (
+        <label key={m} className="flex items-center gap-2 text-xs">
+          <span className="w-16 shrink-0 capitalize text-muted-foreground">
+            {m}
+          </span>
+          <Input
+            value={messages[m] ?? ""}
+            onChange={(e) => setMessage(m, e.target.value)}
+            aria-label={`${m} increment message`}
+            className="h-8 text-sm"
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function MessagesSection({ channelSlug }: { channelSlug: string }) {
   const metricValues = useBannerMetricValues(channelSlug);
+  const bannerDwellMs = useDemoLayoutStore((s) => s.config.bannerDwellMs);
+  const bannerBorder = useDemoLayoutStore((s) => s.config.bannerBorder);
+  const setBannerDwellMs = useDemoLayoutStore((s) => s.setBannerDwellMs);
+  const setBannerBorder = useDemoLayoutStore((s) => s.setBannerBorder);
   // The draft, not the saved list: nothing typed here reaches the overlay or
   // the database until Save changes is pressed in the toolbar.
   const messages = useDemoLayoutStore((s) => s.draftMessages);
@@ -769,6 +895,29 @@ export function MessagesSection({ channelSlug }: { channelSlug: string }) {
         The members strip cycles through these, showing the member count beside
         the first one only. A single message does not cycle.
       </p>
+      {/* Settings for the banner itself rather than for any one message, so they
+          sit above the list rather than inside a row of it. */}
+      <div className="flex flex-wrap items-center gap-4 rounded-md border px-3 py-2 text-xs">
+        <label className="flex items-center gap-2">
+          Show each message for
+          <DisplayTimeInput
+            seconds={bannerDwellMs / 1000}
+            placeholder=""
+            label="Seconds each message shows for"
+            onCommit={setBannerDwellMs}
+          />
+          seconds
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            aria-label="Draw a border around the message banner"
+            checked={bannerBorder}
+            onChange={(e) => setBannerBorder(e.target.checked)}
+          />
+          Border
+        </label>
+      </div>
       <ul className="divide-y rounded-md border">
         {messages.map((message, i) => (
           <MessageEditor
@@ -777,6 +926,7 @@ export function MessagesSection({ channelSlug }: { channelSlug: string }) {
             position={i}
             metricValues={metricValues}
             total={messages.length}
+            border={bannerBorder}
             onChange={(next) => replace(i, next)}
             onRemove={() => setMessages(messages.filter((_, j) => j !== i))}
             onMove={(by) => move(i, by)}
@@ -1193,6 +1343,7 @@ export function SettingsTab({
           Subs count up from a baseline captured when you schedule or go live. Likes
           and viewers use absolute YouTube values.
         </p>
+        <GoalRiseMessages />
       </Section>
 
       <Section title="OBS overlay">

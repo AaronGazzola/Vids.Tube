@@ -8,6 +8,8 @@ import { BreakCard } from "@/components/overlay/break-card";
 import { OverlayStage } from "@/components/overlay/overlay-stage";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
+import { WelcomeCard } from "@/components/overlay/welcome-card";
+import { groupGreetings } from "@/lib/greeting-groups";
 import type { DemoLayoutConfig } from "@/app/(app)/live/demo.types";
 import {
   DEMO_TTS_SAMPLE_SRC,
@@ -39,6 +41,7 @@ import {
   usePlayableAsk,
   usePlayableTts,
   usePromotedMessages,
+  useRecentGreetings,
   useStreamStandings,
 } from "./page.hooks";
 
@@ -65,6 +68,7 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
   const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
   const [doneTts, setDoneTts] = useState<Set<string>>(new Set());
   const [doneAsks, setDoneAsks] = useState<Set<string>>(new Set());
+  const [doneWelcomes, setDoneWelcomes] = useState<Set<string>>(new Set());
 
   const currentHighlight = snapshot.visible.highlight
     ? snapshot.highlights.find((h) => !doneHighlights.has(h.id)) ?? null
@@ -79,6 +83,10 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
       : null;
   const currentAskId = currentAsk?.id ?? null;
   const persistAsk = snapshot.persist.ask;
+  const currentWelcome =
+    !currentHighlight && !currentTts && !currentAsk && snapshot.visible.welcome
+      ? (snapshot.welcomes ?? []).find((w) => !doneWelcomes.has(w.id)) ?? null
+      : null;
 
   useOverlayChime(
     currentHighlight
@@ -87,7 +95,9 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
         ? `tts:${currentTts.id}`
         : currentAskId
           ? `ask:${currentAskId}`
-          : null
+          : currentWelcome
+            ? `welcome:${currentWelcome.id}`
+            : null
   );
 
   useEffect(() => {
@@ -151,6 +161,20 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
           includeAnswer={currentAsk.includeAnswer}
         />
       )}
+      {currentWelcome && (
+        <WelcomeCard
+          key={currentWelcome.id}
+          kind={currentWelcome.kind}
+          authors={currentWelcome.authors}
+          onDone={() =>
+            setDoneWelcomes((prev) => {
+              const next = new Set(prev);
+              next.add(currentWelcome.id);
+              return next;
+            })
+          }
+        />
+      )}
     </>
   );
 }
@@ -158,21 +182,35 @@ function DemoOverlayFeed({ snapshot }: { snapshot: DemoOverlaySnapshot }) {
 function LiveFeedSlot({
   streamId,
   soundOn,
+  welcomeVisible,
 }: {
   streamId: string;
   soundOn: boolean;
+  welcomeVisible: boolean;
 }) {
   const { data: promoted } = usePromotedMessages(streamId);
   const { data: standings } = useStreamStandings(streamId);
   const { data: ttsQueue } = usePlayableTts(streamId);
   const { data: askQueue } = usePlayableAsk(streamId);
+  const { data: greetings } = useRecentGreetings(streamId);
 
   const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
   const [doneTts, setDoneTts] = useState<Set<string>>(new Set());
   const [doneAsks, setDoneAsks] = useState<Set<string>>(new Set());
+  const [doneWelcomes, setDoneWelcomes] = useState<Set<string>>(new Set());
+  // Only arrivals from after this overlay loaded. Refreshing the browser source
+  // mid-broadcast must not re-welcome everyone the poll still returns, and a
+  // moment of loading is a simpler thing to hold than a set of what to ignore.
+  const [loadedAt] = useState(() => Date.now());
 
-  // One shared slot: the highlight, TTS card, and ask exchange never render
-  // together — each waits until the slot is free.
+  const welcomeGroups = welcomeVisible
+    ? groupGreetings(greetings ?? []).filter(
+        (g) => Date.parse(g.greetedAt) > loadedAt
+      )
+    : [];
+
+  // One shared slot: the highlight, TTS card, ask exchange and welcome never
+  // render together — each waits until the slot is free.
   const currentHighlight =
     promoted?.find((m) => !doneHighlights.has(highlightShowKey(m))) ?? null;
   const currentTts = currentHighlight
@@ -183,6 +221,10 @@ function LiveFeedSlot({
       ? null
       : (askQueue ?? []).find((a) => !doneAsks.has(a.id)) ?? null;
   const currentAskId = currentAsk?.id ?? null;
+  const currentWelcome =
+    currentHighlight || currentTts || currentAsk
+      ? null
+      : welcomeGroups.find((g) => !doneWelcomes.has(g.id)) ?? null;
 
   useOverlayChime(
     !soundOn
@@ -193,7 +235,9 @@ function LiveFeedSlot({
           ? `tts:${ttsPlayKey(currentTts)}`
           : currentAsk
             ? `ask:${currentAsk.id}`
-            : null
+            : currentWelcome
+              ? `welcome:${currentWelcome.id}`
+              : null
   );
 
   useEffect(() => {
@@ -278,6 +322,20 @@ function LiveFeedSlot({
           includeAnswer={currentAsk.includeAnswer}
         />
       )}
+      {currentWelcome && (
+        <WelcomeCard
+          key={currentWelcome.id}
+          kind={currentWelcome.kind}
+          authors={currentWelcome.authors}
+          onDone={() =>
+            setDoneWelcomes((prev) => {
+              const next = new Set(prev);
+              next.add(currentWelcome.id);
+              return next;
+            })
+          }
+        />
+      )}
     </>
   );
 }
@@ -329,10 +387,14 @@ export default function OverlayFramePage({
   const visible = demo ? demo.visible : config.visible;
 
   const feedVisible = demo
-    ? demo.visible.highlight || demo.visible.tts || demo.visible.ask
+    ? demo.visible.highlight ||
+      demo.visible.tts ||
+      demo.visible.ask ||
+      demo.visible.welcome
     : config.visible.highlight ||
       config.visible.tts ||
-      config.visible.ask;
+      config.visible.ask ||
+      config.visible.welcome;
 
   const goalMetric = (m: GoalMetric) => {
     if (demo) {
@@ -364,7 +426,11 @@ export default function OverlayFramePage({
   const feedSlot = demo ? (
     <DemoOverlayFeed snapshot={demo} />
   ) : streamId ? (
-    <LiveFeedSlot streamId={streamId} soundOn={config.feedSound !== "off"} />
+    <LiveFeedSlot
+      streamId={streamId}
+      soundOn={config.feedSound !== "off"}
+      welcomeVisible={visible.welcome}
+    />
   ) : null;
 
   const breakSlot = demo
