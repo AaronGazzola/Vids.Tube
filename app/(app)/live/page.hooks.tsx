@@ -2,7 +2,9 @@
 
 import { getFeaturedMessagesAction } from "@/app/(overlay)/overlay/[channelSlug]/page.actions";
 import { CustomToast } from "@/components/CustomToast";
+import { supabase } from "@/supabase/browser-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import {
   approveAskAction,
@@ -28,12 +30,40 @@ import {
   unhideMessageAction,
 } from "./page.actions";
 
+function useRefetchOnInsert(
+  table: string,
+  streamId: string | null,
+  key: string
+) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!streamId) return;
+    const channel = supabase
+      .channel(`${key}:${streamId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table,
+          filter: `stream_id=eq.${streamId}`,
+        },
+        () => queryClient.invalidateQueries({ queryKey: [key, streamId] })
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [table, streamId, key, queryClient]);
+}
+
 export function useOwnerChat(streamId: string | null) {
+  useRefetchOnInsert("chat_messages", streamId, "owner-chat");
   return useQuery({
     queryKey: ["owner-chat", streamId],
     queryFn: () => getOwnerChatMessagesAction(streamId!),
     enabled: !!streamId,
-    refetchInterval: 3000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -64,11 +94,12 @@ export function useViewerReasoning(
 }
 
 export function useReadThisQueue(streamId: string | null) {
+  useRefetchOnInsert("featured_messages", streamId, "read-this");
   return useQuery({
     queryKey: ["read-this", streamId],
     queryFn: () => getFeaturedMessagesAction(streamId!),
     enabled: !!streamId,
-    refetchInterval: 8000,
+    refetchInterval: 10_000,
   });
 }
 

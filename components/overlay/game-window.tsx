@@ -93,9 +93,13 @@ export function GameWindow({
       scrolling="no"
       allow="autoplay 'none'"
       data-testid="game-window"
+      // The box's own size, not the nominal one. The game is a camera on a
+      // simulation rather than a card: a pinned frame stretched by a transform
+      // gives it no more room and never triggers the reframe that a genuine
+      // viewport change does.
       style={{
-        width: OVERLAY_BASE_DIMS.game.w,
-        height: OVERLAY_BASE_DIMS.game.h,
+        width: box.width,
+        height: box.height,
         border: "none",
         background: "transparent",
       }}

@@ -64,6 +64,16 @@ async function main() {
             default: "Dragon",
             help: "What your chatters call it",
           },
+          {
+            key: "roominess",
+            label: "Room",
+            type: "number",
+            default: 1,
+            min: 0.25,
+            max: 4,
+            step: 0.25,
+            help: "How much space the creature has. Lower means a smaller tank, so the creature looks bigger in the same window.",
+          },
         ],
         commands: [
           {
