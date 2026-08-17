@@ -28,7 +28,7 @@ import {
   upsertWorkerHeartbeat,
 } from "../lib/streams";
 import { deliverApprovedAskAnswers } from "../lib/ask-command";
-import { processCommands } from "../lib/commands";
+import { processCommands, scorableMessages } from "../lib/commands";
 import {
   consumeSelfEcho,
   enqueueNightbotBridge,
@@ -74,9 +74,14 @@ function toScoringMessage(m: BufferedMessage): ScoringMessage {
   return { ref: m.ref, origin: m.origin, author: m.author, text: m.text };
 }
 
+// `hostUserId` is required, not optional. The streamer chats on their own site
+// like anyone else, and a message of theirs that arrives without the host mark
+// is scored, charged credits and put on the leaderboard — which is exactly what
+// happened when this argument did not exist.
 async function fetchNewVidstube(
   streamId: string,
-  sinceIso: string
+  sinceIso: string,
+  hostUserId: string | null
 ): Promise<BufferedMessage[]> {
   const { data } = await supabaseAdmin
     .from("chat_messages")
@@ -105,6 +110,7 @@ async function fetchNewVidstube(
     authorAvatarUrl: null,
     chatMessageId: m.id,
     createdAt: m.created_at,
+    isHost: !!hostUserId && m.user_id === hostUserId,
   }));
 }
 
@@ -640,6 +646,11 @@ export async function runScoringJob(
     channelSlug = channelRow?.slug ?? "";
   }
 
+  // Resolved here rather than inside the YouTube consumer, which only runs when
+  // the broadcast has a YouTube video. The host is the host either way, and a
+  // stream with no simulcast still needs them recognised on their own site.
+  const hostUserId = await resolveCommunityOwner(channelId);
+
   const ytBuffer: BufferedMessage[] = [];
   let stopped = false;
 
@@ -652,7 +663,6 @@ export async function runScoringJob(
       ? await resolveEnrichmentMode(channelId)
       : "full";
     const hostChannelId = await resolveHostChannelId(stream.id, channelId);
-    const hostUserId = await resolveCommunityOwner(channelId);
     if (hostChannelId) {
       console.error(`[chat:yt] host recognised as ${hostChannelId}`);
     }
@@ -804,7 +814,7 @@ export async function runScoringJob(
       // must be renewed from inside the loop or it goes stale mid-broadcast.
       await upsertWorkerHeartbeat();
 
-      const vid = await fetchNewVidstube(stream.id, vidstubeCursor);
+      const vid = await fetchNewVidstube(stream.id, vidstubeCursor, hostUserId);
       if (vid.length) {
         vidstubeCursor = vid[vid.length - 1].createdAt;
       }
@@ -824,14 +834,18 @@ export async function runScoringJob(
         await runProactiveMoments(stream, channelId);
         await runWrapupIfRequested(stream, channelId);
       }
-      let batch = unmoderated;
+      // Commands dispatch, and every message stays in the batch afterwards. A
+      // command is chat too: a good !ask question is worth featuring, and a
+      // YouTube viewer should see that someone on the site used a command rather
+      // than watching a reply appear from nowhere. `processCommands` still
+      // returns the non-commands; nothing needs that list any more.
       if (channelId) {
         const { data: prefs } = await supabaseAdmin
           .from("streams")
           .select("disabled_commands")
           .eq("id", stream.id)
           .maybeSingle();
-        batch = await processCommands(
+        await processCommands(
           {
             id: stream.id,
             channelId,
@@ -849,7 +863,10 @@ export async function runScoringJob(
           .eq("stream_id", stream.id)
           .maybeSingle();
         if (bridgeState?.bridge_enabled !== false) {
-          for (const m of batch) {
+          // Every message posted on the site, commands included. Bridging a
+          // command cannot make it run twice: it arrives back in YouTube chat as
+          // a Nightbot message, and bot messages are never command-processed.
+          for (const m of unmoderated) {
             if (m.origin === "vidstube") {
               enqueueNightbotBridge(`${m.authorName ?? m.author}: ${m.text}`);
             }
@@ -857,9 +874,11 @@ export async function runScoringJob(
         }
       }
 
-      // Commands have dispatched by now, so the host drops out here: present in
-      // chat and in replay, never scored, never on a leaderboard.
-      const scorable = batch.filter((m) => !m.isHost);
+      // Commands have dispatched by now, and their messages stay in the batch:
+      // a command is chat too, and is scored and featurable like any other line.
+      // The host still drops out: present in chat and in replay, never scored,
+      // never on a leaderboard.
+      const scorable = scorableMessages(unmoderated);
       if (scorable.length) {
         const transcript = await fetchTranscriptWindow(stream.id);
         console.error(

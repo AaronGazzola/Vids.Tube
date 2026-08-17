@@ -53,6 +53,7 @@ export function buildNewMemberGreeting(input: {
   handle: string | null;
   communitySlug: string;
   memberNumber: number;
+  credits: number;
 }): string {
   const who = mention(input.displayName);
   // A handle that is still a guess will be rewritten by the enrichment run, so
@@ -60,10 +61,16 @@ export function buildNewMemberGreeting(input: {
   const tail = input.handle
     ? ` Your page: ${memberLink(input.handle, input.communitySlug)}`
     : ` Find yourself at ${siteLabel()}`;
+  // The joining grant, read from the membership rather than restated here, so
+  // the greeting cannot disagree with the ledger if the amount ever changes.
+  const purse =
+    input.credits > 0
+      ? ` ${input.credits.toLocaleString("en-US")} credit${input.credits === 1 ? "" : "s"} to spend!`
+      : "";
   return fit(
     `${who} `,
     `welcome in — you're member #${input.memberNumber} of the community!`,
-    tail
+    `${purse}${tail}`
   );
 }
 
@@ -256,6 +263,9 @@ export async function runChatterGreetings(opts: {
     const handle = p.handle;
 
     if (p.isNew) {
+      // Read rather than assumed: the joining grant is written by a trigger when
+      // the membership is created, which has happened by now.
+      const joined = await membershipNumbers(p.channelId, opts.communityId);
       await deliverReply({
         streamId: opts.streamId,
         origin: "youtube",
@@ -264,6 +274,7 @@ export async function runChatterGreetings(opts: {
           handle,
           communitySlug: opts.communitySlug,
           memberNumber: total,
+          credits: joined.credits,
         }),
       });
       console.error(`[greet] new member @${p.handle ?? "?"} (#${total})`);

@@ -399,6 +399,7 @@ export type Database = {
           channel_id: string
           cooldown_s: number
           created_at: string
+          credit_cost: number
           description: string
           enabled: boolean
           id: string
@@ -415,6 +416,7 @@ export type Database = {
           channel_id: string
           cooldown_s?: number
           created_at?: string
+          credit_cost?: number
           description: string
           enabled?: boolean
           id?: string
@@ -431,6 +433,7 @@ export type Database = {
           channel_id?: string
           cooldown_s?: number
           created_at?: string
+          credit_cost?: number
           description?: string
           enabled?: boolean
           id?: string
@@ -2105,6 +2108,10 @@ export type Database = {
       credits_for_xp: { Args: { xp: number }; Returns: number }
       email_signup_status: { Args: { p_email: string }; Returns: string }
       end_abandoned_live_streams: { Args: never; Returns: number }
+      grant_joining_credits: {
+        Args: { p_membership_id: string }
+        Returns: number
+      }
       is_participant_banned: { Args: { p_user: string }; Returns: boolean }
       level_for_xp: { Args: { xp: number }; Returns: number }
       membership_credit_balance: {

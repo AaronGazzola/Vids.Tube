@@ -286,6 +286,36 @@ export async function gatherRecentMessages(
 
 // Credits are earned per community, so the balance quoted is the one held in the
 // community the caller is chatting in. A balance of nothing is left unsaid.
+// The channel a chatter's identity resolves to, following a merge to the
+// surviving channel. Exported because the credit charge needs the same answer,
+// and two lookups that could disagree about who someone is would eventually
+// charge the wrong purse.
+export async function resolveChannelId(
+  identity: MeIdentity
+): Promise<string | null> {
+  const { supabaseAdmin } = await deps();
+
+  if (identity.youtubeChannelId) {
+    const { data } = await supabaseAdmin
+      .from("channels")
+      .select("id, merged_into_channel_id")
+      .eq("youtube_channel_id", identity.youtubeChannelId)
+      .maybeSingle();
+    return data?.merged_into_channel_id ?? data?.id ?? null;
+  }
+  if (identity.userId) {
+    const { data } = await supabaseAdmin
+      .from("channels")
+      .select("id")
+      .eq("owner_user_id", identity.userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
+  }
+  return null;
+}
+
 async function creditsLine(
   identity: MeIdentity,
   communityId: string | null
@@ -295,24 +325,7 @@ async function creditsLine(
   }
   const { supabaseAdmin } = await deps();
 
-  let channelId: string | null = null;
-  if (identity.youtubeChannelId) {
-    const { data } = await supabaseAdmin
-      .from("channels")
-      .select("id, merged_into_channel_id")
-      .eq("youtube_channel_id", identity.youtubeChannelId)
-      .maybeSingle();
-    channelId = data?.merged_into_channel_id ?? data?.id ?? null;
-  } else if (identity.userId) {
-    const { data } = await supabaseAdmin
-      .from("channels")
-      .select("id")
-      .eq("owner_user_id", identity.userId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    channelId = data?.id ?? null;
-  }
+  const channelId = await resolveChannelId(identity);
   if (!channelId) {
     return "";
   }

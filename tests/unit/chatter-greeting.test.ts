@@ -34,6 +34,7 @@ describe("new member greeting", () => {
       handle: "emre_kzn",
       communitySlug: COMMUNITY,
       memberNumber: 144,
+      credits: 5,
     });
     expect(text).toContain("@Emre");
     expect(text).toContain("144");
@@ -46,6 +47,7 @@ describe("new member greeting", () => {
       handle: "emre_kzn",
       communitySlug: COMMUNITY,
       memberNumber: 144,
+      credits: 5,
     });
     expect(text.match(/https:\/\//g)).toHaveLength(1);
   });
@@ -56,6 +58,7 @@ describe("new member greeting", () => {
       handle: null,
       communitySlug: COMMUNITY,
       memberNumber: 144,
+      credits: 5,
     });
     expect(text).not.toContain("https://");
     expect(text).toContain(siteLabel());
@@ -67,6 +70,7 @@ describe("new member greeting", () => {
       handle: "emre_kzn",
       communitySlug: COMMUNITY,
       memberNumber: 1,
+      credits: 5,
     });
     expect(text.startsWith("@Emre ")).toBe(true);
     expect(text).not.toContain("@@");
@@ -158,6 +162,7 @@ describe("the 200-character limit", () => {
       handle: longHandle,
       communitySlug: longHandle,
       memberNumber: 999999,
+      credits: 5,
     });
     expect(text.length).toBeLessThanOrEqual(MAX_GREETING_CHARS);
   });
@@ -196,5 +201,43 @@ describe("the 200-character limit", () => {
       credits: 12345,
     });
     expect(text.endsWith(memberLink("kuroma", COMMUNITY))).toBe(true);
+  });
+});
+
+describe("the new member greeting names the joining grant", () => {
+  const base = {
+    displayName: "Ava",
+    handle: "ava",
+    communitySlug: "azanything",
+    memberNumber: 148,
+  };
+
+  it("says how many credits the new member has to spend", () => {
+    const text = buildNewMemberGreeting({ ...base, credits: 5 });
+    expect(text).toContain("5 credits to spend");
+  });
+
+  it("says credit, singular, for one", () => {
+    const text = buildNewMemberGreeting({ ...base, credits: 1 });
+    expect(text).toContain("1 credit to spend");
+    expect(text).not.toContain("credits");
+  });
+
+  it("says nothing about credits when the grant did not land", () => {
+    const text = buildNewMemberGreeting({ ...base, credits: 0 });
+    expect(text).not.toMatch(/credit/);
+    expect(text).toContain("welcome in");
+  });
+
+  it("still fits YouTube's limit with the grant and a long name", () => {
+    const text = buildNewMemberGreeting({
+      ...base,
+      displayName: "A".repeat(120),
+      credits: 5,
+    });
+    expect(text.length).toBeLessThanOrEqual(MAX_GREETING_CHARS);
+    // The grant and the link are fixed parts and survive; the sentence gives way.
+    expect(text).toContain("5 credits to spend");
+    expect(text).toContain("azanything");
   });
 });

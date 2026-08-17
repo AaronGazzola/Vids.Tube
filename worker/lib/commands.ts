@@ -1,6 +1,7 @@
 import { parseChatCommand } from "@/lib/chat-commands";
 import type { BufferedMessage } from "../jobs/score";
 import { deliverReply } from "./replies";
+import { shouldCharge } from "./credits";
 import { supabaseAdmin } from "../supabase";
 
 export type CommandRegistryRow = {
@@ -14,6 +15,7 @@ export type CommandRegistryRow = {
   max_per_stream: number | null;
   enabled: boolean;
   sort_order: number;
+  credit_cost: number;
 };
 
 export type CommandStreamInfo = {
@@ -52,7 +54,7 @@ export async function loadCommandRegistry(
   const { data, error } = await supabaseAdmin
     .from("chat_commands")
     .select(
-      "id, keyword, kind, builtin_key, description, response, cooldown_s, max_per_stream, enabled, sort_order"
+      "id, keyword, kind, builtin_key, description, response, cooldown_s, max_per_stream, enabled, sort_order, credit_cost"
     )
     .eq("channel_id", channelId)
     .order("sort_order", { ascending: true });
@@ -121,6 +123,15 @@ export const BUILTIN_HANDLERS: Record<
   },
 };
 
+// What the scorer sees. A command message stays in: it is chat like any other
+// line and may be featured. Only the host drops out, because the host owns the
+// broadcast rather than competing in it.
+export function scorableMessages<T extends { isHost?: boolean }>(
+  batch: T[]
+): T[] {
+  return batch.filter((m) => !m.isHost);
+}
+
 export function cooldownWaitSeconds(
   lastExecutedIso: string,
   cooldownS: number,
@@ -145,7 +156,16 @@ export function commandParticipantKey(m: {
   return m.userId ? String(m.userId) : `youtube:${m.externalAuthorId}`;
 }
 
-type EventStatus = "executed" | "cooldown" | "limit" | "disabled" | "unknown";
+// `insufficient` is its own outcome rather than folded into `limit`: the log
+// exists to answer why a command did not run, and "could not afford it" is a
+// different answer from "used it too many times".
+type EventStatus =
+  | "executed"
+  | "cooldown"
+  | "limit"
+  | "disabled"
+  | "unknown"
+  | "insufficient";
 
 async function insertEvent(
   stream: CommandStreamInfo,
@@ -178,8 +198,12 @@ async function insertEvent(
 }
 
 // Runs the command layer over a ban-filtered batch from both chat origins.
-// Command messages (known or attempted) are consumed here and never scored;
-// the returned array is what the scoring prompt should see.
+// Command messages (known or attempted) are dispatched here and returned to the
+// caller minus themselves: the returned array is what may be echoed back to
+// YouTube chat, since bridging a command would replay it at its own chat.
+//
+// It is NOT the scoring batch. A command message is scored and featurable like
+// any other line, so the caller scores what it passed in, not what it gets back.
 export async function processCommands(
   stream: CommandStreamInfo,
   batch: BufferedMessage[]
@@ -278,6 +302,41 @@ export async function processCommands(
       }
       if ((count ?? 0) >= row.max_per_stream) {
         await insertEvent(stream, m, row.keyword, parsed.args, "limit", null);
+        continue;
+      }
+    }
+
+    // Charged last of all the checks, so a chatter is never billed for a
+    // command that was going to be refused anyway. A free command — which is
+    // every command whose price has not been set — costs no lookup at all.
+    if (shouldCharge(row, m)) {
+      const { chargeCommand, insufficientReply, resolveMembershipId } =
+        await import("./credits");
+      const membershipId = await resolveMembershipId(m, stream.channelId);
+      const outcome = membershipId
+        ? await chargeCommand({
+            membershipId,
+            amount: row.credit_cost,
+            sourceId: m.chatMessageId ?? `${stream.id}:${m.ref}`,
+          })
+        : ({ charged: false, balance: null } as const);
+
+      if (!outcome.charged) {
+        const text = insufficientReply({
+          mention: mention(m),
+          keyword: row.keyword,
+          amount: row.credit_cost,
+          balance: outcome.balance,
+        });
+        await insertEvent(
+          stream,
+          m,
+          row.keyword,
+          parsed.args,
+          "insufficient",
+          text
+        );
+        await deliverReply({ streamId: stream.id, origin: m.origin, text });
         continue;
       }
     }
