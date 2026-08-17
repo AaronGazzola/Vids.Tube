@@ -764,6 +764,21 @@ function ChatMessageRow({
   );
 }
 
+// What the chat panel shows, and why it might be showing nothing. Three empty
+// states have to stay apart: no chat has arrived, chat has arrived but the
+// filter hides all of it, and the first load has not finished. Deciding that in
+// one place is what stops "nothing featured yet" reading as a broken tab.
+export function chatPanelView<T extends { id: string }>(
+  chat: T[] | undefined,
+  isFeatured: (id: string) => boolean,
+  highlightsOnly: boolean
+): { rows: T[]; empty: "no-chat" | "nothing-featured" | null } {
+  const all = chat ?? [];
+  if (!all.length) return { rows: [], empty: "no-chat" };
+  const rows = highlightsOnly ? all.filter((m) => isFeatured(m.id)) : all;
+  return { rows, empty: rows.length ? null : "nothing-featured" };
+}
+
 function ChatPanel({ streamId }: { streamId: string }) {
   const { data: chat, isPending, refetch } = useOwnerChat(streamId);
   const { data: featured } = useReadThisQueue(streamId);
@@ -771,9 +786,9 @@ function ChatPanel({ streamId }: { streamId: string }) {
   const { data: askFeed } = useAskFeed(streamId);
   const { data: clipMarkers } = useClipMarkers(streamId);
   const post = usePostChatMessage(streamId);
-  const { scrollRef, contentRef, onScroll } = useChatAutoScroll(
-    chat?.length ?? 0
-  );
+  // A view filter and nothing else: held here rather than in a store or the
+  // layout, so it cannot outlive the page or reach a broadcast.
+  const [highlightsOnly, setHighlightsOnly] = useState(false);
 
   const featuredByMsg = new Map<string, FeaturedMessageWithAuthor>();
   for (const f of featured ?? []) {
@@ -792,9 +807,31 @@ function ChatPanel({ streamId }: { streamId: string }) {
     if (c.chatMessageId) clipByMsg.set(c.chatMessageId, c);
   }
 
+  const view = chatPanelView(
+    chat,
+    (id) => featuredByMsg.has(id),
+    highlightsOnly
+  );
+  // Follows what is rendered, so turning the filter on does not leave the view
+  // scrolled to a position the shorter list no longer has.
+  const { scrollRef, contentRef, onScroll } = useChatAutoScroll(view.rows.length);
+
   return (
     <div className="flex min-h-[300px] flex-1 flex-col rounded-lg border">
-      <div className="shrink-0 border-b px-3 py-2 text-sm font-semibold">Live chat</div>
+      <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
+        <span className="flex-1">Live chat</span>
+        <Button
+          type="button"
+          size="sm"
+          variant={highlightsOnly ? "secondary" : "ghost"}
+          className="h-7 gap-1.5 px-2 text-xs font-medium"
+          aria-pressed={highlightsOnly}
+          onClick={() => setHighlightsOnly((on) => !on)}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Highlights only
+        </Button>
+      </div>
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -803,13 +840,19 @@ function ChatPanel({ streamId }: { streamId: string }) {
         <div ref={contentRef}>
           {isPending ? (
             <Skeleton className="h-16 w-full" />
-          ) : !chat?.length ? (
+          ) : view.empty === "no-chat" ? (
             <p className="px-1 py-2 text-xs text-muted-foreground">
               No messages yet.
             </p>
+          ) : view.empty === "nothing-featured" ? (
+            // Distinct from having no chat at all: the filter is on and the AI
+            // has featured nothing yet, which is normal early in a broadcast.
+            <p className="px-1 py-2 text-xs text-muted-foreground">
+              Nothing featured yet.
+            </p>
           ) : (
             <ul className="space-y-1">
-              {chat.map((m) => (
+              {view.rows.map((m) => (
                 <ChatMessageRow
                   key={m.id}
                   msg={m}
