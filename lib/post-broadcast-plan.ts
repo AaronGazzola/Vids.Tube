@@ -7,7 +7,8 @@ export type StepName =
   | "topUpChat"
   | "scoreChat"
   | "rebuildMemberships"
-  | "checkLedger";
+  | "checkLedger"
+  | "writeNotes";
 
 export type StepStatus = "ok" | "failed" | "unknown";
 
@@ -21,13 +22,15 @@ export type StepOutcome = {
 // Ordered by dependency, not preference. Saving must precede the top-up because
 // the top-up compares stored chat against the saved log; the top-up must precede
 // scoring because scoring reads chat; scoring must precede the rebuild because
-// membership totals derive from ratings.
+// membership totals derive from ratings; the rebuild must precede the notes
+// because a note is written against a chatter's totals as they now stand.
 export const STEP_ORDER: StepName[] = [
   "saveChatLog",
   "topUpChat",
   "scoreChat",
   "rebuildMemberships",
   "checkLedger",
+  "writeNotes",
 ];
 
 // Settling a broadcast is two phases against one broadcast, not one pass.
@@ -48,6 +51,7 @@ export function stepsForPhase(phase: Phase): StepName[] {
 const REQUIRES: Partial<Record<StepName, StepName>> = {
   rebuildMemberships: "scoreChat",
   checkLedger: "rebuildMemberships",
+  writeNotes: "rebuildMemberships",
 };
 
 export function blockedBy(
@@ -118,6 +122,15 @@ export function judgeStep(
     case "checkLedger":
       // Saves nothing by nature, so it is judged on its own verdict alone.
       return result.ok === true ? "ok" : "failed";
+    case "writeNotes": {
+      const failed = num(result, "failed");
+      const written = num(result, "written");
+      if (failed === null || written === null) return "unknown";
+      // Zero written is legitimate here and only here: a broadcast where every
+      // chatter had already been written about spends nothing and writes
+      // nothing. Failure is failure, whatever was written alongside it.
+      return failed > 0 ? "failed" : "ok";
+    }
   }
 }
 

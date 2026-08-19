@@ -46,6 +46,12 @@ const STEP_COMMANDS: Record<
     "--apply",
   ],
   checkLedger: () => ["scripts/verify-credit-ledger.ts"],
+  writeNotes: (streamId) => [
+    "scripts/write-chatter-notes.ts",
+    "--stream",
+    streamId,
+    "--apply",
+  ],
 };
 
 function runScript(args: string[]): Promise<{ ok: boolean; output: string }> {

@@ -39,14 +39,20 @@ describe("the step order", () => {
     );
   });
 
-  it("checks the ledger last, once the totals it checks exist", () => {
-    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe("checkLedger");
+  it("writes the notes last, once the totals they are written against exist", () => {
+    expect(STEP_ORDER[STEP_ORDER.length - 1]).toBe("writeNotes");
   });
 });
 
 describe("blockedBy", () => {
   it("stops the rebuild when scoring failed", () => {
     expect(blockedBy("rebuildMemberships", [failed("scoreChat")])).toBe("scoreChat");
+  });
+
+  it("stops the notes when the rebuild failed", () => {
+    expect(blockedBy("writeNotes", [failed("rebuildMemberships")])).toBe(
+      "rebuildMemberships"
+    );
   });
 
   it("stops the ledger check when the rebuild failed", () => {
@@ -86,6 +92,7 @@ describe("remainingSteps", () => {
       "scoreChat",
       "rebuildMemberships",
       "checkLedger",
+      "writeNotes",
     ]);
   });
 });
@@ -125,12 +132,13 @@ describe("stepsForPhase", () => {
     expect(stepsForPhase("score")).not.toContain("saveChatLog");
   });
 
-  it("scores, rebuilds and checks the ledger on the night", () => {
+  it("scores, rebuilds, checks the ledger and writes the notes on the night", () => {
     expect(stepsForPhase("score")).toEqual([
       "topUpChat",
       "scoreChat",
       "rebuildMemberships",
       "checkLedger",
+      "writeNotes",
     ]);
   });
 

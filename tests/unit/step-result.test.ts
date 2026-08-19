@@ -86,4 +86,21 @@ describe("judgeStep", () => {
     expect(judgeStep("checkLedger", true, { ok: true })).toBe("ok");
     expect(judgeStep("checkLedger", true, { ok: false })).toBe("failed");
   });
+
+  it("fails the notes when any chatter failed", () => {
+    expect(judgeStep("writeNotes", true, { written: 6, skipped: 2, capped: 0, failed: 1 })).toBe(
+      "failed"
+    );
+  });
+
+  it("passes notes that wrote nothing because every chatter was unchanged", () => {
+    expect(judgeStep("writeNotes", true, { written: 0, skipped: 9, capped: 0, failed: 0 })).toBe(
+      "ok"
+    );
+  });
+
+  it("is unknown when the notes step does not say what it did", () => {
+    expect(judgeStep("writeNotes", true, null)).toBe("unknown");
+    expect(judgeStep("writeNotes", true, { written: 3 })).toBe("unknown");
+  });
 });
