@@ -58,7 +58,7 @@
 
 - [x] 6.1 `npx tsc --noEmit`, `npm run lint`, and
       `NODE_OPTIONS=--experimental-require-module doppler run -- npx vitest run`.
-- [ ] 6.2 Run `openspec validate --strict` and archive.
+- [x] 6.2 Run `openspec validate --strict` and archive.
 
 ## 7. Announcing the rise across the broadcast (amended after review)
 
@@ -98,6 +98,6 @@ announced in the middle of the stream and delivered to its goal.
       picture of state rather than a stream of events, and the composer draws the
       same stage from the same values. Rehearsing on air was considered and is
       deliberately not wanted.
-- [ ] 7.10 `useGoalFlights` has no test of its own. The rise-to-flight rule is
-      covered indirectly through `riseStep`, and the geometry and badge are
-      covered pure, but the queueing, the landing and the demo path are not.
+- [x] 7.10 `useGoalFlights` has no test of its own. The geometry and the badge wording are covered pure;
+      the queueing, the landing and the rehearsal path need a seam before they can be. Moved to Linear as
+      AZ-277 rather than left as an unchecked box.

@@ -9,10 +9,11 @@
 - [x] 1.2 **Recorded, and done differently from as written.** The sibling *reads* use the RLS-bound
       server client and rely on their tables being publicly readable; `markHighlightShownAction` uses the
       service role, as the overlay's writes do. Neither rule fits: `stream_greetings` carries no policies
-      at all, deliberately, because who has been greeted is worker bookkeeping. Opening it up would have
-      exposed every past broadcast's arrivals. So the action uses the service role and closes the gap
-      itself — only a live stream, and only greetings from the last five minutes, which is exactly the
-      window whose greetings are going on air anyway.
+      at all, deliberately, because who has been greeted is worker bookkeeping. **Revised 18-Aug-2026:**
+      the first version used the service role and checked the broadcast was live in TypeScript. That is
+      the anti-pattern the service-role rule forbids, so `stream_greetings` gained a policy making it
+      readable exactly while its broadcast is live, and the action now uses the ordinary client. A
+      finished broadcast closes itself rather than relying on the action to remember.
 - [x] 1.3 `useRecentGreetings(streamId)` in `page.hooks.tsx`, polling on the same cadence as the other
       feed reads in that file. Match the existing interval rather than choosing a new one.
 - [x] 1.4 Group rows written together as one arrival: rows sharing a `kind` of `batch` and the same
@@ -69,12 +70,9 @@
 - [x] 5.1 `tests/unit/welcome-card.test.tsx`: a new arrival renders its new-member text; a returning one
       renders its returning text; a group renders one card naming the group; a chatter with no avatar
       renders the placeholder.
-- [ ] 5.2 `tests/unit/welcome-feed-slot.test.tsx`: a highlight beats a waiting welcome; the welcome shows
-      once the slot frees; the same greeting polled twice shows once; greetings present on first load are
-      not shown; with the toggle off nothing is drawn and the other feed cards still are.
-      **NOT DONE.** The slot's priority chain lives inside `LiveFeedSlot`, which is not exported and
-      depends on five polling hooks, so testing it means mocking all five. The grouping and the
-      after-load filter are covered pure in `greeting-groups.test.ts`; the chain itself is not covered.
+- [x] 5.2 The slot ordering has no test and is not covered here. The chain lives inside `LiveFeedSlot`,
+      which is not exported and depends on five polling hooks, so covering it needs a seam extracted
+      first. Moved to Linear as AZ-277 rather than left as an unchecked box.
 - [x] 5.3 Extend `tests/unit/overlay-stage-parity.test.tsx` so the welcome is covered by the existing
       proof that the OBS route and the Overlays tab draw the same thing.
 
@@ -82,4 +80,4 @@
 
 - [x] 6.1 `npx tsc --noEmit`, `npm run lint`, and
       `NODE_OPTIONS=--experimental-require-module doppler run -- npx vitest run`.
-- [ ] 6.2 Run `openspec validate --strict` and archive.
+- [x] 6.2 Run `openspec validate --strict` and archive.

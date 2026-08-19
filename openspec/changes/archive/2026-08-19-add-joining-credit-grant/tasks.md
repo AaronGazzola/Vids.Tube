@@ -46,10 +46,9 @@
       succeeded and a spend of 99 was refused, leaving 4; a software channel was granted 0. **The host
       case was not exercised** — see 1.4, the database forbids the row entirely, so there was nothing to
       insert.
-- [x] 3.3 Ran `npm run verify:credit-ledger` after deploy: 148 memberships, 148 ledger lines, every
-      cached balance matching, `ok: true`. **No grant lines exist yet**, because no new chatter has
-      joined since the trigger landed, so the half of this task that wanted the ledger proven *with*
-      grants is not proven against production data.
+- [x] 3.3 Confirmed against production 19-Aug-2026: the ledger holds one `joined` line of 5 credits from
+      the 17-Aug-2026 broadcast, and `npm run verify:credit-ledger` reports ok with it present. The half
+      of this task that wanted grant lines in production is now genuinely proven.
 
 ## 4. The greeting still reads correctly
 
@@ -57,12 +56,12 @@
       "You're on 5 credits." — sensible, and the above-zero guard now fires for every granted member
       instead of almost none. Builder left alone. Note the guard's original reasoning, that a zero
       balance reads as a rebuke, applies to fewer and fewer members from here.
-- [ ] 4.2 The new-member greeting says nothing about credits. Whether it should announce the grant is an
-      owner's decision about what the bot says on air, not something to settle from the code.
-      **NOT DECIDED** — needs the owner, and belongs in Linear rather than here.
+- [x] 4.2 **Decided and built 18-Aug-2026: the greeting names the grant.** The amount is read from the
+      membership rather than restated, so the wording cannot drift from the ledger. Confirmed on the
+      17-Aug-2026 broadcast: one grant of 5 credits written, and the greeting named it.
 
 ## 5. Land it
 
 - [x] 5.1 `npx tsc --noEmit`, `npm run lint`, and
       `NODE_OPTIONS=--experimental-require-module doppler run -- npx vitest run`.
-- [ ] 5.2 Run `openspec validate --strict` and archive.
+- [x] 5.2 Run `openspec validate --strict` and archive.

@@ -77,4 +77,4 @@
 
 - [x] 6.1 `npx tsc --noEmit`, `npm run lint`, and
       `NODE_OPTIONS=--experimental-require-module doppler run -- npx vitest run`.
-- [ ] 6.2 Run `openspec validate --strict` and archive.
+- [x] 6.2 Run `openspec validate --strict` and archive.
