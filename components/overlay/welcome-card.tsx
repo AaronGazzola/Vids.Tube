@@ -61,7 +61,7 @@ export function WelcomeCard({
     >
       {/* Avatar above, message below: an arrival's own shape, which reads at a
           glance as somebody appearing rather than as somebody being quoted. */}
-      <div className="flex w-full flex-col items-center gap-2">
+      <div className="flex w-full flex-col items-center gap-6">
         <div className="flex items-end justify-center -space-x-3">
           {authors.slice(0, 5).map((author, i) => (
             <AvatarBubble

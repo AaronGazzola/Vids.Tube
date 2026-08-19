@@ -48,6 +48,12 @@ import { useDemoLayoutStore } from "./demo.stores";
 import { ActivityContent, ActivityIndicators, WrapupButton } from "./panels";
 import { SettingsTab, type SettingsForm } from "./settings-tab";
 import {
+  useSaveStreamTasks,
+  useSeedTaskDraft,
+  useTaskDraftPending,
+} from "./tasks.hooks";
+import { useTasksStore } from "./tasks.stores";
+import {
   useCurrentBroadcast,
   useDiscardBroadcast,
   useEndStream,
@@ -452,6 +458,13 @@ export default function LivePage() {
   const commitMessages = useDemoLayoutStore((s) => s.commitMessages);
   const { data: myChannel } = useMyChannel();
 
+  // The task list is edited as a draft on two tabs and committed by the same
+  // Save changes press as the rest of the Settings tab.
+  const taskDraft = useTasksStore((s) => s.tasks);
+  const tasksPending = useTaskDraftPending(streamId);
+  const saveTasks = useSaveStreamTasks(streamId);
+  useSeedTaskDraft(streamId);
+
   const demoGoals = settings?.goals ?? null;
 
   useDemoLayout(true);
@@ -487,7 +500,8 @@ export default function LivePage() {
 
   const dirty =
     (!!form && !!dbForm && JSON.stringify(form) !== JSON.stringify(dbForm)) ||
-    messagesPending;
+    messagesPending ||
+    tasksPending;
 
   const buildPayload = (f: SettingsForm) => ({
     title: f.title,
@@ -525,6 +539,12 @@ export default function LivePage() {
     // From here the layout's own debounced save persists the messages and the
     // realtime push carries them to OBS, on the path a box move already uses.
     commitMessages();
+    // Tasks are their own rows rather than part of the broadcast settings, so
+    // they are written here rather than folded into the payload below. A save
+    // that changed nothing writes no version.
+    if (streamId && tasksPending) {
+      await saveTasks.mutateAsync(taskDraft);
+    }
     // A staged thumbnail reaches storage only now, so an abandoned choice never
     // leaves an object behind and never touches the broadcast.
     let payload = buildPayload(f);
@@ -650,6 +670,7 @@ export default function LivePage() {
                 form={form}
                 setForm={setForm}
                 channelSlug={settings.channelSlug}
+                streamId={streamId}
                 thumbnailPath={broadcast?.thumbnail_path ?? null}
                 isPublic={isPublic}
                 workerRunning={settings.workerRunning}

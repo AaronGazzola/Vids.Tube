@@ -8,7 +8,9 @@ import { BreakCard } from "@/components/overlay/break-card";
 import { OverlayStage } from "@/components/overlay/overlay-stage";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import { TtsCard } from "@/components/overlay/tts-card";
+import { TaskListCard } from "@/components/overlay/task-list-card";
 import { WelcomeCard } from "@/components/overlay/welcome-card";
+import { taskRevealFor, type StreamTask } from "@/lib/stream-tasks";
 import { groupGreetings } from "@/lib/greeting-groups";
 import type { DemoLayoutConfig } from "@/app/(app)/live/demo.types";
 import {
@@ -41,6 +43,7 @@ import {
   usePlayableAsk,
   usePlayableTts,
   usePromotedMessages,
+  useNewestTaskVersion,
   useRecentGreetings,
   useStreamStandings,
 } from "./page.hooks";
@@ -183,16 +186,21 @@ function LiveFeedSlot({
   streamId,
   soundOn,
   welcomeVisible,
+  tasksVisible,
 }: {
   streamId: string;
   soundOn: boolean;
   welcomeVisible: boolean;
+  tasksVisible: boolean;
 }) {
   const { data: promoted } = usePromotedMessages(streamId);
   const { data: standings } = useStreamStandings(streamId);
   const { data: ttsQueue } = usePlayableTts(streamId);
   const { data: askQueue } = usePlayableAsk(streamId);
   const { data: greetings } = useRecentGreetings(streamId);
+  const { data: taskVersion } = useNewestTaskVersion(
+    tasksVisible ? streamId : null
+  );
 
   const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
   const [doneTts, setDoneTts] = useState<Set<string>>(new Set());
@@ -225,6 +233,26 @@ function LiveFeedSlot({
     currentHighlight || currentTts || currentAsk
       ? null
       : welcomeGroups.find((g) => !doneWelcomes.has(g.id)) ?? null;
+
+  // The version this overlay has already drawn. Seeded with whatever was newest
+  // when the browser source loaded, so a reload mid-broadcast replays nothing,
+  // and advanced only when a reveal finishes — which is what makes two saves
+  // during one reveal collapse into a single following reveal covering both.
+  const [shownTasks, setShownTasks] = useState<{
+    id: string | null;
+    items: StreamTask[];
+  } | null>(null);
+  if (taskVersion !== undefined && shownTasks === null) {
+    setShownTasks({ id: taskVersion?.id ?? null, items: taskVersion?.items ?? [] });
+  }
+  // ponytail: ranked last, so a reveal never interrupts what is already on
+  // screen. The ceiling is that continuous chat can hold the slot, and the
+  // reveal waits for as long as that lasts.
+  const currentTasks = taskRevealFor(
+    shownTasks,
+    taskVersion,
+    !!(currentHighlight || currentTts || currentAsk || currentWelcome)
+  );
 
   useOverlayChime(
     !soundOn
@@ -336,6 +364,16 @@ function LiveFeedSlot({
           }
         />
       )}
+      {currentTasks && shownTasks && (
+        <TaskListCard
+          key={currentTasks.id}
+          previous={shownTasks.items}
+          next={currentTasks.items}
+          onDone={() =>
+            setShownTasks({ id: currentTasks.id, items: currentTasks.items })
+          }
+        />
+      )}
     </>
   );
 }
@@ -394,7 +432,8 @@ export default function OverlayFramePage({
     : config.visible.highlight ||
       config.visible.tts ||
       config.visible.ask ||
-      config.visible.welcome;
+      config.visible.welcome ||
+      config.visible.tasks;
 
   const goalMetric = (m: GoalMetric) => {
     if (demo) {
@@ -430,6 +469,7 @@ export default function OverlayFramePage({
       streamId={streamId}
       soundOn={config.feedSound !== "off"}
       welcomeVisible={visible.welcome}
+      tasksVisible={config.visible.tasks}
     />
   ) : null;
 

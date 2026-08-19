@@ -130,7 +130,25 @@ at in OBS.
 
 ---
 
-## 5. After a clean broadcast, not before
+## 5. The task list and its overlay reveal (AZ-278)
+
+Built 19-Aug-2026 and never seen live. The list is managed from the Settings tab
+and from a checkbox button in the Activity tab header, and the overlay shows it
+briefly whenever a save changes it.
+
+- Save a list from the Settings tab, then edit it mid-broadcast from the Activity
+  tab popover. Nothing may reach the overlay until Save is pressed.
+- Mark a task complete and save: the reveal opens on the previous state, ticks
+  the box, holds and fades.
+- Press Show in overlay: the saved list draws with nothing animated.
+- Refresh the OBS browser source: nothing replays.
+- Save while a highlight is on screen: the highlight plays out first.
+
+Full check list is on AZ-278; close it when they all pass.
+
+---
+
+## 6. After a clean broadcast, not before
 
 Delete the rollback copies from the streaming machine once the ladder has run
 cleanly through a broadcast:

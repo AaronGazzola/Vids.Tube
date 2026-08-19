@@ -70,16 +70,36 @@ async function main() {
 
     if (!APPLY) continue;
 
-    for (const [table, col] of [
-      ["viewer_scores", "participant_key"],
-      ["featured_messages", "user_id"],
-      ["score_events", "user_id"],
+    // Written out rather than looped over a (table, column) pair: the column
+    // differs per table, and the typed client cannot narrow one name against
+    // three different column unions.
+    for (const [table, query] of [
+      [
+        "viewer_scores",
+        admin
+          .from("viewer_scores")
+          .delete()
+          .eq("stream_id", s.id)
+          .eq("participant_key", host),
+      ],
+      [
+        "featured_messages",
+        admin
+          .from("featured_messages")
+          .delete()
+          .eq("stream_id", s.id)
+          .eq("user_id", host),
+      ],
+      [
+        "score_events",
+        admin
+          .from("score_events")
+          .delete()
+          .eq("stream_id", s.id)
+          .eq("user_id", host),
+      ],
     ] as const) {
-      const { error } = await admin
-        .from(table)
-        .delete()
-        .eq("stream_id", s.id)
-        .eq(col, host);
+      const { error } = await query;
       if (error) throw new Error(`${table}: ${error.message}`);
     }
   }

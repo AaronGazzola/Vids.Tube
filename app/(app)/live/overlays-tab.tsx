@@ -85,7 +85,15 @@ export function OverlaysTab({
   const playHighlight = useDemoGeneratorStore((s) => s.playHighlight);
   const playTts = useDemoGeneratorStore((s) => s.playTts);
   const playAsk = useDemoGeneratorStore((s) => s.playAsk);
-  const playFor = { highlight: playHighlight, tts: playTts, ask: playAsk } as const;
+  const playWelcome = useDemoGeneratorStore((s) => s.playWelcome);
+  const playTasks = useDemoGeneratorStore((s) => s.playTasks);
+  const playFor = {
+    highlight: playHighlight,
+    tts: playTts,
+    ask: playAsk,
+    welcome: playWelcome,
+    tasks: playTasks,
+  } as const;
   const { data: myChannel } = useMyChannel();
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -120,7 +128,10 @@ export function OverlaysTab({
   };
 
   const feedVisible =
-    config.visible.highlight || config.visible.tts || config.visible.ask;
+    config.visible.highlight ||
+    config.visible.tts ||
+    config.visible.ask ||
+    config.visible.tasks;
   const demoValues = useOverlayDemoValues(goals, feedVisible);
   const realValues = useOverlayComposerValues(channelSlug, feedVisible, goals);
   const values = demo ? demoValues : realValues;
@@ -304,24 +315,30 @@ export function OverlaysTab({
                   onCheckedChange={() => toggleVisible(key)}
                 />
               </label>
-              {(key === "highlight" || key === "tts" || key === "ask") && (
+              {(key === "highlight" ||
+                key === "tts" ||
+                key === "ask" ||
+                key === "welcome" ||
+                key === "tasks") && (
                 <div className="flex items-center justify-between gap-2 pl-2">
                   <button
                     onClick={playFor[key]}
                     className="rounded bg-white/15 px-2 py-0.5 text-[10px] hover:bg-white/25"
-                    aria-label={`Play ${DEMO_OVERLAY_LABELS[key]}`}
+                    aria-label={`${key === "welcome" || key === "tasks" ? "Demo" : "Play"} ${DEMO_OVERLAY_LABELS[key]}`}
                   >
-                    Play
+                    {key === "welcome" || key === "tasks" ? "Demo" : "Play"}
                   </button>
-                  <label className="flex items-center gap-1 text-[10px] text-white/80">
-                    <input
-                      type="checkbox"
-                      aria-label={`Persist ${DEMO_OVERLAY_LABELS[key]}`}
-                      checked={persist[key]}
-                      onChange={(e) => setPersist(key, e.target.checked)}
-                    />
-                    persist
-                  </label>
+                  {key !== "welcome" && key !== "tasks" && (
+                    <label className="flex items-center gap-1 text-[10px] text-white/80">
+                      <input
+                        type="checkbox"
+                        aria-label={`Persist ${DEMO_OVERLAY_LABELS[key]}`}
+                        checked={persist[key]}
+                        onChange={(e) => setPersist(key, e.target.checked)}
+                      />
+                      persist
+                    </label>
+                  )}
                 </div>
               )}
               {/* A goal announces its rises across the broadcast. Switchable per
@@ -351,7 +368,10 @@ export function OverlaysTab({
               )}
               {/* The feed's card types share the highlight box, so they have no
                   box of their own to fade. */}
-              {key !== "tts" && key !== "ask" && key !== "welcome" && (
+              {key !== "tts" &&
+                key !== "ask" &&
+                key !== "welcome" &&
+                key !== "tasks" && (
                 <div className="flex items-center gap-1.5 pl-2">
                   <input
                     type="range"

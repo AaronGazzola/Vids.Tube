@@ -1,4 +1,5 @@
 import type { FeaturedAuthor } from "@/app/layout.types";
+import { cn } from "@/lib/utils";
 import { AvatarBubble } from "./avatar-bubble";
 
 export function SpeechBubble({
@@ -10,7 +11,12 @@ export function SpeechBubble({
 }) {
   return (
     <div
-      className="overlay-surface relative flex-1 self-start rounded-xl border border-white px-4 py-3 text-base leading-relaxed text-white"
+      className={cn(
+        "overlay-surface relative flex-1 rounded-xl border border-white px-4 py-3 text-base leading-relaxed text-white",
+        // The top pointer sits above a centred avatar, so the bubble centres too
+        // rather than sticking to the left edge when the text is short.
+        pointer === "top" ? "self-center" : "self-start"
+      )}
       style={
         {
           "--overlay-surface-alpha": 1,

@@ -41,13 +41,30 @@ export function SettingsField({
   if (field.type === "number") {
     const current = typeof value === "number" ? value : (field.min ?? 0);
     const ranged = field.min !== undefined && field.max !== undefined;
+    // The readout is typed into as well as read, because a slider fine enough to
+    // be worth having is too fine to land on an exact value by dragging. A typed
+    // number is held to the same bounds the slider is, so neither route can
+    // reach a value the other cannot.
+    const commit = (raw: number) => {
+      if (!Number.isFinite(raw)) return;
+      const lo = field.min ?? -Infinity;
+      const hi = field.max ?? Infinity;
+      onChange(Math.min(hi, Math.max(lo, raw)));
+    };
     return (
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           {label}
-          <span className="w-10 text-right text-[10px] tabular-nums text-white/70">
-            {current}
-          </span>
+          <input
+            type="number"
+            aria-label={`${field.label} value`}
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            value={current}
+            onChange={(e) => commit(Number(e.target.value))}
+            className="w-14 rounded bg-white/15 px-1 py-0.5 text-right text-[10px] tabular-nums text-white/90"
+          />
         </div>
         <input
           type={ranged ? "range" : "number"}
@@ -56,7 +73,7 @@ export function SettingsField({
           max={field.max}
           step={field.step}
           value={current}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(e) => commit(Number(e.target.value))}
           className="w-full min-w-0 accent-primary"
         />
       </div>

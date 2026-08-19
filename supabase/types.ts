@@ -598,6 +598,45 @@ export type Database = {
           },
         ]
       }
+      chatter_notes: {
+        Row: {
+          generated_at: string
+          membership_id: string
+          notes: Json
+          snapshot: Json
+          source_stream_id: string | null
+        }
+        Insert: {
+          generated_at?: string
+          membership_id: string
+          notes?: Json
+          snapshot: Json
+          source_stream_id?: string | null
+        }
+        Update: {
+          generated_at?: string
+          membership_id?: string
+          notes?: Json
+          snapshot?: Json
+          source_stream_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatter_notes_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: true
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chatter_notes_source_stream_id_fkey"
+            columns: ["source_stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clip_markers: {
         Row: {
           author_name: string | null
@@ -1513,6 +1552,48 @@ export type Database = {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "stream_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_task_versions: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          items: Json
+          reason: string
+          stream_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          items?: Json
+          reason?: string
+          stream_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          reason?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_task_versions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stream_task_versions_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "streams"
             referencedColumns: ["id"]
           },
         ]

@@ -45,6 +45,7 @@ import {
   EllipsisVertical,
   HelpCircle,
   Info,
+  ListChecks,
   Scissors,
   Shield,
   Sparkles,
@@ -52,6 +53,13 @@ import {
   Volume2,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { TaskListEditor } from "./task-list-editor";
+import {
+  useRevealStreamTasks,
+  useSaveStreamTasks,
+  useTaskDraftPending,
+} from "./tasks.hooks";
+import { useTasksStore } from "./tasks.stores";
 import {
   useOverlayContext,
   useViewerLeaderboard,
@@ -1099,6 +1107,64 @@ function ModBotActionsIndicator({ streamId }: { streamId: string }) {
 // Icon-with-badge popovers rendered in the tab bar next to the tab triggers
 // (and in the pop-out header): goals, competition, mod bot actions, clip
 // markers. The competition trigger is the leading chatter's avatar.
+// The task list, editable mid-broadcast without leaving the Activity tab.
+// Everything here is a draft: a status flipped in this popover reaches the
+// overlay only when Save is pressed.
+function TasksIndicator({ streamId }: { streamId: string }) {
+  const tasks = useTasksStore((s) => s.tasks);
+  const pending = useTaskDraftPending(streamId);
+  const save = useSaveStreamTasks(streamId);
+  const reveal = useRevealStreamTasks(streamId);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative h-8 w-8"
+          aria-label="Tasks"
+        >
+          <ListChecks className="h-4 w-4" />
+          <CountBadge count={tasks.filter((t) => t.text.trim() !== "").length} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-96 p-2">
+        <p className="px-1 pb-1 text-sm font-semibold">Tasks</p>
+        <TaskListEditor />
+        <div className="flex items-center justify-between gap-2 pt-2">
+          {/* Shows what is saved, so it is unavailable while the draft says
+              something else — the audience is never shown a list the owner has
+              already moved on from. */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending || reveal.isPending}
+            title={
+              pending ? "Save first — this shows the saved list" : undefined
+            }
+            onClick={() => reveal.mutate()}
+          >
+            Show in overlay
+          </Button>
+          <Button
+            size="sm"
+            disabled={!pending || save.isPending}
+            onClick={() => save.mutate(tasks)}
+          >
+            Save
+          </Button>
+        </div>
+        {pending && (
+          <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+            Save first to show these on the overlay.
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function ActivityIndicators() {
   const { data: ctx } = useOverlayContext();
   const streamId = ctx?.streamId ?? null;
@@ -1108,6 +1174,7 @@ export function ActivityIndicators() {
       <CompetitionIndicator streamId={streamId} />
       {streamId && <ModBotActionsIndicator streamId={streamId} />}
       <ClipMarkersIndicator streamId={streamId} />
+      {streamId && <TasksIndicator streamId={streamId} />}
     </div>
   );
 }

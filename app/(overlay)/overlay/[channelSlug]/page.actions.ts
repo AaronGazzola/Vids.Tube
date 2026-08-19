@@ -9,6 +9,7 @@ import type {
   FeaturedMessageWithAuthor,
 } from "@/app/layout.types";
 import { resolveAuthorIdentities } from "@/lib/author-identity";
+import { parseTaskItems, type StreamTask } from "@/lib/stream-tasks";
 import { channelAvatarUrl } from "@/lib/storage";
 import type { OverlayInstallation } from "@/lib/overlay-frame";
 import { installationForChannel } from "@/lib/overlay-installation";
@@ -494,4 +495,40 @@ export async function getRecentGreetingsAction(
       },
     };
   });
+}
+
+export type OverlayTaskVersion = {
+  id: string;
+  items: StreamTask[];
+  createdAt: string;
+};
+
+// The newest saved version of the broadcast's task list, which is both what the
+// overlay draws and how it notices there is something new to draw.
+//
+// Read with the ordinary client: the policy opens these rows exactly while the
+// broadcast is live, which is exactly while the audience can see them anyway.
+export async function getNewestTaskVersionAction(
+  streamId: string
+): Promise<OverlayTaskVersion | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("stream_task_versions")
+    .select("id, items, created_at")
+    .eq("stream_id", streamId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw new Error("Failed to fetch the task list");
+  }
+  if (!data) {
+    return null;
+  }
+  return {
+    id: data.id,
+    items: parseTaskItems(data.items),
+    createdAt: data.created_at,
+  };
 }

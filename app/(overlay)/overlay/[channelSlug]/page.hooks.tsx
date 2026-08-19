@@ -32,6 +32,7 @@ import {
   getMemberCountAction,
   getOverlayLayoutAction,
   getPlayableAskAction,
+  getNewestTaskVersionAction,
   getRecentGreetingsAction,
   getPlayableTtsAction,
   getPromotedMessagesAction,
@@ -314,6 +315,18 @@ export function useRecentGreetings(streamId: string | null) {
   return useQuery({
     queryKey: ["greetings", streamId],
     queryFn: () => getRecentGreetingsAction(streamId!),
+    enabled: !!streamId,
+    refetchInterval: 2000,
+  });
+}
+
+// The newest saved version of the task list, polled on the same cadence as the
+// rest of the feed so a task ticked off reaches the broadcast as quickly as a
+// highlight does.
+export function useNewestTaskVersion(streamId: string | null) {
+  return useQuery({
+    queryKey: ["stream-task-version", streamId],
+    queryFn: () => getNewestTaskVersionAction(streamId!),
     enabled: !!streamId,
     refetchInterval: 2000,
   });

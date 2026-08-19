@@ -127,6 +127,35 @@ export function OverlayStage({
       }
       style={{ width: OVERLAY_CANVAS_W, height: OVERLAY_CANVAS_H }}
     >
+      {/* Drawn first, so it sits behind every other overlay. The boxes are
+          absolutely positioned siblings with no z-index between them, so paint
+          order is document order and nothing else. The game is the one surface
+          large enough to cover another, and it is scenery: a goal, a highlight
+          or a task reveal landing on top of it is the right way round. */}
+      {visible.game && (
+        <Positioned boxKey="game" box={boxes.game} opacity={config.boxOpacity.game}>
+          {wrap(
+            "game",
+            <GameWindow
+              installation={values.gameInstallation}
+              events={values.gameEvents}
+              // The stage is what knows the box, so it is the stage that tells
+              // the overlay how much room it has. The scale is the half a frame
+              // cannot measure for itself.
+              //
+              // The game box carries its own width and height because it is the
+              // one overlay that resizes freely; the nominal dimensions are the
+              // fallback for a layout saved before it could.
+              box={{
+                width: boxes.game.w ?? OVERLAY_BASE_DIMS.game.w,
+                height: boxes.game.h ?? OVERLAY_BASE_DIMS.game.h,
+                scale: boxes.game.scale,
+              }}
+            />
+          )}
+        </Positioned>
+      )}
+
       {values.feedVisible && (
         <Positioned boxKey="highlight" box={boxes.highlight} opacity={config.boxOpacity.highlight}>
           <div style={{ width: OVERLAY_FEED_WIDTH }}>
@@ -209,30 +238,6 @@ export function OverlayStage({
             <CompetitionLadder
               entries={values.competitionEntries}
               size={OVERLAY_LADDER_SIZE}
-            />
-          )}
-        </Positioned>
-      )}
-
-      {visible.game && (
-        <Positioned boxKey="game" box={boxes.game} opacity={config.boxOpacity.game}>
-          {wrap(
-            "game",
-            <GameWindow
-              installation={values.gameInstallation}
-              events={values.gameEvents}
-              // The stage is what knows the box, so it is the stage that tells
-              // the overlay how much room it has. The scale is the half a frame
-              // cannot measure for itself.
-              //
-              // The game box carries its own width and height because it is the
-              // one overlay that resizes freely; the nominal dimensions are the
-              // fallback for a layout saved before it could.
-              box={{
-                width: boxes.game.w ?? OVERLAY_BASE_DIMS.game.w,
-                height: boxes.game.h ?? OVERLAY_BASE_DIMS.game.h,
-                scale: boxes.game.scale,
-              }}
             />
           )}
         </Positioned>

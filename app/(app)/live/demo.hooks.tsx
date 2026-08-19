@@ -202,6 +202,7 @@ export function useDemoOverlayBroadcast(
   const goalProgressFull = useDemoLayoutStore((s) => s.config.goalProgressFull);
   const persist = useDemoLayoutStore((s) => s.persist);
   const viewers = useDemoGeneratorStore((s) => s.viewers);
+  const welcomes = useDemoGeneratorStore((s) => s.welcomes);
   const messages = useDemoGeneratorStore((s) => s.messages);
   const scores = useDemoGeneratorStore((s) => s.scores);
   const tts = useDemoGeneratorStore((s) => s.tts);
@@ -280,25 +281,13 @@ export function useDemoOverlayBroadcast(
           includeAnswer: a.includeAnswer,
           ...standingFor(a.viewerKey),
         })),
-      // One of each shape, from the viewers the demo already invented, so the
-      // streamer can see how a welcome reads before a real chatter triggers one.
-      welcomes: viewers.length
-        ? [
-            {
-              id: "demo-welcome-new",
-              kind: "new" as const,
-              authors: [authorFor(viewers[0].key)].filter((a) => a !== null),
-            },
-            {
-              id: "demo-welcome-batch",
-              kind: "batch" as const,
-              authors: viewers
-                .slice(1, 4)
-                .map((v) => authorFor(v.key))
-                .filter((a) => a !== null),
-            },
-          ]
-        : [],
+      // Seeded so a welcome reads on the overlay before a real chatter triggers
+      // one, and appended to by the panel's Demo button.
+      welcomes: welcomes.map((w) => ({
+        id: w.id,
+        kind: w.kind,
+        authors: w.viewerKeys.map(authorFor).filter((a) => a !== null),
+      })),
     };
 
     // Debounced: box drags update the store many times per second.
@@ -321,6 +310,7 @@ export function useDemoOverlayBroadcast(
     goalProgressFull,
     persist,
     viewers,
+    welcomes,
     messages,
     scores,
     tts,

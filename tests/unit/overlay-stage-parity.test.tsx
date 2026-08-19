@@ -115,6 +115,34 @@ describe("OverlayStage parity across surfaces", () => {
     expect(render("obs")).toContain("143");
     expect(render("composer")).toContain("143");
   });
+
+  // Paint order is document order: the boxes are absolutely positioned siblings
+  // with no z-index between them, so the game being drawn first is the whole of
+  // it sitting behind everything else.
+  it("draws the game box before every other overlay, on both surfaces", () => {
+    for (const surface of ["obs", "composer"] as const) {
+      // The game is off by default, so it has to be switched on to be ordered.
+      const markup = renderToStaticMarkup(
+        <OverlayStage
+          config={CONFIG}
+          boxes={CONFIG.boxes}
+          visible={{ ...CONFIG.visible, game: true }}
+          surface={surface}
+          values={values()}
+        />
+      );
+      const game = markup.indexOf('data-testid="overlay-box-game"');
+      expect(game).toBeGreaterThan(-1);
+      for (const other of [
+        "overlay-box-highlight",
+        "overlay-box-messageBanner",
+        "overlay-box-goalSubs",
+        "overlay-box-competition",
+      ]) {
+        expect(markup.indexOf(`data-testid="${other}"`)).toBeGreaterThan(game);
+      }
+    }
+  });
 });
 
 describe("the welcome card draws the same on both surfaces", () => {

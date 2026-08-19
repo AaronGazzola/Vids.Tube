@@ -7,6 +7,8 @@ import type { CompetitionEntry } from "@/components/overlay/competition-ladder";
 import { HighlightedMessage } from "@/components/overlay/highlighted-message";
 import type { OverlayStageValues } from "@/components/overlay/overlay-stage.types";
 import { TtsCard } from "@/components/overlay/tts-card";
+import { TaskListCard } from "@/components/overlay/task-list-card";
+import { WelcomeCard } from "@/components/overlay/welcome-card";
 import { OVERLAY_LADDER_MAX } from "@/lib/demo-overlay";
 import { computeGoalProgress, reachedProgress, type Counts } from "@/lib/goals";
 import { computeStandings } from "@/lib/standings";
@@ -49,10 +51,14 @@ function DemoOverlayFeed() {
   const scores = useDemoGeneratorStore((s) => s.scores);
   const tts = useDemoGeneratorStore((s) => s.tts);
   const asks = useDemoGeneratorStore((s) => s.asks);
+  const welcomes = useDemoGeneratorStore((s) => s.welcomes);
+  const taskReveals = useDemoGeneratorStore((s) => s.taskReveals);
   const markTtsPlayed = useDemoGeneratorStore((s) => s.markTtsPlayed);
   const markAskShown = useDemoGeneratorStore((s) => s.markAskShown);
   const [doneHighlights, setDoneHighlights] = useState<Set<string>>(new Set());
   const [finishedTts, setFinishedTts] = useState<Set<string>>(new Set());
+  const [doneWelcomes, setDoneWelcomes] = useState<Set<string>>(new Set());
+  const [doneTaskReveals, setDoneTaskReveals] = useState<Set<string>>(new Set());
 
   const currentHighlight = config.visible.highlight
     ? [...messages]
@@ -67,6 +73,20 @@ function DemoOverlayFeed() {
   const currentAsk =
     !currentHighlight && !currentTts && config.visible.ask
       ? asks.find((a) => a.status === "approved") ?? null
+      : null;
+  const currentWelcome =
+    !currentHighlight && !currentTts && !currentAsk && config.visible.welcome
+      ? welcomes.find((w) => !doneWelcomes.has(w.id)) ?? null
+      : null;
+  // Last in the slot, as it is on a live broadcast: a reveal waits rather than
+  // interrupting whatever is already on screen.
+  const currentTaskReveal =
+    !currentHighlight &&
+    !currentTts &&
+    !currentAsk &&
+    !currentWelcome &&
+    config.visible.tasks
+      ? taskReveals.find((r) => !doneTaskReveals.has(r.id)) ?? null
       : null;
   const currentTtsId = currentTts?.id ?? null;
   const currentAskId = currentAsk?.id ?? null;
@@ -156,6 +176,42 @@ function DemoOverlayFeed() {
     );
   }
 
+  if (currentWelcome) {
+    return (
+      <WelcomeCard
+        key={currentWelcome.id}
+        kind={currentWelcome.kind}
+        authors={currentWelcome.viewerKeys
+          .map(authorFor)
+          .filter((a) => a !== null)}
+        onDone={() =>
+          setDoneWelcomes((prev) => {
+            const next = new Set(prev);
+            next.add(currentWelcome.id);
+            return next;
+          })
+        }
+      />
+    );
+  }
+
+  if (currentTaskReveal) {
+    return (
+      <TaskListCard
+        key={currentTaskReveal.id}
+        previous={currentTaskReveal.previous}
+        next={currentTaskReveal.next}
+        onDone={() =>
+          setDoneTaskReveals((prev) => {
+            const next = new Set(prev);
+            next.add(currentTaskReveal.id);
+            return next;
+          })
+        }
+      />
+    );
+  }
+
   return null;
 }
 
@@ -170,6 +226,7 @@ export function useOverlayDemoValues(
   const messages = useDemoGeneratorStore((s) => s.messages);
   const tts = useDemoGeneratorStore((s) => s.tts);
   const asks = useDemoGeneratorStore((s) => s.asks);
+  const taskReveals = useDemoGeneratorStore((s) => s.taskReveals);
 
   const gameInstallation = useInstalledGameOverlay();
 
@@ -193,7 +250,8 @@ export function useOverlayDemoValues(
     (config.visible.highlight &&
       messages.some((m) => m.promoted && !m.dismissed)) ||
       (config.visible.tts && tts.some((t) => t.status === "approved")) ||
-      (config.visible.ask && asks.some((a) => a.status === "approved"))
+      (config.visible.ask && asks.some((a) => a.status === "approved")) ||
+      (config.visible.tasks && taskReveals.length > 0)
   );
 
   return {

@@ -16,7 +16,7 @@ export type DemoBoxKey =
   | "highlight"
   | "break"
   | "game";
-export type DemoOverlayKey = DemoBoxKey | "tts" | "ask" | "welcome";
+export type DemoOverlayKey = DemoBoxKey | "tts" | "ask" | "welcome" | "tasks";
 export type DemoBackground = "slideshow" | "gradient" | "black";
 
 // `w` and `h` are canvas units and are carried only by a box that resizes
@@ -167,6 +167,7 @@ export const DEMO_OVERLAY_LABELS: Record<DemoOverlayKey, string> = {
   tts: "TTS card",
   ask: "!ask exchange",
   welcome: "Welcome card",
+  tasks: "Task list",
   break: "Break timer",
   game: "Game",
 };
@@ -204,6 +205,7 @@ export const DEFAULT_DEMO_LAYOUT: DemoLayoutConfig = {
     tts: true,
     ask: true,
     welcome: true,
+    tasks: true,
     break: false,
     // Off by default: an existing channel's overlay must not gain a window on
     // deploy, and the window shows nothing at all unless a game is configured.

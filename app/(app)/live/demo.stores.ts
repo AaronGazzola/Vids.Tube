@@ -2,6 +2,7 @@
 
 import type { GoalMetric } from "@/app/layout.types";
 import { placeholderAvatar } from "@/lib/placeholder-avatar";
+import type { StreamTask } from "@/lib/stream-tasks";
 import { useEffect, useRef } from "react";
 import { create } from "zustand";
 import {
@@ -377,6 +378,18 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+export type DemoTaskReveal = {
+  id: string;
+  previous: StreamTask[];
+  next: StreamTask[];
+};
+
+export type DemoWelcome = {
+  id: string;
+  kind: "new" | "returning" | "batch";
+  viewerKeys: string[];
+};
+
 type GeneratorState = {
   seq: number;
   viewers: DemoViewer[];
@@ -388,6 +401,8 @@ type GeneratorState = {
   tts: DemoTtsRequest[];
   asks: DemoAskRequest[];
   clips: DemoClipMarker[];
+  welcomes: DemoWelcome[];
+  taskReveals: DemoTaskReveal[];
   wrapupDone: boolean;
   seed: () => void;
   tick: () => void;
@@ -402,6 +417,8 @@ type GeneratorState = {
   playHighlight: () => void;
   playTts: () => void;
   playAsk: () => void;
+  playWelcome: () => void;
+  playTasks: () => void;
   approveTts: (id: string) => void;
   dismissTts: (id: string) => void;
   markTtsPlayed: (id: string) => void;
@@ -495,6 +512,15 @@ function seededState() {
     tts,
     asks,
     clips,
+    welcomes: [
+      { id: "demo-welcome-new", kind: "new", viewerKeys: [viewers[0].key] },
+      {
+        id: "demo-welcome-batch",
+        kind: "batch",
+        viewerKeys: viewers.slice(1, 4).map((v) => v.key),
+      },
+    ] as DemoWelcome[],
+    taskReveals: [],
     wrapupDone: false,
   };
 }
@@ -820,6 +846,53 @@ export const useDemoGeneratorStore = create<GeneratorState>((set) => ({
             status: "approved" as const,
           },
         ].slice(-20),
+      };
+    }),
+  playWelcome: () =>
+    set((s) => {
+      const seq = s.seq + 1;
+      if (!s.viewers.length) return { seq };
+      const kind = pick<DemoWelcome["kind"]>(["new", "returning", "batch"]);
+      const start = Math.floor(Math.random() * Math.max(1, s.viewers.length - 3));
+      return {
+        seq,
+        welcomes: [
+          ...s.welcomes,
+          {
+            id: `welcome-play-${seq}`,
+            kind,
+            viewerKeys:
+              kind === "batch"
+                ? s.viewers.slice(start, start + 3).map((v) => v.key)
+                : [pick(s.viewers).key],
+          },
+        ].slice(-20),
+      };
+    }),
+  // A canned before-and-after, so the reveal can be positioned and judged
+  // without saving a real list on a real broadcast. One task is ticked off, one
+  // leaves the backlog, and one appears: the three things the reveal has to
+  // show at the same moment.
+  playTasks: () =>
+    set((s) => {
+      const seq = s.seq + 1;
+      const previous: StreamTask[] = [
+        { id: "demo-task-1", text: "Wire up the overlay token", status: "completed" },
+        { id: "demo-task-2", text: "Ship the task list", status: "in_progress" },
+        { id: "demo-task-3", text: "Write the tests", status: "backlog" },
+      ];
+      const next: StreamTask[] = [
+        previous[0],
+        { ...previous[1], status: "completed" },
+        { ...previous[2], status: "todo" },
+        { id: "demo-task-4", text: "Demo it on stream", status: "backlog" },
+      ];
+      return {
+        seq,
+        taskReveals: [
+          ...s.taskReveals,
+          { id: `task-reveal-${seq}`, previous, next },
+        ].slice(-5),
       };
     }),
   approveTts: (id) =>

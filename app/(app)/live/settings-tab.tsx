@@ -51,6 +51,8 @@ import {
 import { MessageBannerField } from "./message-banner-field";
 import { ColourPicker } from "./colour-picker";
 import { useBannerMetricValues } from "./banner-metrics.hooks";
+import { TaskListEditor } from "./task-list-editor";
+import { useCarryPreviousTasks, useTaskDraftPending } from "./tasks.hooks";
 import type { BannerMetricValues } from "@/lib/banner-metrics";
 import {
   AlignCenter,
@@ -953,6 +955,37 @@ export function MessagesSection({ channelSlug }: { channelSlug: string }) {
   );
 }
 
+function TasksSection({ streamId }: { streamId: string | null }) {
+  const carry = useCarryPreviousTasks(streamId);
+  const pending = useTaskDraftPending(streamId);
+
+  return (
+    <Section title="Tasks">
+      <p className="text-xs text-muted-foreground">
+        What is being worked on this broadcast. The list is shown on the overlay
+        when it changes, and can be edited during the broadcast from the
+        Activity tab.
+      </p>
+      <TaskListEditor />
+      <div className="flex items-center gap-3">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!streamId || carry.isPending}
+          onClick={() => carry.mutate()}
+        >
+          Carry over unfinished tasks
+        </Button>
+        {pending && (
+          <span className="text-xs text-muted-foreground">
+            Not saved yet — press Save changes.
+          </span>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 type CommandDialogState = {
   id: string | null;
   keyword: string;
@@ -1192,6 +1225,7 @@ export function SettingsTab({
   form,
   setForm,
   channelSlug,
+  streamId,
   thumbnailPath,
   isPublic,
   workerRunning,
@@ -1200,6 +1234,7 @@ export function SettingsTab({
   form: SettingsForm;
   setForm: (f: SettingsForm) => void;
   channelSlug: string;
+  streamId: string | null;
   thumbnailPath: string | null;
   isPublic: boolean;
   workerRunning: boolean;
@@ -1535,6 +1570,8 @@ export function SettingsTab({
         />
       </Section>
 
+      <TasksSection streamId={streamId} />
+
       <MessagesSection channelSlug={channelSlug} />
 
       <ProjectsSection />
@@ -1588,6 +1625,10 @@ export function SettingsTab({
 // Copies a previous broadcast into the form and nothing else. Save changes is
 // still the only writer, so opening this, browsing it and picking the wrong
 // broadcast all cost nothing.
+//
+// Deliberately not the task list: tasks belong to the broadcast they were worked
+// on, and carrying unfinished ones forward is its own button in the Tasks
+// section, pressed on purpose.
 export function ReuseSettingsDialog({
   form,
   setForm,

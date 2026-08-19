@@ -255,6 +255,100 @@ async function run() {
     console.log("SKIP: no owned channel for user A to test storage RLS");
   }
 
+  // Task versions: the owner's, and nobody else's. The list is what the
+  // audience is shown during the broadcast, so the read window is opened by a
+  // policy of its own rather than by this one.
+  const { data: taskChannel } = await admin
+    .from("channels")
+    .select("id")
+    .eq("owner_user_id", a.user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (taskChannel) {
+    const clientB = createClient<Database>(url, publishableKey);
+    const { error: signInBErr } = await clientB.auth.signInWithPassword({
+      email: emailB,
+      password,
+    });
+    if (signInBErr) throw signInBErr;
+
+    const { data: taskStream, error: taskStreamErr } = await admin
+      .from("streams")
+      .insert({ channel_id: taskChannel.id, status: "idle" })
+      .select("id")
+      .single();
+    if (taskStreamErr) throw taskStreamErr;
+
+    const version = {
+      stream_id: taskStream.id,
+      channel_id: taskChannel.id,
+      items: [{ id: `t_${stamp}`, text: "rls task", status: "todo" }],
+    };
+
+    const { error: ownTaskErr } = await clientA
+      .from("stream_task_versions")
+      .insert(version);
+    assert("owner can save their own task versions", ownTaskErr === null);
+
+    const { data: ownTasks } = await clientA
+      .from("stream_task_versions")
+      .select("id")
+      .eq("stream_id", taskStream.id);
+    assert("owner can read their own task versions", (ownTasks?.length ?? 0) === 1);
+
+    const { data: otherTasks } = await clientB
+      .from("stream_task_versions")
+      .select("id")
+      .eq("stream_id", taskStream.id);
+    assert(
+      "non-owner cannot read task versions of an idle broadcast (zero rows)",
+      (otherTasks?.length ?? 0) === 0
+    );
+
+    const { data: anonTasks } = await anon
+      .from("stream_task_versions")
+      .select("id")
+      .eq("stream_id", taskStream.id);
+    assert(
+      "anonymous cannot read task versions of an idle broadcast (zero rows)",
+      (anonTasks?.length ?? 0) === 0
+    );
+
+    const { error: otherWriteErr } = await clientB
+      .from("stream_task_versions")
+      .insert(version);
+    assert("non-owner cannot write task versions", otherWriteErr !== null);
+
+    // While the broadcast is live the list is on screen in front of the
+    // audience, so the overlay reads it without the service role.
+    await admin
+      .from("streams")
+      .update({ status: "live" })
+      .eq("id", taskStream.id);
+
+    const { data: liveTasks } = await anon
+      .from("stream_task_versions")
+      .select("id")
+      .eq("stream_id", taskStream.id);
+    assert(
+      "task versions of a live broadcast are readable",
+      (liveTasks?.length ?? 0) === 1
+    );
+
+    const { error: liveWriteErr } = await clientB
+      .from("stream_task_versions")
+      .insert(version);
+    assert(
+      "non-owner still cannot write task versions on a live broadcast",
+      liveWriteErr !== null
+    );
+
+    await admin.from("streams").delete().eq("id", taskStream.id);
+  } else {
+    console.log("SKIP: no owned channel for user A to test task version RLS");
+  }
+
   await admin.from("channels").delete().eq("owner_user_id", a.user.id);
   await admin.auth.admin.deleteUser(a.user.id);
   await admin.auth.admin.deleteUser(b.user.id);
