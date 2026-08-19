@@ -47,7 +47,8 @@ async function main() {
   for (const m of memberships) {
     const lines = byMembership.get(m.id) ?? [];
     const earnedLines = lines.filter((l) => l.kind === "earned");
-    const spendLines = lines.filter((l) => l.kind !== "earned");
+    const joinedLines = lines.filter((l) => l.kind === "joined");
+    const spendLines = lines.filter((l) => l.kind !== "earned" && l.kind !== "joined");
     const sum = lines.reduce((a, l) => a + l.amount, 0);
 
     if (earnedLines.length > 1) {
@@ -60,11 +61,17 @@ async function main() {
         `${m.id}: earning line ${earnedLines[0].amount} but ${m.lifetime_xp} XP should give ${expectedEarned(m.lifetime_xp)}`
       );
     }
+    if (joinedLines.length > 1) {
+      failures.push(`${m.id}: ${joinedLines.length} joined lines, expected at most 1`);
+    }
+    if (joinedLines.some((l) => l.amount <= 0)) {
+      failures.push(`${m.id}: a joined line has a non-positive amount`);
+    }
     if (m.credits !== sum) {
       failures.push(`${m.id}: cached credits ${m.credits} but ledger sums to ${sum}`);
     }
     if (spendLines.some((l) => l.amount >= 0)) {
-      failures.push(`${m.id}: a non-earning line has a non-negative amount`);
+      failures.push(`${m.id}: a spend line has a non-negative amount`);
     }
 
     totalEarned += earnedLines.reduce((a, l) => a + l.amount, 0);
