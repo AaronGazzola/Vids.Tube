@@ -34,7 +34,7 @@ Sensitive means: email addresses, JSON Web Tokens, bearer tokens and API keys, s
 - All responses should be extremely concise, specific and focused on what the user needs to know
 - Any skills from the "AI Resources" repository (public; owned by AaronGazzola) should match any changes made to the local version. 
 - Don't include any comments in any files.
-- Don't use `console.log` in any app code unless requested, delete all logs after the related development is completed
+- Don't use `console.log` in any app code unless requested
 - Error handling follows the expected-vs-unexpected split (see "Error handling in actions" below) - no silent "fallback" functionality
 - All errors should be logged with `console.error`
 - Import "cn" from "@/lib/utils" to concatenate classes.
@@ -222,6 +222,66 @@ In order to query the database, create and run a custom typescript script. (Do n
 
 `npx supabase gen types typescript --project-id <project-ref> > supabase/types.ts`
 
+# Where work happens: worktrees and branches
+
+Development sessions are streamed, and the app and worker being demonstrated are running locally out of **this** directory. An agent editing files here recompiles the running app mid-stream. So **implementation happens in a separate worktree, and this directory changes only when the owner says so** — one merge, one reload, at a moment of their choosing.
+
+Three branches, one long-lived checkout:
+
+- **`dev`** is checked out here, in the **streaming worktree** (`C:\Users\azgaz\Documents\Projects\Vids.Tube`). This is the only place `npm run dev`, `npm run worker` and the maintenance task ever run.
+- **A branch per OpenSpec change**, cut from `dev`, checked out in its own worktree outside this folder. All implementation happens there.
+- **`main`** is the published branch. It is never checked out locally; pushing to it deploys to production.
+
+## Starting a change
+
+```bash
+git worktree add ../Vids.Tube.worktrees/<change-id> -b change/<change-id> dev
+```
+
+- Worktrees live **outside** the project folder. A worktree inside it is watched by the running dev server, which then recompiles on every agent edit — the exact interruption this whole arrangement exists to prevent.
+- **Never run `npm install` in a feature worktree.** Link the existing modules instead, from inside the new worktree:
+
+  ```powershell
+  New-Item -ItemType Junction -Path node_modules -Target "C:\Users\azgaz\Documents\Projects\Vids.Tube\node_modules"
+  ```
+
+  Installing through that junction writes into the live tree, so don't. When a change genuinely needs a new dependency, **stop and ask the owner to install it** rather than installing it yourself.
+- `doppler.yaml` is committed, so secrets resolve in a fresh worktree with no setup step.
+
+## Verifying in a feature worktree
+
+Nothing is served from a feature worktree. No `npm run dev`, no `npm run worker`, no `maintain:install` — those ports and that scheduled task belong to the streaming worktree, which is on screen. Verification is `npx tsc --noEmit`, `npm run lint`, unit tests and read-only scripts. `next build` is a CPU spike on the machine that is encoding video; run it only when asked.
+
+**Migrations are written but not pushed.** Supabase is remote-only and there is a single project, shared with whatever is on screen. `npx supabase db push` from a feature worktree changes the database under the live demonstration. Write the migration file in the worktree; push it after the merge, on the owner's word.
+
+## Merging into the streaming worktree
+
+Merging is the owner's call, never the agent's own initiative, and it is deliberately one recompile:
+
+```bash
+git -C C:/Users/azgaz/Documents/Projects/Vids.Tube merge --no-ff change/<change-id>
+```
+
+- It must run **from the streaming worktree**. Git refuses to move a branch that is checked out elsewhere, so a feature worktree cannot update `dev` by itself — which is the point.
+- That tree usually holds uncommitted parallel work. If git refuses the merge because of local changes, **stop and report it.** Never stash, force, reset or check out over it.
+- Commit in the feature worktree as work progresses, so a merge is always available the moment it is asked for.
+
+## Publishing to viewers
+
+```bash
+git push origin dev:main   # deploys to production
+git branch -f main dev     # keep the local ref in step
+```
+
+## Finishing
+
+Remove the worktree when the change is archived:
+
+```bash
+git worktree remove ../Vids.Tube.worktrees/<change-id>
+git branch -d change/<change-id>
+```
+
 # Spec & task governance
 
 How OpenSpec changes and deferred work are managed. These rules exist to prevent process poisoning (incomplete active changes being treated as a mandate and re-implemented, causing regressions) and corner-cutting, and to keep each spec small, specific, and unambiguous so its tasks pin down exactly what will be done and how. Follow them exactly.
@@ -233,6 +293,7 @@ How OpenSpec changes and deferred work are managed. These rules exist to prevent
 5. **No silent checking.** Check a task box only with evidence the work is actually done. "Done but unverifiable right now" becomes a Linear verification issue — never a checked box.
 6. **Specs are small and specific.** Keep each change narrow — one coherent piece of work, not a grab-bag. Every task must describe exactly *what* will be done and *how* it will be done (which file, which function, which behavior), so there is no room to improvise or take shortcuts at implementation time. A task a reader could satisfy two different ways is underspecified — tighten it.
 7. **Resolve ambiguity before writing, through discussion.** When anything about a spec is unclear or could be read more than one way, stop and discuss it with the user until it is settled — never paper over it with a vague task or a guessed assumption. Ambiguity is resolved in the spec, not deferred to implementation.
+8. **A change is built in its own worktree.** The branch and worktree are created when the proposal is approved and removed when the change is archived — see "Where work happens". No implementation is ever written in the streaming worktree; it only receives merges, on the owner's word.
 
 
 **Backlog location:** Linear, Gazzola (personal) workspace, **"Az"** team, **"Vids.Tube"** project. Read open issues there before starting deferred work.
@@ -270,6 +331,7 @@ changing anything it covers, and update it when the behaviour it describes chang
 
 Two rules that keep costing time when forgotten:
 
+- **The worker, the dev server and the maintenance task run from the streaming worktree only.** Every runbook below assumes it; feature worktrees serve nothing — see "Where work happens".
 - **The live worker (`npm run worker`) engages broadcasts and nothing else.** It does not settle a finished one. Stopping it the moment a stream ends is correct and loses nothing.
 - **Tool paths are found, not configured.** `worker/lib/resolve-bin.ts` resolves the Claude CLI, ffmpeg and whisper by trying the configured value, the same path under the current user's home, then the usual install locations. Never edit a Doppler path to make a tool resolve: those values are shared across machines and user accounts, so fixing one account breaks another.
 

@@ -18,6 +18,8 @@ doppler login && doppler setup        # select the prd config
 npm run maintain:install
 ```
 
+On the streaming machine, run this from the **streaming worktree** and nowhere else — the scheduled task records the path it was installed from, so installing from a feature worktree points maintenance at a branch that is about to be deleted. See "Where work happens" in `CLAUDE.md`.
+
 That is the whole thing. `maintain:install` runs one sweep first and refuses to
 install if it fails, so a machine that cannot do the work says so immediately
 rather than every 30 minutes into a log nobody reads.
