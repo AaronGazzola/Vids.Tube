@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Refresh the local skills from the shared skills repo first, including this one, then pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs and Supabase, read and delete any handover document left for this session, then report in /simple format on branches, tickets, specs and roadmap position, ending with next steps. Hard-fails if git, the Linear MCP or the Supabase MCP is unreachable. Invoke with /sync.
+description: Refresh the local skills from the shared skills repo first, including this one, then pull the latest git state and sync it against Linear, OpenSpec, the roadmap docs and Supabase, read and delete any handover document left for this session, then report the branch position and any loose end with no ticket behind it, and close by rendering the full ordered work list through the tasks skill. Absences are never printed. Hard-fails if git or the Linear MCP is unreachable. Invoke with /sync.
 ---
 
 # /sync — project state sync + next-steps report
@@ -34,23 +34,26 @@ Read `.claude/sync.config.json` at the repo root.
 
 ## 1. Access gate — fail loudly, never report partially
 
-Before gathering, confirm the three **required** sources are reachable:
+Two sources are **required**, because the report's main body is the task list and
+the task list cannot be built without them:
 
 | Source | Check |
 | --- | --- |
 | git | `git rev-parse --is-inside-work-tree` and `git fetch` both succeed |
 | Linear MCP | `list_teams` (or `list_projects`) returns the configured team/project |
-| Supabase MCP | `list_projects` returns `supabase.projectRef` |
 
-If any required source is unreachable — an MCP server not connected, no network,
-`projectRef` absent from the account the MCP is connected to — **stop**. Report
-exactly which source failed and the one-off command or connector setup the user
-must do themselves. **Do not produce the report from partial data**, and do not
-substitute inference for a source you could not read.
+If either is unreachable — an MCP server not connected, no network, no team or
+project matching the config — **stop**. Report exactly which source failed and
+the one-off command or connector setup the user must do themselves. **Do not
+produce the report from partial data**, and do not substitute inference for a
+source you could not read.
 
-There is no fallback path for Supabase. The Supabase MCP must be connected. Do
-not substitute the Supabase CLI, and do not report a database section built from
-migration files alone.
+Every other source is **reported when reachable and named when not**. Where
+Supabase, Doppler, Sentry or Trigger.dev cannot be read, the run continues, and
+one bullet under **Could not be gathered** names the source and the action that
+fixes it. A source that could not be read is never inferred from something else:
+no database section is built from migration files alone, and the Supabase CLI is
+not substituted for the Supabase MCP.
 
 ## 2. Shared skills repo — `skills.enabled`
 
@@ -196,15 +199,23 @@ Spot-check the files named in unchecked tasks to decide which bucket applies.
 
 Scope every query to `linear.team` + `linear.project` from config.
 
-- `list_issues` for states In Progress, Todo, and In Review, ordered by priority.
-- For each: identifier, title, state, priority, labels (phase labels matter), and
-  whether it maps to an active OpenSpec change or a git branch.
-- Separate three groups explicitly:
-  - **In progress needing verification only** — the code exists; the ticket is
-    open because it has not been tested/confirmed. Say what test closes it.
-  - **In progress with code still to write.**
-  - **Backlog ideas** — never build straight from these; per governance a backlog
-    item must first be promoted into a new OpenSpec change.
+**Gather what the `tasks` skill's own gather step asks for**, so that step 5 can
+render from context without reading Linear a second time. Read
+`.claude/skills/tasks/SKILL.md` and follow its Linear gather rules, which in
+summary are:
+
+- `list_issues` for the confirmed team and project, for **every state whose type
+  is `started`, `unstarted`, `backlog` or `triage`**. Do not filter by state
+  name; workspaces rename states, and a renamed state must not vanish silently.
+- `list_issue_statuses` for the team, to map each state to its type.
+- Per issue: identifier, title, state and state type, priority, labels, assignee
+  presence, whether an OpenSpec change or a branch is named, and whether another
+  issue is named as a blocker or a parent.
+- Descriptions for every `started` issue, every issue matched to a change, and
+  any issue whose title does not say what the work is.
+
+Grouping, pairing and ordering are the `tasks` skill's job, not this one's. Do
+not pre-group here.
 
 ### Code cross-reference
 
@@ -234,10 +245,10 @@ Read the paths listed in `docs.roadmap`. If the config lists none, search
   dates of recent feature commits.
 - Check whether items marked "planned"/"next" are already shipped in code, and
   whether shipped work is missing from the doc.
-- Verdict per doc: **current** or **stale**, naming the specific lines that are
-  wrong.
-- Then one line stating where the project actually stands: which phase is done,
-  which is in flight, what the next milestone is.
+- **Report a roadmap document only when it contradicts the code**, naming the
+  specific lines that are wrong. A document that matches is not mentioned.
+- Where the project's actual phase position matters, it is carried by the task
+  list, not stated as a verdict here.
 
 ### Handover documents — always, and read before anything is concluded
 
@@ -278,7 +289,7 @@ names the deleted path.
 
 ### Optional integrations
 
-Run only when enabled, and give each one line in the report unless it is red:
+Run only when enabled, and report each **only** when it is red or unreachable:
 Doppler (`doppler configs`, `doppler secrets --only-names` — names only, never
 values; flag if the locally selected config differs from `doppler.config`),
 Sentry (unresolved issues from the last 48h by event count), Trigger.dev (recent
@@ -287,82 +298,133 @@ run statuses; flag failed or stuck).
 ## 4. Report
 
 Everything gathered above is held in context so the user can ask follow-up
-questions. Almost none of it is printed. The report is a **synthesis, not an
-inventory**: the user is being told where the project stands and what to do
-next, in the fewest bullets that carry the meaning.
+questions. Almost none of it is printed. The report answers one question: *what
+changed, what is broken, and what should be picked up first?*
 
-Write it in **`/simple` format** — read `.claude/skills/simple/SKILL.md` and
-follow it exactly: bold one-line section titles that are not list items,
+The last of those three is not written here. **The ordered list of open work is
+rendered by the `tasks` skill**, and this skill's own sections carry only what
+that list cannot.
+
+### Never print an absence
+
+A bullet exists to change what the user does next. A bullet saying that nothing
+happened cannot do that, so it is not written.
+
+- **Never state that something was not found, was clean, matched, or agreed.**
+  No "no handover document was found", no "skills matched the shared repo", no
+  "migrations are aligned", no "everything gathered".
+- **Never state that the gathering happened.** The report is the evidence.
+- An area with nothing wrong is silent. Its section is omitted, without comment.
+- The two exceptions, which are statements rather than absences: a source that
+  **could not** be gathered, and a handover document that **was** read.
+
+### Route every fact to the list first
+
+The task list is the main body of the report. Before a fact is written into a
+section here, ask whether it belongs on a task line instead, and where it does,
+put it there and write nothing here.
+
+Facts that belong to the task list, never to a section of this skill:
+
+- Anything with a Linear ticket or an OpenSpec change behind it, including a
+  security hole that already has a ticket.
+- How many changes are active and how far along each one is.
+- Work that is code-complete and waiting on a live broadcast or a test.
+- Verification tickets held against a finished phase.
+- Dead work: cancelled tickets, duplicates, and branches or worktrees holding
+  nothing unique.
+
+What stays here, because no ticket or change holds it:
+
+- A source that could not be gathered.
+- A handover document that was read.
+- The branch position, and any branch holding work that is not merged or not
+  pushed.
+- Uncommitted paths in this worktree.
+- A roadmap document that contradicts the code.
+- A skill whose local version is newer than the shared repo's.
+- A security or database finding with no ticket behind it, which is then named
+  as needing one.
+
+### Length and shape
+
+Follow the `/simple` format: read `.claude/skills/simple/SKILL.md` and apply it,
+with the same exceptions the `tasks` skill takes, so both halves of the report
+read as one document. Bold one-line section titles that are not list items,
 bulleted facts only, no prose paragraphs, no numbered lists, passive voice, no
 pronouns as subjects, every tool and service named directly, no commit hashes,
 no em-dashes, dates as D-Mon-YYYY.
 
-### What the report is for
-
-The user reads this to answer one question: *what do I need to know to keep
-going?* Every bullet earns its place by changing what the user does next. A
-bullet that merely proves the gathering happened is deleted.
-
-- **Synthesize, do not enumerate.** State the conclusion drawn from a source,
-  not the rows read from the source.
-  - Rejected: six bullets, one per advisory.
-  - Accepted: "Six database warnings are open, none high risk."
-- **Green gets one reassuring bullet, never a list.** Where an area is aligned
-  and needs no action, say so in one line and move on.
-  - Accepted: "Database migrations are aligned between the repository and Supabase."
-- **Dead work is one bullet, as a group.** Abandoned branches, superseded
-  approaches and cancelled tickets are named as a count and a shared cause, never
-  itemised. Where dead work needs a decision, that decision is the bullet.
-- **Name a thing only where the user must act on that thing.** A ticket
-  identifier, spec name or branch name appears when the user will open it. It
-  does not appear as evidence.
-- **No inventories of healthy things.** Branches with no work in progress,
-  passing checks, and integrations that are fine are all silent.
-
-### Length
-
-- The whole report fits on one screen.
-- At most 4 bullets under any section title, and at most one level of nesting.
-- Nesting is used only where a next step needs its condition stated.
-- Where a section would exceed 4 bullets, the bullets are being enumerated
-  instead of synthesized: collapse them.
+- The sections before the task list fit in well under half a screen.
+- At most 4 bullets under any section title.
+- Nested unordered bullets throughout, in the same shape the `tasks` skill uses:
+  a short top line that stands on its own, and any qualifier nested beneath it
+  rather than added as a clause.
+- A bullet needing a second clause is a bullet and a nested bullet.
 
 ### Sections
 
-Use only these, in this order. Omit any section with nothing to say.
+Use only these, in this order, then the task list. Omit any section with nothing
+to say, without comment.
 
-- **Handover read and deleted** — one bullet per handover document handled, at
-  most 3, omitted entirely when none was found.
-  - Each bullet carries the document's date, whether the document was current or
-    stale, one clause saying what the document contained, and that the document
-    was deleted.
-  - The contents themselves are not reproduced: what a handover document says
-    about the project belongs in the sections below, confirmed against the code.
-- **Where things stand** — the position, in at most 4 bullets.
-  - Which branch is checked out, whether that branch holds the latest work, and
-    whether anything is undeployed.
-  - Whether the roadmap, the active spec and the tickets agree on the current
-    direction, said as one judgement rather than three verdicts.
-  - How far through the current phase the work is.
-  - Anything abandoned, as a single grouped bullet.
-- **Needs attention** — at most 4 loose ends, each one the user must decide or
-  clean up. State what is wrong and what closes it, in one line each.
-  - A skill whose local version is newer than the shared repo's belongs here, as
-    the one question it raises: push the local version, or not.
-- **Continue here** — at most 4 next actions, in priority order, each beginning
-  with the spec, ticket or branch and then the verb.
-  - Nest a condition only where an action cannot start without it.
-- **Next batch** — at most 3 tickets recommended for the block of work after the
-  current one, one line each saying why the ticket is ready. Include only when
-  the current work is near enough to done that the question is live.
+- **Could not be gathered** — one bullet per source that failed, naming the
+  source and, nested, the one action that fixes it.
+- **Handover** — only when a handover document was found. One bullet per
+  document, at most 3, carrying its date, one clause on what it contained, and
+  that it was deleted.
+  - What a handover document claims about the project is not reproduced. It is
+    confirmed against the code and reported as a task or as a finding below.
+- **Branches** — the position in at most 4 bullets.
+  - Which branch is checked out and how it sits against the trunk and its
+    upstream, with the reason nested where a difference is unimportant.
+  - Any other branch holding work that is neither merged nor pushed.
+  - Uncommitted or untracked paths in this worktree, as one bullet naming them.
+- **Needs attention** — at most 4 loose ends that no task line already carries,
+  each stating what is wrong on the top line and what closes it nested beneath.
 
-Close with a single line offering the detail held in context, naming the areas
-where detail exists. That line is not a section and carries no bullet.
+Worked shape for **Branches**:
 
-Priority order within **Continue here**: unblock anything red first; then verify
-and archive work that is already code-complete; then finish the in-progress spec;
-then reconcile a stale document or ticket; and only then start new work promoted
-from a backlog item.
+- `dev` is checked out and level with its remote, one commit ahead of `main`.
+  - That commit changes documentation only, so nothing of substance is
+    undeployed.
+- Three paths are uncommitted here, including an untracked `tasks` skill folder
+  that matches the shared repo.
+  - Committing it is all that is needed.
+
+Rejected:
+
+- "`dev` is checked out, holds the latest work and is level with the remote;
+  `main` sits one documentation-only commit behind." Three facts in one line,
+  where two of them are qualifiers.
+- "The roadmap, the active specs and the tickets agree on direction." An
+  absence. Alignment is reported only when it is broken.
+
+## 5. The task list
+
+Render the open work by following the `tasks` skill, and print its output as the
+final and largest part of the report.
+
+- **Read `.claude/skills/tasks/SKILL.md` from disk and follow it**, after step 2
+  has run. Step 2 may have just replaced that file, so the version in context at
+  the start of the run is not the one to follow.
+- **Do not gather twice.** Everything the `tasks` skill gathers has already been
+  gathered above: the Linear issues, the active changes and their task files, and
+  the branch list. Render from what is in context, and read only what is
+  genuinely missing, such as the description of an issue not yet pulled.
+- **Follow its grouping, categorising, ordering, capping and two-level line shape
+  exactly.** No group is added, renamed or merged to suit this report.
+- **Pass on the wider context.** This skill has read the roadmap, the deployment
+  position, the database advisors, the dirty worktree and any handover document,
+  and the `tasks` skill on its own has none of that. Use it where it changes
+  which task is most pressing, and say on the line why the placement was made.
+- Its **Open items** section is kept, and it holds the record-level
+  inconsistencies. **Needs attention** above holds only findings with no record
+  at all, so nothing is written in both.
+
+The `tasks` skill ends with a single line offering the detail held in context.
+**That line closes the whole report, and it is written once.** Widen it to name
+this skill's areas too, such as the roadmap, the database and the deployment
+position, rather than adding a second closing line beneath it.
 
 ## Installing into a new project
 
